@@ -4,28 +4,34 @@
 
 BatchMaster ERP is a Manufacturing Execution System (MES) and batch tracking application designed for chemical/process manufacturing operations. The system manages orders, production batches, inventory (raw materials and finished goods), product recipes/bill of materials (BOM), lot traceability, and quality control workflows.
 
-The application follows a full-stack TypeScript architecture with a React frontend and Express backend, using PostgreSQL for data persistence.
+The application follows a full-stack TypeScript architecture with a React frontend and Express backend, using PostgreSQL for data persistence. All measurements are in KG (Kilograms).
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+## Recent Changes
+
+- **Jan 7, 2026**: Connected all frontend pages to real PostgreSQL database via REST API with React Query. Added proper loading and error states to all pages.
+- **Jan 7, 2026**: Created complete database schema with 15+ tables including products, materials, lots, recipes, batches, orders, quality checks, stock movements, and audit logs.
+- **Jan 7, 2026**: Implemented database seeding with sample data for testing.
 
 ## System Architecture
 
 ### Frontend Architecture
 - **Framework**: React 18 with TypeScript
 - **Routing**: Wouter (lightweight React router)
-- **State Management**: TanStack React Query for server state
+- **State Management**: TanStack React Query for server state with proper loading/error handling
 - **UI Components**: shadcn/ui component library built on Radix UI primitives
 - **Styling**: Tailwind CSS v4 with CSS variables for theming
 - **Build Tool**: Vite
 
 The frontend is organized with:
-- Pages in `client/src/pages/` for each major feature (Dashboard, Orders, Production, Inventory, Products, Traceability, Quality)
+- Pages in `client/src/pages/` for each major feature (Dashboard, Orders, Production, Inventory, Products, Traceability)
 - Reusable UI components in `client/src/components/ui/`
 - Layout components in `client/src/components/layout/`
 - Custom hooks in `client/src/hooks/`
-- Mock data in `client/src/lib/mockData.ts` for development
+- API client with React Query hooks in `client/src/lib/api.ts`
 
 ### Backend Architecture
 - **Framework**: Express.js with TypeScript
@@ -35,8 +41,10 @@ The frontend is organized with:
 
 The backend follows a modular structure:
 - `server/index.ts` - Express app setup and middleware
-- `server/routes.ts` - API route registration
-- `server/storage.ts` - Data access layer interface (currently in-memory, designed for database migration)
+- `server/routes.ts` - API route registration for all resources
+- `server/storage.ts` - Data access layer with DatabaseStorage class using Drizzle ORM
+- `server/db.ts` - PostgreSQL connection setup with Drizzle
+- `server/seed.ts` - Database seeding script with sample data
 - `server/vite.ts` - Development server with Vite HMR integration
 - `server/static.ts` - Production static file serving
 
@@ -44,13 +52,38 @@ The backend follows a modular structure:
 - **Schema Location**: `shared/schema.ts` - Shared between frontend and backend
 - **Database**: PostgreSQL (configured via DATABASE_URL environment variable)
 - **Migrations**: Drizzle Kit with migrations output to `./migrations`
-- **Current Schema**: Basic users table with UUID primary keys
 
-The storage layer uses an interface pattern (`IStorage`) allowing easy swapping between in-memory storage (development) and database storage (production).
+#### Database Tables:
+- **products** - Finished goods with SKU, stock levels
+- **materials** - Raw materials with SKU, stock levels
+- **lots** - Lot tracking with expiry dates, supplier lots, traceability
+- **recipes** - Versioned product formulations
+- **recipeItems** - Bill of materials for each recipe
+- **batches** - Production batches with status workflow (planned → in_progress → quality_check → completed → released)
+- **batchMaterials** - Material lots used in each batch (for traceability)
+- **orders** - Customer orders with priority and status
+- **orderItems** - Line items for each order
+- **qualityChecks** - QC records for batches
+- **stockMovements** - Inventory movement audit trail
+- **auditLogs** - Immutable system-wide audit logging
+
+### API Endpoints
+- `GET/POST /api/products` - Product CRUD
+- `GET/POST /api/materials` - Material CRUD
+- `GET/POST /api/lots` - Lot tracking
+- `GET/POST /api/recipes` - Recipe management
+- `GET /api/recipes/:id/items` - Recipe ingredients
+- `GET/POST /api/batches` - Batch management
+- `GET/POST /api/orders` - Order management
+- `GET /api/orders/:id/items` - Order line items
+- `GET /api/dashboard/stats` - Dashboard statistics
+- `GET /api/traceability/forward/:lotId` - Forward lot traceability
+- `GET /api/traceability/backward/:batchId` - Backward batch traceability
 
 ### Build System
 - **Development**: `npm run dev` - Runs Express server with Vite middleware for HMR
 - **Production Build**: `npm run build` - Uses esbuild for server bundling, Vite for client
+- **Database**: `npm run db:push` - Push schema changes to PostgreSQL
 - **Output**: `dist/` directory with `index.cjs` (server) and `public/` (client assets)
 
 ## External Dependencies
