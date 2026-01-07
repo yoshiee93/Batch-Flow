@@ -9,20 +9,32 @@ import { format } from 'date-fns';
 import { useOrders, useProducts, useMaterials, useOrderItems, useDashboardStats } from '@/lib/api';
 
 export default function Dashboard() {
-  const { data: orders = [], isLoading: ordersLoading } = useOrders();
-  const { data: products = [], isLoading: productsLoading } = useProducts();
-  const { data: materials = [], isLoading: materialsLoading } = useMaterials();
+  const { data: orders = [], isLoading: ordersLoading, isError: ordersError } = useOrders();
+  const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
+  const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: stats } = useDashboardStats();
 
   const activeOrders = orders.filter(o => ['pending', 'in_production'].includes(o.status));
   const lowStockMaterials = materials.filter(m => parseFloat(m.currentStock) <= parseFloat(m.minStock));
 
   const isLoading = ordersLoading || productsLoading || materialsLoading;
+  const hasError = ordersError || productsError || materialsError;
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Failed to load data</h2>
+        <p className="text-muted-foreground mb-4">There was an error loading the dashboard data. Please try refreshing the page.</p>
+        <Button onClick={() => window.location.reload()}>Refresh Page</Button>
       </div>
     );
   }

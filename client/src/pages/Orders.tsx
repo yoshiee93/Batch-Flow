@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function Orders() {
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: orders = [], isLoading } = useOrders();
+  const { data: orders = [], isLoading, isError } = useOrders();
   const { data: products = [] } = useProducts();
   const updateOrder = useUpdateOrder();
   const { toast } = useToast();
@@ -44,6 +44,17 @@ export default function Orders() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Failed to load orders</h2>
+        <p className="text-muted-foreground mb-4">There was an error loading the orders. Please try refreshing the page.</p>
+        <Button onClick={() => window.location.reload()}>Refresh Page</Button>
       </div>
     );
   }

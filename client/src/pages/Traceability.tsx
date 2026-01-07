@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, ArrowRight, ArrowLeft, Box, Factory, Loader2 } from 'lucide-react';
+import { Search, ArrowRight, ArrowLeft, Box, Factory, Loader2, AlertCircle } from 'lucide-react';
 import { useLots, useBatches, useTraceabilityForward, useTraceabilityBackward } from '@/lib/api';
 
 export default function Traceability() {
@@ -12,13 +12,15 @@ export default function Traceability() {
   const { data: lots = [] } = useLots();
   const { data: batches = [] } = useBatches();
   
-  const { data: forwardTrace, isLoading: forwardLoading } = useTraceabilityForward(
+  const { data: forwardTrace, isLoading: forwardLoading, isError: forwardError } = useTraceabilityForward(
     searchId?.type === 'lot' ? searchId.id : ''
   );
   
-  const { data: backwardTrace, isLoading: backwardLoading } = useTraceabilityBackward(
+  const { data: backwardTrace, isLoading: backwardLoading, isError: backwardError } = useTraceabilityBackward(
     searchId?.type === 'batch' ? searchId.id : ''
   );
+
+  const hasError = forwardError || backwardError;
 
   const handleTrace = () => {
     const lot = lots.find(l => l.lotNumber.toLowerCase() === query.toLowerCase() || l.supplierLot?.toLowerCase() === query.toLowerCase());
@@ -69,11 +71,20 @@ export default function Traceability() {
         </div>
       )}
 
-      {forwardTrace && searchId?.type === 'lot' && (
+      {hasError && (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Failed to load traceability data</h2>
+          <p className="text-muted-foreground mb-4">There was an error retrieving the trace data. Please try again.</p>
+          <Button onClick={() => setSearchId(null)}>Clear and Try Again</Button>
+        </div>
+      )}
+
+      {forwardTrace && searchId?.type === 'lot' && !hasError && (
         <ForwardTraceView trace={forwardTrace} />
       )}
 
-      {backwardTrace && searchId?.type === 'batch' && (
+      {backwardTrace && searchId?.type === 'batch' && !hasError && (
         <BackwardTraceView trace={backwardTrace} />
       )}
 

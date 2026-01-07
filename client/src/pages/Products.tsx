@@ -4,16 +4,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, Package, FileText, Plus, Loader2 } from 'lucide-react';
+import { Search, Package, FileText, Plus, Loader2, AlertCircle } from 'lucide-react';
 import { useProducts, useRecipes, useMaterials, useRecipeItems } from '@/lib/api';
 
 export default function Products() {
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: products = [], isLoading: productsLoading } = useProducts();
-  const { data: recipes = [], isLoading: recipesLoading } = useRecipes();
+  const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
+  const { data: recipes = [], isLoading: recipesLoading, isError: recipesError } = useRecipes();
   const { data: materials = [] } = useMaterials();
 
   const isLoading = productsLoading || recipesLoading;
+  const hasError = productsError || recipesError;
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -24,6 +25,17 @@ export default function Products() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Failed to load products</h2>
+        <p className="text-muted-foreground mb-4">There was an error loading the products data. Please try refreshing the page.</p>
+        <Button onClick={() => window.location.reload()}>Refresh Page</Button>
       </div>
     );
   }

@@ -2,7 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Play, Pause, CheckSquare, AlertCircle, Loader2, MoreHorizontal } from 'lucide-react';
+import { Plus, Play, CheckSquare, AlertCircle, Loader2, MoreHorizontal } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   DropdownMenu,
@@ -16,7 +16,7 @@ import { useBatches, useProducts, useUpdateBatch } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Production() {
-  const { data: batches = [], isLoading } = useBatches();
+  const { data: batches = [], isLoading, isError } = useBatches();
   const { data: products = [] } = useProducts();
   const updateBatch = useUpdateBatch();
   const { toast } = useToast();
@@ -34,6 +34,17 @@ export default function Production() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Failed to load batches</h2>
+        <p className="text-muted-foreground mb-4">There was an error loading the production data. Please try refreshing the page.</p>
+        <Button onClick={() => window.location.reload()}>Refresh Page</Button>
       </div>
     );
   }

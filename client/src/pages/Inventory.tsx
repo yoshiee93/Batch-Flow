@@ -5,16 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Filter, Plus, FileDown, Loader2 } from 'lucide-react';
+import { Search, Filter, Plus, FileDown, Loader2, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMaterials, useLots } from '@/lib/api';
 
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: materials = [], isLoading: materialsLoading } = useMaterials();
-  const { data: lots = [], isLoading: lotsLoading } = useLots();
+  const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
+  const { data: lots = [], isLoading: lotsLoading, isError: lotsError } = useLots();
 
   const isLoading = materialsLoading || lotsLoading;
+  const hasError = materialsError || lotsError;
 
   const filteredMaterials = materials.filter(m => 
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -30,6 +31,17 @@ export default function Inventory() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Failed to load inventory</h2>
+        <p className="text-muted-foreground mb-4">There was an error loading the inventory data. Please try refreshing the page.</p>
+        <Button onClick={() => window.location.reload()}>Refresh Page</Button>
       </div>
     );
   }
