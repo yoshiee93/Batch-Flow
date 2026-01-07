@@ -1,29 +1,41 @@
 import { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, Package, FileText, Plus } from 'lucide-react';
-import { mockProducts, mockRecipes, mockMaterials } from '@/lib/mockData';
+import { Search, Package, FileText, Plus, Loader2 } from 'lucide-react';
+import { useProducts, useRecipes, useMaterials, useRecipeItems } from '@/lib/api';
 
 export default function Products() {
   const [searchTerm, setSearchTerm] = useState('');
+  const { data: products = [], isLoading: productsLoading } = useProducts();
+  const { data: recipes = [], isLoading: recipesLoading } = useRecipes();
+  const { data: materials = [] } = useMaterials();
 
-  const filteredProducts = mockProducts.filter(p => 
+  const isLoading = productsLoading || recipesLoading;
+
+  const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-mono">Products & BOM</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-mono" data-testid="text-products-title">Products & BOM</h1>
           <p className="text-muted-foreground mt-1">Manage finished goods and formulations.</p>
         </div>
-        <Button>
+        <Button data-testid="button-new-product">
           <Plus size={16} className="mr-2" /> New Product
         </Button>
       </div>
@@ -35,6 +47,7 @@ export default function Products() {
           className="border-none shadow-none focus-visible:ring-0"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          data-testid="input-search-products"
         />
       </div>
 
@@ -51,9 +64,9 @@ export default function Products() {
           </TableHeader>
           <TableBody>
             {filteredProducts.map((product) => {
-              const recipe = mockRecipes.find(r => r.productId === product.id);
+              const recipe = recipes.find(r => r.productId === product.id);
               return (
-                <TableRow key={product.id}>
+                <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
                   <TableCell className="font-mono font-medium">{product.sku}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -62,60 +75,87 @@ export default function Products() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {product.currentStock} {product.unit}
+                    {parseFloat(product.currentStock).toFixed(0)} {product.unit}
                   </TableCell>
                   <TableCell className="text-center">
                     {recipe ? (
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8">
-                             <FileText size={14} className="mr-2" />
-                             v{recipe.version}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md">
-                          <DialogHeader>
-                            <DialogTitle className="font-mono">Recipe: {product.name} (v{recipe.version})</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="bg-muted p-4 rounded-md text-sm font-mono">
-                               {recipe.instructions}
-                            </div>
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Material</TableHead>
-                                  <TableHead className="text-right">Ratio</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {recipe.items.map((item, idx) => {
-                                  const mat = mockMaterials.find(m => m.id === item.materialId);
-                                  return (
-                                    <TableRow key={idx}>
-                                      <TableCell>{mat?.name}</TableCell>
-                                      <TableCell className="text-right font-mono">{item.quantity} {mat?.unit}/KG</TableCell>
-                                    </TableRow>
-                                  );
-                                })}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                      <RecipeDialog recipe={recipe} product={product} materials={materials} />
                     ) : (
                       <span className="text-muted-foreground text-xs italic">No Recipe</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">Edit</Button>
+                    <Button variant="ghost" size="sm" data-testid={`button-edit-${product.id}`}>Edit</Button>
                   </TableCell>
                 </TableRow>
               );
             })}
+            {filteredProducts.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  No products found
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </Card>
     </div>
+  );
+}
+
+function RecipeDialog({ recipe, product, materials }: { recipe: any; product: any; materials: any[] }) {
+  const { data: items = [] } = useRecipeItems(recipe.id);
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8" data-testid={`button-recipe-${product.id}`}>
+          <FileText size={14} className="mr-2" />
+          v{recipe.version}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-mono">Recipe: {product.name} (v{recipe.version})</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {recipe.instructions && (
+            <div className="bg-muted p-4 rounded-md text-sm font-mono">
+              {recipe.instructions}
+            </div>
+          )}
+          <div className="text-sm text-muted-foreground">
+            Output: <span className="font-mono font-medium">{parseFloat(recipe.outputQuantity).toFixed(0)} KG</span>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Material</TableHead>
+                <TableHead className="text-right">Quantity</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item: any) => {
+                const mat = materials.find(m => m.id === item.materialId);
+                return (
+                  <TableRow key={item.id}>
+                    <TableCell>{mat?.name || 'Unknown'}</TableCell>
+                    <TableCell className="text-right font-mono">{parseFloat(item.quantity).toFixed(0)} {mat?.unit || 'KG'}</TableCell>
+                  </TableRow>
+                );
+              })}
+              {items.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={2} className="text-center text-muted-foreground">
+                    No ingredients defined
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

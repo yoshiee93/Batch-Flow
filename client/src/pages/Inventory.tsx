@@ -1,39 +1,51 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Filter, Plus, FileDown, AlertTriangle } from 'lucide-react';
-import { mockMaterials, mockLots } from '@/lib/mockData';
+import { Search, Filter, Plus, FileDown, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useMaterials, useLots } from '@/lib/api';
 
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState('');
+  const { data: materials = [], isLoading: materialsLoading } = useMaterials();
+  const { data: lots = [], isLoading: lotsLoading } = useLots();
 
-  const filteredMaterials = mockMaterials.filter(m => 
+  const isLoading = materialsLoading || lotsLoading;
+
+  const filteredMaterials = materials.filter(m => 
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     m.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredLots = mockLots.filter(l => 
+  const filteredLots = lots.filter(l => 
     l.lotNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     l.supplierLot?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-mono">Inventory Management</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-mono" data-testid="text-inventory-title">Inventory Management</h1>
           <p className="text-muted-foreground mt-1">Manage raw materials and track lot expiry.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" data-testid="button-export">
             <FileDown size={16} className="mr-2" /> Export
           </Button>
-          <Button>
+          <Button data-testid="button-receive-material">
             <Plus size={16} className="mr-2" /> Receive Material
           </Button>
         </div>
@@ -46,16 +58,17 @@ export default function Inventory() {
           className="border-none shadow-none focus-visible:ring-0"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          data-testid="input-search-inventory"
         />
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" data-testid="button-filter-inventory">
           <Filter size={16} />
         </Button>
       </div>
 
       <Tabs defaultValue="materials">
         <TabsList>
-          <TabsTrigger value="materials">Raw Materials</TabsTrigger>
-          <TabsTrigger value="lots">Lot Tracking</TabsTrigger>
+          <TabsTrigger value="materials" data-testid="tab-materials">Raw Materials</TabsTrigger>
+          <TabsTrigger value="lots" data-testid="tab-lots">Lot Tracking</TabsTrigger>
         </TabsList>
 
         <TabsContent value="materials" className="mt-4">
@@ -72,28 +85,40 @@ export default function Inventory() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMaterials.map((material) => (
-                  <TableRow key={material.id}>
-                    <TableCell className="font-mono font-medium">{material.sku}</TableCell>
-                    <TableCell>{material.name}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {material.currentStock} <span className="text-xs text-muted-foreground">{material.unit}</span>
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-muted-foreground">
-                      {material.minStock} {material.unit}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {material.currentStock <= material.minStock ? (
-                        <Badge variant="destructive" className="uppercase text-[10px]">Low Stock</Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 uppercase text-[10px]">OK</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">Adjust</Button>
+                {filteredMaterials.map((material) => {
+                  const current = parseFloat(material.currentStock);
+                  const min = parseFloat(material.minStock);
+                  const isLow = current <= min;
+                  return (
+                    <TableRow key={material.id} data-testid={`row-material-${material.id}`}>
+                      <TableCell className="font-mono font-medium">{material.sku}</TableCell>
+                      <TableCell>{material.name}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {current.toFixed(0)} <span className="text-xs text-muted-foreground">{material.unit}</span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-muted-foreground">
+                        {min.toFixed(0)} {material.unit}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isLow ? (
+                          <Badge variant="destructive" className="uppercase text-[10px]">Low Stock</Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 uppercase text-[10px]">OK</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" data-testid={`button-adjust-${material.id}`}>Adjust</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {filteredMaterials.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No materials found
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </Card>
@@ -105,39 +130,45 @@ export default function Inventory() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Lot Number</TableHead>
-                  <TableHead>Item</TableHead>
                   <TableHead>Supplier Lot</TableHead>
+                  <TableHead>Supplier</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right">Remaining</TableHead>
                   <TableHead className="text-right">Expiry</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredLots.map((lot) => {
-                  const material = mockMaterials.find(m => m.id === lot.itemId);
+                  const material = materials.find(m => m.id === lot.materialId);
+                  const isExpiringSoon = lot.expiryDate && new Date(lot.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
                   return (
-                    <TableRow key={lot.id}>
+                    <TableRow key={lot.id} data-testid={`row-lot-${lot.id}`}>
                       <TableCell className="font-mono font-medium">{lot.lotNumber}</TableCell>
-                      <TableCell>{material?.name || 'Unknown Item'}</TableCell>
                       <TableCell className="font-mono text-xs">{lot.supplierLot || '-'}</TableCell>
+                      <TableCell>{lot.supplierName || '-'}</TableCell>
                       <TableCell className="text-right font-mono">
-                        {lot.quantity} <span className="text-xs text-muted-foreground">{material?.unit}</span>
+                        {parseFloat(lot.quantity).toFixed(0)} <span className="text-xs text-muted-foreground">{material?.unit || 'KG'}</span>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm">
-                        {format(new Date(lot.expiryDate), 'MMM d, yyyy')}
+                      <TableCell className="text-right font-mono">
+                        {parseFloat(lot.remainingQuantity).toFixed(0)} <span className="text-xs text-muted-foreground">{material?.unit || 'KG'}</span>
                       </TableCell>
                       <TableCell className="text-right">
-                         <Badge variant="outline" className={
-                           lot.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' :
-                           lot.status === 'quarantined' ? 'bg-red-50 text-red-700 border-red-200' :
-                           'bg-slate-50 text-slate-700'
-                         }>
-                           {lot.status}
-                         </Badge>
+                        {lot.expiryDate ? (
+                          <span className={`font-mono text-sm ${isExpiringSoon ? 'text-amber-600 font-medium' : ''}`}>
+                            {format(new Date(lot.expiryDate), 'MMM d, yyyy')}
+                          </span>
+                        ) : '-'}
                       </TableCell>
                     </TableRow>
                   );
                 })}
+                {filteredLots.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No lots found
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </Card>
