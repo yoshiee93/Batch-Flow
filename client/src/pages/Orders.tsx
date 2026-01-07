@@ -3,7 +3,10 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -16,14 +19,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from 'lucide-react';
-import { useOrders, useProducts, useOrderItems, useUpdateOrder } from '@/lib/api';
+import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Orders() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newOrder, setNewOrder] = useState({
+    orderNumber: '',
+    customerName: '',
+    priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent',
+    dueDate: '',
+  });
+  
   const { data: orders = [], isLoading, isError } = useOrders();
   const { data: products = [] } = useProducts();
   const updateOrder = useUpdateOrder();
+  const createOrder = useCreateOrder();
   const { toast } = useToast();
 
   const filteredOrders = orders.filter(o => 
@@ -37,6 +49,27 @@ export default function Orders() {
       toast({ title: "Order updated", description: `Status changed to ${newStatus.replace('_', ' ')}` });
     } catch (error) {
       toast({ title: "Error", description: "Failed to update order", variant: "destructive" });
+    }
+  };
+
+  const handleCreateOrder = async () => {
+    if (!newOrder.orderNumber || !newOrder.customerName || !newOrder.dueDate) {
+      toast({ title: "Missing fields", description: "Please fill in all required fields", variant: "destructive" });
+      return;
+    }
+    try {
+      await createOrder.mutateAsync({
+        orderNumber: newOrder.orderNumber,
+        customerName: newOrder.customerName,
+        priority: newOrder.priority,
+        dueDate: new Date(newOrder.dueDate).toISOString(),
+        status: 'pending',
+      });
+      toast({ title: "Order created", description: `Order ${newOrder.orderNumber} created successfully` });
+      setIsCreateDialogOpen(false);
+      setNewOrder({ orderNumber: '', customerName: '', priority: 'normal', dueDate: '' });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to create order", variant: "destructive" });
     }
   };
 
@@ -66,9 +99,71 @@ export default function Orders() {
           <h1 className="text-3xl font-bold tracking-tight font-mono" data-testid="text-orders-title">Orders</h1>
           <p className="text-muted-foreground mt-1">Manage customer orders and fulfillment.</p>
         </div>
-        <Button size="lg" className="font-mono" data-testid="button-create-order">
-          <Plus size={16} className="mr-2" /> Create Order
-        </Button>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="lg" className="font-mono" data-testid="button-create-order">
+              <Plus size={16} className="mr-2" /> Create Order
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Order</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="orderNumber">Order Number *</Label>
+                <Input
+                  id="orderNumber"
+                  placeholder="e.g. ORD-2025-005"
+                  value={newOrder.orderNumber}
+                  onChange={(e) => setNewOrder({ ...newOrder, orderNumber: e.target.value })}
+                  data-testid="input-order-number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customerName">Customer Name *</Label>
+                <Input
+                  id="customerName"
+                  placeholder="e.g. Acme Corporation"
+                  value={newOrder.customerName}
+                  onChange={(e) => setNewOrder({ ...newOrder, customerName: e.target.value })}
+                  data-testid="input-customer-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="priority">Priority</Label>
+                <Select value={newOrder.priority} onValueChange={(v) => setNewOrder({ ...newOrder, priority: v as any })}>
+                  <SelectTrigger data-testid="select-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dueDate">Due Date *</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={newOrder.dueDate}
+                  onChange={(e) => setNewOrder({ ...newOrder, dueDate: e.target.value })}
+                  data-testid="input-due-date"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleCreateOrder} disabled={createOrder.isPending} data-testid="button-submit-order">
+                {createOrder.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create Order
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="flex items-center space-x-2 bg-card p-2 rounded-md border max-w-md">
@@ -111,7 +206,7 @@ export default function Orders() {
             {filteredOrders.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  No orders found
+                  No orders found. Click "Create Order" to add your first order.
                 </TableCell>
               </TableRow>
             )}
@@ -145,12 +240,12 @@ function OrderRow({ order, products, onStatusChange }: { order: any; products: a
               {item.product?.name || 'Loading...'} <span className="text-muted-foreground font-mono">({parseFloat(item.quantity).toFixed(0)} KG)</span>
             </div>
           ))}
-          {items.length === 0 && <span className="text-muted-foreground text-sm">Loading...</span>}
+          {items.length === 0 && <span className="text-muted-foreground text-sm italic">No items</span>}
         </div>
       </TableCell>
       <TableCell className="text-center">
         {items.length === 0 ? (
-          <Badge className="bg-slate-100 text-slate-600">...</Badge>
+          <Badge className="bg-slate-100 text-slate-600">-</Badge>
         ) : allFulfillable ? (
           <Badge className="bg-green-100 text-green-700 border-green-200">
             <CheckCircle2 size={12} className="mr-1" /> OK

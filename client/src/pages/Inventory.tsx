@@ -1,18 +1,33 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Search, Filter, Plus, FileDown, Loader2, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { useMaterials, useLots } from '@/lib/api';
+import { useMaterials, useLots, useCreateMaterial } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newMaterial, setNewMaterial] = useState({
+    sku: '',
+    name: '',
+    description: '',
+    unit: 'KG',
+    minStock: '0',
+    currentStock: '0',
+  });
+
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: lots = [], isLoading: lotsLoading, isError: lotsError } = useLots();
+  const createMaterial = useCreateMaterial();
+  const { toast } = useToast();
 
   const isLoading = materialsLoading || lotsLoading;
   const hasError = materialsError || lotsError;
@@ -26,6 +41,29 @@ export default function Inventory() {
     l.lotNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     l.supplierLot?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleCreateMaterial = async () => {
+    if (!newMaterial.sku || !newMaterial.name) {
+      toast({ title: "Missing fields", description: "Please fill in SKU and Name", variant: "destructive" });
+      return;
+    }
+    try {
+      await createMaterial.mutateAsync({
+        sku: newMaterial.sku,
+        name: newMaterial.name,
+        description: newMaterial.description || null,
+        unit: newMaterial.unit,
+        minStock: newMaterial.minStock,
+        currentStock: newMaterial.currentStock,
+        active: true,
+      });
+      toast({ title: "Material created", description: `Material ${newMaterial.name} created successfully` });
+      setIsCreateDialogOpen(false);
+      setNewMaterial({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0' });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to create material", variant: "destructive" });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -57,9 +95,89 @@ export default function Inventory() {
           <Button variant="outline" data-testid="button-export">
             <FileDown size={16} className="mr-2" /> Export
           </Button>
-          <Button data-testid="button-receive-material">
-            <Plus size={16} className="mr-2" /> Receive Material
-          </Button>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-receive-material">
+                <Plus size={16} className="mr-2" /> Add Material
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Material</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="sku">SKU *</Label>
+                  <Input
+                    id="sku"
+                    placeholder="e.g. RM-007"
+                    value={newMaterial.sku}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, sku: e.target.value })}
+                    data-testid="input-material-sku"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Material Name *</Label>
+                  <Input
+                    id="name"
+                    placeholder="e.g. Sodium Carbonate"
+                    value={newMaterial.name}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, name: e.target.value })}
+                    data-testid="input-material-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Input
+                    id="description"
+                    placeholder="Optional description"
+                    value={newMaterial.description}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, description: e.target.value })}
+                    data-testid="input-material-description"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="unit">Unit</Label>
+                  <Input
+                    id="unit"
+                    placeholder="KG"
+                    value={newMaterial.unit}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, unit: e.target.value })}
+                    data-testid="input-material-unit"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="currentStock">Current Stock</Label>
+                    <Input
+                      id="currentStock"
+                      type="number"
+                      value={newMaterial.currentStock}
+                      onChange={(e) => setNewMaterial({ ...newMaterial, currentStock: e.target.value })}
+                      data-testid="input-material-current-stock"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="minStock">Min Stock</Label>
+                    <Input
+                      id="minStock"
+                      type="number"
+                      value={newMaterial.minStock}
+                      onChange={(e) => setNewMaterial({ ...newMaterial, minStock: e.target.value })}
+                      data-testid="input-material-min-stock"
+                    />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateMaterial} disabled={createMaterial.isPending} data-testid="button-submit-material">
+                  {createMaterial.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Add Material
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -127,7 +245,7 @@ export default function Inventory() {
                 {filteredMaterials.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No materials found
+                      No materials found. Click "Add Material" to add your first material.
                     </TableCell>
                   </TableRow>
                 )}
@@ -177,7 +295,7 @@ export default function Inventory() {
                 {filteredLots.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No lots found
+                      No lots found.
                     </TableCell>
                   </TableRow>
                 )}

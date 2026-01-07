@@ -250,7 +250,9 @@ export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, c
 export const insertRecipeItemSchema = createInsertSchema(recipeItems).omit({ id: true });
 export const insertBatchSchema = createInsertSchema(batches).omit({ id: true, createdAt: true });
 export const insertBatchMaterialSchema = createInsertSchema(batchMaterials).omit({ id: true, addedAt: true });
-export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true });
+export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true }).extend({
+  dueDate: z.union([z.string(), z.date()]).transform((val) => typeof val === 'string' ? new Date(val) : val),
+});
 export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: true });
 export const insertQualityCheckSchema = createInsertSchema(qualityChecks).omit({ id: true, checkedAt: true });
 export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({ id: true, createdAt: true });
