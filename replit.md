@@ -1,0 +1,78 @@
+# BatchMaster ERP
+
+## Overview
+
+BatchMaster ERP is a Manufacturing Execution System (MES) and batch tracking application designed for chemical/process manufacturing operations. The system manages orders, production batches, inventory (raw materials and finished goods), product recipes/bill of materials (BOM), lot traceability, and quality control workflows.
+
+The application follows a full-stack TypeScript architecture with a React frontend and Express backend, using PostgreSQL for data persistence.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+- **Framework**: React 18 with TypeScript
+- **Routing**: Wouter (lightweight React router)
+- **State Management**: TanStack React Query for server state
+- **UI Components**: shadcn/ui component library built on Radix UI primitives
+- **Styling**: Tailwind CSS v4 with CSS variables for theming
+- **Build Tool**: Vite
+
+The frontend is organized with:
+- Pages in `client/src/pages/` for each major feature (Dashboard, Orders, Production, Inventory, Products, Traceability, Quality)
+- Reusable UI components in `client/src/components/ui/`
+- Layout components in `client/src/components/layout/`
+- Custom hooks in `client/src/hooks/`
+- Mock data in `client/src/lib/mockData.ts` for development
+
+### Backend Architecture
+- **Framework**: Express.js with TypeScript
+- **API Pattern**: RESTful API endpoints prefixed with `/api`
+- **Database ORM**: Drizzle ORM with PostgreSQL dialect
+- **Schema Validation**: Zod with drizzle-zod integration
+
+The backend follows a modular structure:
+- `server/index.ts` - Express app setup and middleware
+- `server/routes.ts` - API route registration
+- `server/storage.ts` - Data access layer interface (currently in-memory, designed for database migration)
+- `server/vite.ts` - Development server with Vite HMR integration
+- `server/static.ts` - Production static file serving
+
+### Data Storage
+- **Schema Location**: `shared/schema.ts` - Shared between frontend and backend
+- **Database**: PostgreSQL (configured via DATABASE_URL environment variable)
+- **Migrations**: Drizzle Kit with migrations output to `./migrations`
+- **Current Schema**: Basic users table with UUID primary keys
+
+The storage layer uses an interface pattern (`IStorage`) allowing easy swapping between in-memory storage (development) and database storage (production).
+
+### Build System
+- **Development**: `npm run dev` - Runs Express server with Vite middleware for HMR
+- **Production Build**: `npm run build` - Uses esbuild for server bundling, Vite for client
+- **Output**: `dist/` directory with `index.cjs` (server) and `public/` (client assets)
+
+## External Dependencies
+
+### Database
+- **PostgreSQL**: Primary database, connected via `DATABASE_URL` environment variable
+- **connect-pg-simple**: Session storage for Express sessions
+
+### UI Framework
+- **Radix UI**: Complete primitive component library (dialogs, menus, forms, etc.)
+- **Lucide React**: Icon library
+- **Embla Carousel**: Carousel component
+- **cmdk**: Command palette component
+- **react-day-picker**: Date picker component
+
+### Data & Validation
+- **Drizzle ORM**: Type-safe database queries and schema definition
+- **Zod**: Runtime schema validation
+- **date-fns**: Date manipulation utilities
+
+### Development Tools
+- **Vite**: Frontend build tool with HMR
+- **esbuild**: Server bundling for production
+- **TypeScript**: Full-stack type safety
+- **Tailwind CSS**: Utility-first CSS framework
