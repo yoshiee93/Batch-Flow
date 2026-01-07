@@ -1,0 +1,140 @@
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Plus, Play, Pause, CheckSquare, AlertCircle, Eye, MoreHorizontal } from 'lucide-react';
+import { mockBatches, mockProducts } from '@/lib/mockData';
+import { format } from 'date-fns';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+export default function Production() {
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight font-mono">Production Control</h1>
+          <p className="text-muted-foreground mt-1">Manage batches and execution.</p>
+        </div>
+        <Button size="lg" className="font-mono">
+          <Plus size={16} className="mr-2" /> Create New Batch
+        </Button>
+      </div>
+
+      <div className="grid gap-6">
+        {mockBatches.map((batch) => {
+          const product = mockProducts.find(p => p.id === batch.productId);
+          const percent = batch.actualQuantity ? (batch.actualQuantity / batch.plannedQuantity) * 100 : 0;
+          
+          return (
+            <Card key={batch.id} className="overflow-hidden border-l-4 border-l-primary/20 hover:border-l-primary transition-all">
+              <div className="p-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-mono text-xl font-bold">{batch.batchNumber}</h3>
+                      <StatusBadge status={batch.status} />
+                    </div>
+                    <p className="text-lg font-medium mt-1">{product?.name}</p>
+                    <p className="text-sm text-muted-foreground font-mono">{product?.sku}</p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {batch.status === 'planned' && (
+                       <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                         <Play size={16} className="mr-2" /> Release
+                       </Button>
+                    )}
+                    {batch.status === 'in_progress' && (
+                       <Button size="sm" variant="secondary">
+                         <Pause size={16} className="mr-2" /> Hold
+                       </Button>
+                    )}
+                     <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal size={18} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem>View Recipe</DropdownMenuItem>
+                        <DropdownMenuItem>Record Output</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-destructive">Quarantine Batch</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-6 py-4">
+                   <div className="space-y-2">
+                     <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Progress</span>
+                     <div className="flex items-center gap-2">
+                        <Progress value={percent} className="h-3" />
+                        <span className="text-xs font-mono font-medium min-w-[3rem]">{Math.round(percent)}%</span>
+                     </div>
+                     <p className="text-xs text-muted-foreground">
+                       {batch.actualQuantity || 0} of {batch.plannedQuantity} {product?.unit} produced
+                     </p>
+                   </div>
+
+                   <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Schedule</span>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Started:</span>
+                        <span className="font-mono">{format(new Date(batch.startDate), 'MMM d, HH:mm')}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Est. End:</span>
+                        <span className="font-mono">-</span>
+                      </div>
+                   </div>
+
+                   <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Quality</span>
+                      {batch.status === 'quality_check' ? (
+                        <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-2 py-1 rounded w-fit">
+                          <AlertCircle size={14} />
+                          <span className="text-xs font-medium">Pending QC Approval</span>
+                        </div>
+                      ) : (
+                         <div className="flex items-center gap-2 text-muted-foreground">
+                            <CheckSquare size={14} />
+                            <span className="text-xs">No issues reported</span>
+                         </div>
+                      )}
+                   </div>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    planned: "bg-slate-100 text-slate-700 border-slate-200",
+    in_progress: "bg-blue-100 text-blue-700 border-blue-200 animate-pulse",
+    quality_check: "bg-amber-100 text-amber-700 border-amber-200",
+    completed: "bg-green-100 text-green-700 border-green-200",
+    released: "bg-green-100 text-green-700 border-green-200",
+    quarantined: "bg-red-100 text-red-700 border-red-200",
+  };
+
+  return (
+    <Badge variant="outline" className={`font-mono uppercase text-[10px] ${styles[status]}`}>
+      {status.replace('_', ' ')}
+    </Badge>
+  );
+}
