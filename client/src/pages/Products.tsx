@@ -94,7 +94,7 @@ export default function Products() {
                                   return (
                                     <TableRow key={idx}>
                                       <TableCell>{mat?.name}</TableCell>
-                                      <TableCell className="text-right font-mono">{item.quantity} {mat?.unit}/L</TableCell>
+                                      <TableCell className="text-right font-mono">{item.quantity} {mat?.unit}/KG</TableCell>
                                     </TableRow>
                                   );
                                 })}

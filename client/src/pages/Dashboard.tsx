@@ -45,7 +45,7 @@ export default function Dashboard() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">24,500 L</div>
+            <div className="text-2xl font-bold font-mono">24,500 KG</div>
             <p className="text-xs text-green-600 flex items-center font-medium">
               <TrendingUp size={12} className="mr-1" /> +12% vs last month
             </p>
@@ -95,7 +95,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <div className="text-sm font-medium">
-                      {batch.actualQuantity || 0} / {batch.plannedQuantity} L
+                      {batch.actualQuantity || 0} / {batch.plannedQuantity} KG
                     </div>
                     <Progress value={((batch.actualQuantity || 0) / batch.plannedQuantity) * 100} className="w-24 h-2" />
                   </div>

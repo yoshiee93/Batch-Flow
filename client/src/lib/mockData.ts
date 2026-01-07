@@ -2,16 +2,16 @@ import { Product, Material, Lot, Batch, Recipe } from './types';
 import { addDays, subDays } from 'date-fns';
 
 export const mockProducts: Product[] = [
-  { id: 'p1', sku: 'FG-001', name: 'Industrial Cleaner X500', unit: 'L', minStock: 1000, currentStock: 2500 },
-  { id: 'p2', sku: 'FG-002', name: 'Heavy Duty Degreaser', unit: 'L', minStock: 500, currentStock: 120 },
-  { id: 'p3', sku: 'FG-003', name: 'Hand Sanitizer Gel', unit: 'L', minStock: 2000, currentStock: 4500 },
+  { id: 'p1', sku: 'FG-001', name: 'Industrial Cleaner X500', unit: 'KG', minStock: 1000, currentStock: 2500 },
+  { id: 'p2', sku: 'FG-002', name: 'Heavy Duty Degreaser', unit: 'KG', minStock: 500, currentStock: 120 },
+  { id: 'p3', sku: 'FG-003', name: 'Hand Sanitizer Gel', unit: 'KG', minStock: 2000, currentStock: 4500 },
 ];
 
 export const mockMaterials: Material[] = [
-  { id: 'm1', sku: 'RM-101', name: 'Isopropyl Alcohol 99%', unit: 'L', minStock: 5000, currentStock: 8000 },
+  { id: 'm1', sku: 'RM-101', name: 'Isopropyl Alcohol 99%', unit: 'KG', minStock: 5000, currentStock: 8000 },
   { id: 'm2', sku: 'RM-102', name: 'Glycerin', unit: 'KG', minStock: 200, currentStock: 450 },
-  { id: 'm3', sku: 'RM-103', name: 'Fragrance Lemon', unit: 'L', minStock: 50, currentStock: 42 },
-  { id: 'm4', sku: 'RM-104', name: 'Distilled Water', unit: 'L', minStock: 10000, currentStock: 12000 },
+  { id: 'm3', sku: 'RM-103', name: 'Fragrance Lemon', unit: 'KG', minStock: 50, currentStock: 42 },
+  { id: 'm4', sku: 'RM-104', name: 'Distilled Water', unit: 'KG', minStock: 10000, currentStock: 12000 },
 ];
 
 export const mockLots: Lot[] = [

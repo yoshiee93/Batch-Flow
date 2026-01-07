@@ -33,8 +33,8 @@ export default function Traceability() {
       // Fake relationships
       batch: isProduct ? mockBatches[0] : null, 
       ingredients: isProduct ? [
-        { lot: 'SUP-A-2023-001', name: 'Isopropyl Alcohol', qty: '700 L' },
-        { lot: 'SUP-B-992', name: 'Glycerin', qty: '20 L' }
+        { lot: 'SUP-A-2023-001', name: 'Isopropyl Alcohol', qty: '700 KG' },
+        { lot: 'SUP-B-992', name: 'Glycerin', qty: '20 KG' }
       ] : [],
       usage: !isProduct ? [
         { batch: 'BATCH-2025-001', product: 'Industrial Cleaner X500' },
