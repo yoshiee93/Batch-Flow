@@ -62,3 +62,20 @@ export interface BatchAction {
   timestamp: string;
   user: string;
 }
+
+export interface OrderItem {
+  productId: string;
+  quantity: number;
+}
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  status: 'pending' | 'in_production' | 'ready' | 'shipped' | 'cancelled';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  items: OrderItem[];
+  dueDate: string;
+  createdAt: string;
+  notes?: string;
+}

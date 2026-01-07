@@ -1,4 +1,4 @@
-import { Product, Material, Lot, Batch, Recipe } from './types';
+import { Product, Material, Lot, Batch, Recipe, Order } from './types';
 import { addDays, subDays } from 'date-fns';
 
 export const mockProducts: Product[] = [
@@ -54,5 +54,58 @@ export const mockBatches: Batch[] = [
     id: 'b4', batchNumber: 'BATCH-2025-004', productId: 'p3', recipeId: 'r1', 
     status: 'planned', plannedQuantity: 2000, 
     startDate: addDays(new Date(), 1).toISOString() 
+  },
+];
+
+export const mockOrders: Order[] = [
+  {
+    id: 'o1',
+    orderNumber: 'ORD-2025-001',
+    customerName: 'Acme Manufacturing Ltd',
+    status: 'pending',
+    priority: 'high',
+    items: [
+      { productId: 'p1', quantity: 500 },
+      { productId: 'p2', quantity: 200 },
+    ],
+    dueDate: addDays(new Date(), 3).toISOString(),
+    createdAt: subDays(new Date(), 2).toISOString(),
+  },
+  {
+    id: 'o2',
+    orderNumber: 'ORD-2025-002',
+    customerName: 'CleanTech Solutions',
+    status: 'in_production',
+    priority: 'urgent',
+    items: [
+      { productId: 'p3', quantity: 1000 },
+    ],
+    dueDate: addDays(new Date(), 1).toISOString(),
+    createdAt: subDays(new Date(), 5).toISOString(),
+  },
+  {
+    id: 'o3',
+    orderNumber: 'ORD-2025-003',
+    customerName: 'Global Distributors Inc',
+    status: 'ready',
+    priority: 'normal',
+    items: [
+      { productId: 'p1', quantity: 1000 },
+    ],
+    dueDate: addDays(new Date(), 7).toISOString(),
+    createdAt: subDays(new Date(), 10).toISOString(),
+  },
+  {
+    id: 'o4',
+    orderNumber: 'ORD-2025-004',
+    customerName: 'Metro Supplies Co',
+    status: 'pending',
+    priority: 'low',
+    items: [
+      { productId: 'p2', quantity: 100 },
+      { productId: 'p3', quantity: 500 },
+    ],
+    dueDate: addDays(new Date(), 14).toISOString(),
+    createdAt: subDays(new Date(), 1).toISOString(),
   },
 ];
