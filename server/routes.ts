@@ -6,6 +6,7 @@ import {
   insertRecipeSchema, insertRecipeItemSchema, insertBatchSchema,
   insertBatchMaterialSchema, insertOrderSchema, insertOrderItemSchema,
   insertQualityCheckSchema, insertStockMovementSchema, insertCustomerSchema,
+  insertCategorySchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -20,19 +21,43 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
+  app.get("/api/categories", asyncHandler(async (req, res) => {
+    const categories = await storage.getCategories();
+    res.json(categories);
+  }));
+
+  app.get("/api/categories/:id", asyncHandler(async (req, res) => {
+    const category = await storage.getCategory(req.params.id);
+    if (!category) return res.status(404).json({ error: "Category not found" });
+    res.json(category);
+  }));
+
+  app.post("/api/categories", asyncHandler(async (req, res) => {
+    const data = insertCategorySchema.parse(req.body);
+    const category = await storage.createCategory(data);
+    res.status(201).json(category);
+  }));
+
+  app.patch("/api/categories/:id", asyncHandler(async (req, res) => {
+    const data = insertCategorySchema.partial().parse(req.body);
+    const category = await storage.updateCategory(req.params.id, data);
+    if (!category) return res.status(404).json({ error: "Category not found" });
+    res.json(category);
+  }));
+
+  app.delete("/api/categories/:id", asyncHandler(async (req, res) => {
+    await storage.deleteCategory(req.params.id);
+    res.status(204).send();
+  }));
+
   app.get("/api/products", asyncHandler(async (req, res) => {
     const products = await storage.getProducts();
     res.json(products);
   }));
 
-  app.get("/api/items/inputs", asyncHandler(async (req, res) => {
-    const items = await storage.getInputItems();
-    res.json(items);
-  }));
-
-  app.get("/api/items/outputs", asyncHandler(async (req, res) => {
-    const items = await storage.getOutputItems();
-    res.json(items);
+  app.get("/api/products/by-category/:categoryId", asyncHandler(async (req, res) => {
+    const products = await storage.getProductsByCategory(req.params.categoryId);
+    res.json(products);
   }));
 
   app.get("/api/products/:id", asyncHandler(async (req, res) => {

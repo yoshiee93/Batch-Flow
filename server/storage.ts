@@ -1,11 +1,12 @@
-import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
+import { eq, desc, and, sql, gte, lte, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, products, materials, lots, recipes, recipeItems,
   batches, batchMaterials, batchOutputs, orders, orderItems, qualityChecks,
-  stockMovements, auditLogs, customers,
+  stockMovements, auditLogs, customers, categories,
   type User, type InsertUser,
   type Customer, type InsertCustomer,
+  type Category, type InsertCategory,
   type Product, type InsertProduct,
   type Material, type InsertMaterial,
   type Lot, type InsertLot,
@@ -33,10 +34,15 @@ export interface IStorage {
   updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
   deleteCustomer(id: string): Promise<void>;
 
+  getCategories(): Promise<Category[]>;
+  getCategory(id: string): Promise<Category | undefined>;
+  createCategory(category: InsertCategory): Promise<Category>;
+  updateCategory(id: string, category: Partial<InsertCategory>): Promise<Category | undefined>;
+  deleteCategory(id: string): Promise<void>;
+
   getProducts(): Promise<Product[]>;
   getProduct(id: string): Promise<Product | undefined>;
-  getInputItems(): Promise<Product[]>;
-  getOutputItems(): Promise<Product[]>;
+  getProductsByCategory(categoryId: string): Promise<Product[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: string): Promise<void>;
@@ -151,6 +157,34 @@ export class DatabaseStorage implements IStorage {
     await this.createAuditLog({ entityType: "customer", entityId: id, action: "delete", changes: JSON.stringify({ active: false }) });
   }
 
+  async getCategories(): Promise<Category[]> {
+    return db.select().from(categories).orderBy(categories.sortOrder);
+  }
+
+  async getCategory(id: string): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories).where(eq(categories.id, id));
+    return category;
+  }
+
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const [created] = await db.insert(categories).values(category).returning();
+    await this.createAuditLog({ entityType: "category", entityId: created.id, action: "create", changes: JSON.stringify(category) });
+    return created;
+  }
+
+  async updateCategory(id: string, category: Partial<InsertCategory>): Promise<Category | undefined> {
+    const [updated] = await db.update(categories).set(category).where(eq(categories.id, id)).returning();
+    if (updated) {
+      await this.createAuditLog({ entityType: "category", entityId: id, action: "update", changes: JSON.stringify(category) });
+    }
+    return updated;
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    await db.delete(categories).where(eq(categories.id, id));
+    await this.createAuditLog({ entityType: "category", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
+  }
+
   async getProducts(): Promise<Product[]> {
     return db.select().from(products).where(eq(products.active, true)).orderBy(products.name);
   }
@@ -160,12 +194,8 @@ export class DatabaseStorage implements IStorage {
     return product;
   }
 
-  async getInputItems(): Promise<Product[]> {
-    return db.select().from(products).where(and(eq(products.active, true), eq(products.isInput, true))).orderBy(products.name);
-  }
-
-  async getOutputItems(): Promise<Product[]> {
-    return db.select().from(products).where(and(eq(products.active, true), eq(products.isOutput, true))).orderBy(products.name);
+  async getProductsByCategory(categoryId: string): Promise<Product[]> {
+    return db.select().from(products).where(and(eq(products.active, true), eq(products.categoryId, categoryId))).orderBy(products.name);
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
