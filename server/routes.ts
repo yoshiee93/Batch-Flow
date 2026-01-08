@@ -185,6 +185,32 @@ export async function registerRoutes(
     res.status(201).json(material);
   }));
 
+  app.delete("/api/batch-materials/:id", asyncHandler(async (req, res) => {
+    await storage.removeBatchMaterial(req.params.id);
+    res.status(204).send();
+  }));
+
+  app.post("/api/batches/:id/input", asyncHandler(async (req, res) => {
+    const { materialId, lotId, quantity } = req.body;
+    if (!materialId || !lotId || !quantity) {
+      return res.status(400).json({ error: "materialId, lotId, and quantity are required" });
+    }
+    const batchMaterial = await storage.recordBatchInput(req.params.id, materialId, lotId, quantity);
+    res.status(201).json(batchMaterial);
+  }));
+
+  app.post("/api/batches/:id/output", asyncHandler(async (req, res) => {
+    const { actualQuantity, wasteQuantity, millingQuantity, markCompleted } = req.body;
+    const batch = await storage.recordBatchOutput(
+      req.params.id,
+      actualQuantity || "0",
+      wasteQuantity || "0",
+      millingQuantity || "0",
+      markCompleted || false
+    );
+    res.json(batch);
+  }));
+
   app.get("/api/orders", asyncHandler(async (req, res) => {
     const orders = await storage.getOrders();
     res.json(orders);
