@@ -67,6 +67,7 @@ export interface IStorage {
   getBatchMaterials(batchId: string): Promise<BatchMaterial[]>;
   addBatchMaterial(material: InsertBatchMaterial): Promise<BatchMaterial>;
   removeBatchMaterial(id: string): Promise<void>;
+  updateBatchMaterial(id: string, quantity: string): Promise<BatchMaterial>;
   recordBatchInput(batchId: string, materialId: string, lotId: string, quantity: string): Promise<BatchMaterial>;
   recordBatchOutput(batchId: string, actualQuantity: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch>;
 
@@ -323,13 +324,86 @@ export class DatabaseStorage implements IStorage {
           lotId: bm.lotId,
           batchId: bm.batchId,
           quantity: bm.quantity, // positive = reversal of consumption
-          reason: "Batch input removed - reversal",
+          reference: "Batch input removed - reversal",
         });
       }
       
       await db.delete(batchMaterials).where(eq(batchMaterials.id, id));
       await this.createAuditLog({ entityType: "batch_material", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
     }
+  }
+
+  async updateBatchMaterial(id: string, newQuantity: string): Promise<BatchMaterial> {
+    const newQty = parseFloat(newQuantity);
+    
+    // Validate quantity
+    if (isNaN(newQty) || newQty <= 0) {
+      throw new Error("Quantity must be a positive number");
+    }
+    
+    // Get the batch material record
+    const [bm] = await db.select().from(batchMaterials).where(eq(batchMaterials.id, id));
+    if (!bm) throw new Error("Batch material not found");
+    
+    // Check if batch is completed
+    const [batch] = await db.select().from(batches).where(eq(batches.id, bm.batchId));
+    if (batch && batch.status === "completed") {
+      throw new Error("Cannot edit inputs on a completed batch");
+    }
+    
+    const oldQty = parseFloat(bm.quantity);
+    const delta = newQty - oldQty;
+    
+    if (delta === 0) {
+      return bm; // No change needed
+    }
+    
+    // Get the lot
+    const [lot] = await db.select().from(lots).where(eq(lots.id, bm.lotId));
+    if (!lot) throw new Error("Lot not found");
+    
+    const lotRemaining = parseFloat(lot.remainingQuantity || "0");
+    
+    // If delta > 0, we need more from the lot (check availability)
+    if (delta > 0 && delta > lotRemaining) {
+      throw new Error(`Insufficient lot quantity. Available: ${lotRemaining} KG`);
+    }
+    
+    // Update lot remaining quantity
+    const newLotRemaining = (lotRemaining - delta).toFixed(2);
+    await db.update(lots).set({ remainingQuantity: newLotRemaining }).where(eq(lots.id, bm.lotId));
+    
+    // Update material current stock
+    const [material] = await db.select().from(materials).where(eq(materials.id, bm.materialId));
+    if (material) {
+      const newStock = (parseFloat(material.currentStock || "0") - delta).toFixed(2);
+      await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, bm.materialId));
+    }
+    
+    // Update batch material record
+    const [updated] = await db.update(batchMaterials)
+      .set({ quantity: newQuantity })
+      .where(eq(batchMaterials.id, id))
+      .returning();
+    
+    // Create stock movement for the delta
+    await this.createStockMovement({
+      movementType: "adjustment",
+      materialId: bm.materialId,
+      lotId: bm.lotId,
+      batchId: bm.batchId,
+      quantity: (-delta).toFixed(2), // negative delta means more consumed, positive means returned
+      reference: `Batch input adjusted: ${oldQty} -> ${newQty} KG`,
+    });
+    
+    await this.createAuditLog({
+      entityType: "batch_material",
+      entityId: id,
+      action: "update",
+      changes: JSON.stringify({ oldQuantity: oldQty, newQuantity: newQty, delta }),
+    });
+    
+    return updated;
   }
 
   async recordBatchInput(batchId: string, materialId: string, lotId: string, quantity: string): Promise<BatchMaterial> {
@@ -370,7 +444,7 @@ export class DatabaseStorage implements IStorage {
       lotId,
       batchId,
       quantity: `-${quantity}`, // negative = consumed
-      reason: "Production input",
+      reference: "Production input",
     });
     
     await this.createAuditLog({
@@ -401,7 +475,7 @@ export class DatabaseStorage implements IStorage {
     
     if (markCompleted) {
       updateData.status = "completed";
-      updateData.endDate = new Date().toISOString();
+      updateData.endDate = new Date();
     }
     
     const [updated] = await db.update(batches).set(updateData).where(eq(batches.id, batchId)).returning();
@@ -445,7 +519,7 @@ export class DatabaseStorage implements IStorage {
           productId: batch.productId,
           batchId,
           quantity: delta.toFixed(2),
-          reason: delta > 0 ? "Production output - finished goods" : "Production output adjustment",
+          reference: delta > 0 ? "Production output - finished goods" : "Production output adjustment",
         });
       }
     }

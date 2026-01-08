@@ -190,6 +190,19 @@ export async function registerRoutes(
     res.status(204).send();
   }));
 
+  app.patch("/api/batch-materials/:id", asyncHandler(async (req, res) => {
+    const { quantity } = req.body;
+    if (!quantity) {
+      return res.status(400).json({ error: "quantity is required" });
+    }
+    const qty = parseFloat(quantity);
+    if (isNaN(qty) || qty <= 0) {
+      return res.status(400).json({ error: "quantity must be a positive number" });
+    }
+    const updated = await storage.updateBatchMaterial(req.params.id, quantity);
+    res.json(updated);
+  }));
+
   app.post("/api/batches/:id/input", asyncHandler(async (req, res) => {
     const { materialId, lotId, quantity } = req.body;
     if (!materialId || !lotId || !quantity) {

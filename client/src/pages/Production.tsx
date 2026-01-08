@@ -22,7 +22,7 @@ import {
 import { 
   useBatches, useProducts, useRecipes, useMaterials, useLots, 
   useUpdateBatch, useCreateBatch, useDeleteBatch,
-  useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useRecordBatchOutput,
+  useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useUpdateBatchMaterial, useRecordBatchOutput,
   type Batch, type Product, type Material, type Lot, type BatchMaterial
 } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
@@ -598,8 +598,12 @@ function BatchCard({
   const percent = planned > 0 ? (totalOutput / planned) * 100 : 0;
   const isCompleted = batch.status === 'completed';
   
+  const [editingMaterial, setEditingMaterial] = useState<BatchMaterial | null>(null);
+  const [editQuantity, setEditQuantity] = useState('');
+  
   const { data: batchMaterials = [] } = useBatchMaterials(batch.id);
   const removeBatchMaterial = useRemoveBatchMaterial();
+  const updateBatchMaterial = useUpdateBatchMaterial();
   const { toast } = useToast();
   
   const handleRemoveMaterial = async (materialId: string) => {
@@ -608,6 +612,23 @@ function BatchCard({
       toast({ title: "Material removed", description: "Material returned to inventory" });
     } catch (error) {
       toast({ title: "Error", description: "Failed to remove material", variant: "destructive" });
+    }
+  };
+  
+  const handleEditMaterialClick = (bm: BatchMaterial) => {
+    setEditingMaterial(bm);
+    setEditQuantity(bm.quantity);
+  };
+  
+  const handleUpdateMaterial = async () => {
+    if (!editingMaterial) return;
+    try {
+      await updateBatchMaterial.mutateAsync({ id: editingMaterial.id, quantity: editQuantity });
+      toast({ title: "Material updated", description: "Quantity has been updated and inventory adjusted" });
+      setEditingMaterial(null);
+      setEditQuantity('');
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to update material", variant: "destructive" });
     }
   };
   
@@ -701,6 +722,7 @@ function BatchCard({
               {batchMaterials.map((bm) => {
                 const material = materials.find(m => m.id === bm.materialId);
                 const lot = lots.find(l => l.id === bm.lotId);
+                const isEditing = editingMaterial?.id === bm.id;
                 return (
                   <div key={bm.id} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm" data-testid={`batch-material-${bm.id}`}>
                     <div>
@@ -708,18 +730,65 @@ function BatchCard({
                       <span className="text-muted-foreground ml-2">Lot: {lot?.lotNumber || 'Unknown'}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono">{bm.quantity} KG</span>
-                      {!isCompleted && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6 text-destructive hover:text-destructive"
-                          onClick={() => handleRemoveMaterial(bm.id)}
-                          disabled={removeBatchMaterial.isPending}
-                          data-testid={`button-remove-material-${bm.id}`}
-                        >
-                          <X size={14} />
-                        </Button>
+                      {isEditing ? (
+                        <>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={editQuantity}
+                            onChange={(e) => setEditQuantity(e.target.value)}
+                            className="w-24 h-7 text-sm font-mono"
+                            data-testid={`input-edit-material-${bm.id}`}
+                          />
+                          <span className="text-xs text-muted-foreground">KG</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 text-green-600 hover:text-green-700"
+                            onClick={handleUpdateMaterial}
+                            disabled={updateBatchMaterial.isPending}
+                            data-testid={`button-save-material-${bm.id}`}
+                          >
+                            <CheckCircle size={14} />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => { setEditingMaterial(null); setEditQuantity(''); }}
+                            data-testid={`button-cancel-edit-${bm.id}`}
+                          >
+                            <X size={14} />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-mono">{bm.quantity} KG</span>
+                          {!isCompleted && (
+                            <>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6"
+                                onClick={() => handleEditMaterialClick(bm)}
+                                data-testid={`button-edit-material-${bm.id}`}
+                              >
+                                <Pencil size={14} />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6 text-destructive hover:text-destructive"
+                                onClick={() => handleRemoveMaterial(bm.id)}
+                                disabled={removeBatchMaterial.isPending}
+                                data-testid={`button-remove-material-${bm.id}`}
+                              >
+                                <X size={14} />
+                              </Button>
+                            </>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

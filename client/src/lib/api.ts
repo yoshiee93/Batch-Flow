@@ -303,6 +303,21 @@ export function useRemoveBatchMaterial() {
   });
 }
 
+export function useUpdateBatchMaterial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, quantity }: { id: string; quantity: string }) =>
+      fetchApi<BatchMaterial>(`/batch-materials/${id}`, { method: "PATCH", body: JSON.stringify({ quantity }) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batchMaterials"] });
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    },
+  });
+}
+
 export function useRecordBatchOutput() {
   const queryClient = useQueryClient();
   return useMutation({
