@@ -49,7 +49,6 @@ export default function Production() {
   
   const [recordInputForm, setRecordInputForm] = useState({
     materialId: '',
-    lotId: '',
     quantity: '',
   });
   
@@ -124,25 +123,24 @@ export default function Production() {
 
   const handleRecordInputClick = (batch: Batch) => {
     setSelectedBatch(batch);
-    setRecordInputForm({ materialId: '', lotId: '', quantity: '' });
+    setRecordInputForm({ materialId: '', quantity: '' });
     setIsRecordInputOpen(true);
   };
 
   const handleRecordInput = async () => {
     if (!selectedBatch) return;
-    if (!recordInputForm.materialId || !recordInputForm.lotId || !recordInputForm.quantity) {
-      toast({ title: "Missing fields", description: "Please select material, lot, and enter quantity", variant: "destructive" });
+    if (!recordInputForm.materialId || !recordInputForm.quantity) {
+      toast({ title: "Missing fields", description: "Please select material and enter quantity", variant: "destructive" });
       return;
     }
     try {
       await recordBatchInput.mutateAsync({
         batchId: selectedBatch.id,
         materialId: recordInputForm.materialId,
-        lotId: recordInputForm.lotId,
         quantity: recordInputForm.quantity,
       });
       toast({ title: "Input recorded", description: "Material has been added to batch and deducted from inventory" });
-      setRecordInputForm({ materialId: '', lotId: '', quantity: '' });
+      setRecordInputForm({ materialId: '', quantity: '' });
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to record input", variant: "destructive" });
     }
@@ -220,13 +218,6 @@ export default function Production() {
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     return `BATCH-${year}${month}${day}-${random}`;
   };
-
-  const availableLots = lots.filter(lot => 
-    lot.materialId === recordInputForm.materialId && 
-    parseFloat(lot.remainingQuantity || "0") > 0
-  );
-
-  const selectedLot = lots.find(l => l.id === recordInputForm.lotId);
 
   if (isLoading) {
     return (
@@ -443,7 +434,7 @@ export default function Production() {
               <Label htmlFor="input-material">Material *</Label>
               <Select 
                 value={recordInputForm.materialId} 
-                onValueChange={(v) => setRecordInputForm({ ...recordInputForm, materialId: v, lotId: '' })}
+                onValueChange={(v) => setRecordInputForm({ ...recordInputForm, materialId: v })}
               >
                 <SelectTrigger data-testid="select-input-material">
                   <SelectValue placeholder="Select a material" />
@@ -456,38 +447,12 @@ export default function Production() {
                   ))}
                 </SelectContent>
               </Select>
+              {recordInputForm.materialId && (
+                <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
+                  Available: <span className="font-mono font-medium">{materials.find(m => m.id === recordInputForm.materialId)?.currentStock || '0'} KG</span>
+                </div>
+              )}
             </div>
-            
-            {recordInputForm.materialId && (
-              <div className="space-y-2">
-                <Label htmlFor="input-lot">Lot *</Label>
-                <Select 
-                  value={recordInputForm.lotId} 
-                  onValueChange={(v) => setRecordInputForm({ ...recordInputForm, lotId: v })}
-                >
-                  <SelectTrigger data-testid="select-input-lot">
-                    <SelectValue placeholder="Select a lot" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableLots.length === 0 ? (
-                      <SelectItem value="none" disabled>No available lots for this material</SelectItem>
-                    ) : (
-                      availableLots.map(lot => (
-                        <SelectItem key={lot.id} value={lot.id}>
-                          {lot.lotNumber} - {lot.remainingQuantity} KG remaining
-                          {lot.expiryDate && ` (Exp: ${format(new Date(lot.expiryDate), 'MMM d, yyyy')})`}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {selectedLot && (
-                  <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
-                    Available: <span className="font-mono font-medium">{selectedLot.remainingQuantity} KG</span>
-                  </div>
-                )}
-              </div>
-            )}
             
             <div className="space-y-2">
               <Label htmlFor="input-quantity">Quantity (KG) *</Label>

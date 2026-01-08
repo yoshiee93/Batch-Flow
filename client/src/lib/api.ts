@@ -314,7 +314,7 @@ export interface BatchMaterial {
   id: string;
   batchId: string;
   materialId: string;
-  lotId: string;
+  lotId: string | null;
   quantity: string;
 }
 
@@ -329,12 +329,11 @@ export function useBatchMaterials(batchId: string) {
 export function useRecordBatchInput() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ batchId, materialId, lotId, quantity }: { batchId: string; materialId: string; lotId: string; quantity: string }) =>
-      fetchApi<BatchMaterial>(`/batches/${batchId}/input`, { method: "POST", body: JSON.stringify({ materialId, lotId, quantity }) }),
+    mutationFn: ({ batchId, materialId, quantity }: { batchId: string; materialId: string; quantity: string }) =>
+      fetchApi<BatchMaterial>(`/batches/${batchId}/input`, { method: "POST", body: JSON.stringify({ materialId, quantity }) }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["batchMaterials", variables.batchId] });
-      queryClient.invalidateQueries({ queryKey: ["lots"] });
       queryClient.invalidateQueries({ queryKey: ["materials"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },

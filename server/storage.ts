@@ -70,7 +70,7 @@ export interface IStorage {
   addBatchMaterial(material: InsertBatchMaterial): Promise<BatchMaterial>;
   removeBatchMaterial(id: string): Promise<void>;
   updateBatchMaterial(id: string, quantity: string): Promise<BatchMaterial>;
-  recordBatchInput(batchId: string, materialId: string, lotId: string, quantity: string): Promise<BatchMaterial>;
+  recordBatchInput(batchId: string, materialId: string, quantity: string): Promise<BatchMaterial>;
   recordBatchOutput(batchId: string, actualQuantity: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch>;
 
   getOrders(): Promise<Order[]>;
@@ -338,29 +338,31 @@ export class DatabaseStorage implements IStorage {
   async removeBatchMaterial(id: string): Promise<void> {
     const [bm] = await db.select().from(batchMaterials).where(eq(batchMaterials.id, id));
     if (bm) {
-      // Restore the quantity back to the lot
-      const [lot] = await db.select().from(lots).where(eq(lots.id, bm.lotId));
-      if (lot) {
-        const restoredQuantity = (parseFloat(lot.remainingQuantity || "0") + parseFloat(bm.quantity)).toFixed(2);
-        await db.update(lots).set({ remainingQuantity: restoredQuantity }).where(eq(lots.id, bm.lotId));
-        
-        // Restore material stock
-        const [material] = await db.select().from(materials).where(eq(materials.id, bm.materialId));
-        if (material) {
-          const restoredStock = (parseFloat(material.currentStock || "0") + parseFloat(bm.quantity)).toFixed(2);
-          await db.update(materials).set({ currentStock: restoredStock }).where(eq(materials.id, bm.materialId));
+      // Restore the quantity back to the lot (if lot exists)
+      if (bm.lotId) {
+        const [lot] = await db.select().from(lots).where(eq(lots.id, bm.lotId));
+        if (lot) {
+          const restoredQuantity = (parseFloat(lot.remainingQuantity || "0") + parseFloat(bm.quantity)).toFixed(2);
+          await db.update(lots).set({ remainingQuantity: restoredQuantity }).where(eq(lots.id, bm.lotId));
         }
-        
-        // Create reversal stock movement
-        await this.createStockMovement({
-          movementType: "adjustment",
-          materialId: bm.materialId,
-          lotId: bm.lotId,
-          batchId: bm.batchId,
-          quantity: bm.quantity, // positive = reversal of consumption
-          reference: "Batch input removed - reversal",
-        });
       }
+      
+      // Restore material stock
+      const [material] = await db.select().from(materials).where(eq(materials.id, bm.materialId));
+      if (material) {
+        const restoredStock = (parseFloat(material.currentStock || "0") + parseFloat(bm.quantity)).toFixed(2);
+        await db.update(materials).set({ currentStock: restoredStock }).where(eq(materials.id, bm.materialId));
+      }
+      
+      // Create reversal stock movement
+      await this.createStockMovement({
+        movementType: "adjustment",
+        materialId: bm.materialId,
+        lotId: bm.lotId,
+        batchId: bm.batchId,
+        quantity: bm.quantity, // positive = reversal of consumption
+        reference: "Batch input removed - reversal",
+      });
       
       await db.delete(batchMaterials).where(eq(batchMaterials.id, id));
       await this.createAuditLog({ entityType: "batch_material", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
@@ -392,27 +394,29 @@ export class DatabaseStorage implements IStorage {
       return bm; // No change needed
     }
     
-    // Get the lot
-    const [lot] = await db.select().from(lots).where(eq(lots.id, bm.lotId));
-    if (!lot) throw new Error("Lot not found");
+    // Get the material to check availability
+    const [material] = await db.select().from(materials).where(eq(materials.id, bm.materialId));
+    if (!material) throw new Error("Material not found");
     
-    const lotRemaining = parseFloat(lot.remainingQuantity || "0");
+    const materialStock = parseFloat(material.currentStock || "0");
     
-    // If delta > 0, we need more from the lot (check availability)
-    if (delta > 0 && delta > lotRemaining) {
-      throw new Error(`Insufficient lot quantity. Available: ${lotRemaining} KG`);
+    // If delta > 0, we need more from stock (check availability)
+    if (delta > 0 && delta > materialStock) {
+      throw new Error(`Insufficient stock. Available: ${materialStock} KG`);
     }
     
-    // Update lot remaining quantity
-    const newLotRemaining = (lotRemaining - delta).toFixed(2);
-    await db.update(lots).set({ remainingQuantity: newLotRemaining }).where(eq(lots.id, bm.lotId));
+    // Update lot remaining quantity (if lot exists)
+    if (bm.lotId) {
+      const [lot] = await db.select().from(lots).where(eq(lots.id, bm.lotId));
+      if (lot) {
+        const newLotRemaining = (parseFloat(lot.remainingQuantity || "0") - delta).toFixed(2);
+        await db.update(lots).set({ remainingQuantity: newLotRemaining }).where(eq(lots.id, bm.lotId));
+      }
+    }
     
     // Update material current stock
-    const [material] = await db.select().from(materials).where(eq(materials.id, bm.materialId));
-    if (material) {
-      const newStock = (parseFloat(material.currentStock || "0") - delta).toFixed(2);
-      await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, bm.materialId));
-    }
+    const newStock = (materialStock - delta).toFixed(2);
+    await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, bm.materialId));
     
     // Update batch material record
     const [updated] = await db.update(batchMaterials)
@@ -440,34 +444,26 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async recordBatchInput(batchId: string, materialId: string, lotId: string, quantity: string): Promise<BatchMaterial> {
+  async recordBatchInput(batchId: string, materialId: string, quantity: string): Promise<BatchMaterial> {
     const quantityNum = parseFloat(quantity);
-    
-    // Get the lot and check available quantity
-    const [lot] = await db.select().from(lots).where(eq(lots.id, lotId));
-    if (!lot) throw new Error("Lot not found");
-    
-    const remainingQty = parseFloat(lot.remainingQuantity || "0");
-    if (quantityNum > remainingQty) {
-      throw new Error(`Insufficient lot quantity. Available: ${remainingQty} KG`);
-    }
-    
-    // Deduct from lot remaining quantity
-    const newRemaining = (remainingQty - quantityNum).toFixed(2);
-    await db.update(lots).set({ remainingQuantity: newRemaining }).where(eq(lots.id, lotId));
     
     // Deduct from material current stock
     const [material] = await db.select().from(materials).where(eq(materials.id, materialId));
-    if (material) {
-      const newStock = (parseFloat(material.currentStock || "0") - quantityNum).toFixed(2);
-      await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, materialId));
+    if (!material) throw new Error("Material not found");
+    
+    const currentStock = parseFloat(material.currentStock || "0");
+    if (quantityNum > currentStock) {
+      throw new Error(`Insufficient stock. Available: ${currentStock} KG`);
     }
     
-    // Create batch material record
+    const newStock = (currentStock - quantityNum).toFixed(2);
+    await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, materialId));
+    
+    // Create batch material record (without lot)
     const [batchMaterial] = await db.insert(batchMaterials).values({
       batchId,
       materialId,
-      lotId,
+      lotId: null,
       quantity,
     }).returning();
     
@@ -475,7 +471,7 @@ export class DatabaseStorage implements IStorage {
     await this.createStockMovement({
       movementType: "production_input",
       materialId,
-      lotId,
+      lotId: null,
       batchId,
       quantity: `-${quantity}`, // negative = consumed
       reference: "Production input",
@@ -485,7 +481,7 @@ export class DatabaseStorage implements IStorage {
       entityType: "batch",
       entityId: batchId,
       action: "input_recorded",
-      changes: JSON.stringify({ materialId, lotId, quantity }),
+      changes: JSON.stringify({ materialId, quantity }),
     });
     
     return batchMaterial;

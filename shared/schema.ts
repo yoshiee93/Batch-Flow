@@ -115,7 +115,7 @@ export const batches = pgTable("batches", {
 export const batchMaterials = pgTable("batch_materials", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   batchId: varchar("batch_id").notNull().references(() => batches.id),
-  lotId: varchar("lot_id").notNull().references(() => lots.id),
+  lotId: varchar("lot_id").references(() => lots.id),
   materialId: varchar("material_id").notNull().references(() => materials.id),
   quantity: decimal("quantity", { precision: 12, scale: 3 }).notNull(),
   addedAt: timestamp("added_at").notNull().defaultNow(),

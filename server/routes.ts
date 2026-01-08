@@ -214,11 +214,11 @@ export async function registerRoutes(
   }));
 
   app.post("/api/batches/:id/input", asyncHandler(async (req, res) => {
-    const { materialId, lotId, quantity } = req.body;
-    if (!materialId || !lotId || !quantity) {
-      return res.status(400).json({ error: "materialId, lotId, and quantity are required" });
+    const { materialId, quantity } = req.body;
+    if (!materialId || !quantity) {
+      return res.status(400).json({ error: "materialId and quantity are required" });
     }
-    const batchMaterial = await storage.recordBatchInput(req.params.id, materialId, lotId, quantity);
+    const batchMaterial = await storage.recordBatchInput(req.params.id, materialId, quantity);
     res.status(201).json(batchMaterial);
   }));
 
