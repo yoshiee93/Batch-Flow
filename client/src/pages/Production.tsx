@@ -44,6 +44,9 @@ export default function Production() {
   
   const [editForm, setEditForm] = useState({
     plannedQuantity: '',
+    actualQuantity: '',
+    wasteQuantity: '',
+    millingQuantity: '',
     notes: '',
   });
   
@@ -97,6 +100,9 @@ export default function Production() {
     setSelectedBatch(batch);
     setEditForm({
       plannedQuantity: batch.plannedQuantity,
+      actualQuantity: batch.actualQuantity || '',
+      wasteQuantity: batch.wasteQuantity || '',
+      millingQuantity: batch.millingQuantity || '',
       notes: batch.notes || '',
     });
     setIsEditDialogOpen(true);
@@ -108,6 +114,9 @@ export default function Production() {
       await updateBatch.mutateAsync({
         id: selectedBatch.id,
         plannedQuantity: editForm.plannedQuantity,
+        actualQuantity: editForm.actualQuantity || undefined,
+        wasteQuantity: editForm.wasteQuantity || undefined,
+        millingQuantity: editForm.millingQuantity || undefined,
         notes: editForm.notes || undefined,
       });
       toast({ title: "Batch updated", description: `Batch ${selectedBatch.batchNumber} updated successfully` });
@@ -365,28 +374,72 @@ export default function Production() {
             <DialogDescription>Update batch details and manage material inputs</DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-plannedQuantity">Planned Quantity (KG)</Label>
-                <Input
-                  id="edit-plannedQuantity"
-                  type="number"
-                  step="0.01"
-                  value={editForm.plannedQuantity}
-                  onChange={(e) => setEditForm({ ...editForm, plannedQuantity: e.target.value })}
-                  data-testid="input-edit-planned-quantity"
-                />
+            <div className="space-y-2">
+              <Label htmlFor="edit-plannedQuantity">Planned Quantity (KG)</Label>
+              <Input
+                id="edit-plannedQuantity"
+                type="number"
+                step="0.01"
+                value={editForm.plannedQuantity}
+                onChange={(e) => setEditForm({ ...editForm, plannedQuantity: e.target.value })}
+                data-testid="input-edit-planned-quantity"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Output Breakdown (KG)</Label>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-actualQuantity" className="text-xs text-muted-foreground">Product Output</Label>
+                  <Input
+                    id="edit-actualQuantity"
+                    type="number"
+                    step="0.01"
+                    value={editForm.actualQuantity}
+                    onChange={(e) => setEditForm({ ...editForm, actualQuantity: e.target.value })}
+                    placeholder="0"
+                    className="font-mono"
+                    data-testid="input-edit-actual-quantity"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-wasteQuantity" className="text-xs text-muted-foreground">Waste</Label>
+                  <Input
+                    id="edit-wasteQuantity"
+                    type="number"
+                    step="0.01"
+                    value={editForm.wasteQuantity}
+                    onChange={(e) => setEditForm({ ...editForm, wasteQuantity: e.target.value })}
+                    placeholder="0"
+                    className="font-mono"
+                    data-testid="input-edit-waste-quantity"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-millingQuantity" className="text-xs text-muted-foreground">Milling</Label>
+                  <Input
+                    id="edit-millingQuantity"
+                    type="number"
+                    step="0.01"
+                    value={editForm.millingQuantity}
+                    onChange={(e) => setEditForm({ ...editForm, millingQuantity: e.target.value })}
+                    placeholder="0"
+                    className="font-mono"
+                    data-testid="input-edit-milling-quantity"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-notes">Notes</Label>
-                <Input
-                  id="edit-notes"
-                  value={editForm.notes}
-                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                  placeholder="Add notes about this batch..."
-                  data-testid="input-edit-notes"
-                />
-              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="edit-notes">Notes</Label>
+              <Input
+                id="edit-notes"
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                placeholder="Add notes about this batch..."
+                data-testid="input-edit-notes"
+              />
             </div>
             
             {selectedBatch && (
