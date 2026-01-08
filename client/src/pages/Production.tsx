@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -816,8 +815,6 @@ function BatchCard({
   const actual = batch.actualQuantity ? parseFloat(batch.actualQuantity) : 0;
   const waste = batch.wasteQuantity ? parseFloat(batch.wasteQuantity) : 0;
   const milling = batch.millingQuantity ? parseFloat(batch.millingQuantity) : 0;
-  const totalOutput = actual + waste + milling;
-  const percent = planned > 0 ? (totalOutput / planned) * 100 : 0;
   const isCompleted = batch.status === 'completed';
   
   const [editingMaterial, setEditingMaterial] = useState<BatchMaterial | null>(null);
@@ -906,32 +903,24 @@ function BatchCard({
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 py-4">
-          <div className="space-y-3">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Progress</span>
-            <div className="flex items-center gap-2">
-              <Progress value={Math.min(percent, 100)} className="h-3" />
-              <span className="text-xs font-mono font-medium min-w-[3rem]">{Math.round(percent)}%</span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {totalOutput.toFixed(1)} of {planned.toFixed(1)} KG accounted for
-            </p>
-          </div>
-
+        <div className="py-4">
           <div className="space-y-2">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Output Breakdown</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Output</span>
+              <span className="text-xs text-muted-foreground">Planned: {planned.toFixed(1)} KG</span>
+            </div>
             <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-2 bg-muted rounded">
-                <div className="text-lg font-mono font-bold text-green-600">{actual.toFixed(1)}</div>
-                <div className="text-[10px] text-muted-foreground uppercase">Product</div>
+              <div className="text-center p-3 bg-muted rounded">
+                <div className="text-xl font-mono font-bold text-green-600">{actual.toFixed(1)}</div>
+                <div className="text-[10px] text-muted-foreground uppercase">Product (KG)</div>
               </div>
-              <div className="text-center p-2 bg-muted rounded">
-                <div className="text-lg font-mono font-bold text-red-600">{waste.toFixed(1)}</div>
-                <div className="text-[10px] text-muted-foreground uppercase">Waste</div>
+              <div className="text-center p-3 bg-muted rounded">
+                <div className="text-xl font-mono font-bold text-red-600">{waste.toFixed(1)}</div>
+                <div className="text-[10px] text-muted-foreground uppercase">Waste (KG)</div>
               </div>
-              <div className="text-center p-2 bg-muted rounded">
-                <div className="text-lg font-mono font-bold text-amber-600">{milling.toFixed(1)}</div>
-                <div className="text-[10px] text-muted-foreground uppercase">Milling</div>
+              <div className="text-center p-3 bg-muted rounded">
+                <div className="text-xl font-mono font-bold text-amber-600">{milling.toFixed(1)}</div>
+                <div className="text-[10px] text-muted-foreground uppercase">Milling (KG)</div>
               </div>
             </div>
           </div>
