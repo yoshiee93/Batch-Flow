@@ -27,6 +27,7 @@ export interface Product {
   currentStock: string;
   isInput: boolean;
   isOutput: boolean;
+  isPowder: boolean;
   active: boolean;
   createdAt: string;
 }

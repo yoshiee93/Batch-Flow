@@ -33,7 +33,7 @@ export default function Inventory() {
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState({
-    sku: '', name: '', description: '', minStock: '0', currentStock: '0', isInput: false, isOutput: true,
+    sku: '', name: '', description: '', minStock: '0', currentStock: '0', isInput: false, isOutput: true, isPowder: false,
   });
 
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
@@ -114,7 +114,7 @@ export default function Inventory() {
     }
   };
 
-  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', minStock: '0', currentStock: '0', isInput: false, isOutput: true });
+  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', minStock: '0', currentStock: '0', isInput: false, isOutput: true, isPowder: false });
 
   const handleCreateProduct = async () => {
     if (!productForm.sku || !productForm.name) {
@@ -125,7 +125,7 @@ export default function Inventory() {
       await createProduct.mutateAsync({
         sku: productForm.sku, name: productForm.name, description: productForm.description || null,
         unit: 'KG', minStock: productForm.minStock, currentStock: productForm.currentStock, 
-        isInput: productForm.isInput, isOutput: productForm.isOutput, active: true,
+        isInput: productForm.isInput, isOutput: productForm.isOutput, isPowder: productForm.isPowder, active: true,
       });
       toast({ title: "Product created", description: `Product ${productForm.name} created successfully` });
       setIsCreateProductOpen(false);
@@ -140,7 +140,7 @@ export default function Inventory() {
     setProductForm({
       sku: product.sku, name: product.name, description: product.description || '',
       minStock: product.minStock, currentStock: product.currentStock,
-      isInput: product.isInput, isOutput: product.isOutput,
+      isInput: product.isInput, isOutput: product.isOutput, isPowder: product.isPowder,
     });
     setIsEditProductOpen(true);
   };
@@ -151,7 +151,7 @@ export default function Inventory() {
       await updateProduct.mutateAsync({
         id: selectedProduct.id, name: productForm.name, description: productForm.description || null,
         minStock: productForm.minStock, currentStock: productForm.currentStock,
-        isInput: productForm.isInput, isOutput: productForm.isOutput,
+        isInput: productForm.isInput, isOutput: productForm.isOutput, isPowder: productForm.isPowder,
       });
       toast({ title: "Product updated", description: `Product ${productForm.name} updated successfully` });
       setIsEditProductOpen(false);
@@ -349,6 +349,9 @@ export default function Inventory() {
           <TabsTrigger value="goods" className="flex items-center gap-2" data-testid="tab-goods">
             <Package size={16} /> Goods
           </TabsTrigger>
+          <TabsTrigger value="powders" className="flex items-center gap-2" data-testid="tab-powders">
+            <span className="text-amber-500">◉</span> Powders
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -433,17 +436,23 @@ export default function Inventory() {
                   </div>
                   <div className="pt-2 border-t">
                     <Label className="text-sm font-medium mb-3 block">Categories</Label>
-                    <div className="flex gap-6">
+                    <div className="flex flex-wrap gap-4">
                       <div className="flex items-center space-x-2">
                         <Checkbox id="isInput" checked={productForm.isInput} onCheckedChange={(checked) => setProductForm({ ...productForm, isInput: !!checked })} data-testid="checkbox-is-input" />
                         <Label htmlFor="isInput" className="text-sm font-normal cursor-pointer flex items-center gap-1">
-                          <ArrowUpCircle className="h-4 w-4 text-blue-500" /> Can be used as Input
+                          <ArrowUpCircle className="h-4 w-4 text-blue-500" /> Input
                         </Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Checkbox id="isOutput" checked={productForm.isOutput} onCheckedChange={(checked) => setProductForm({ ...productForm, isOutput: !!checked })} data-testid="checkbox-is-output" />
                         <Label htmlFor="isOutput" className="text-sm font-normal cursor-pointer flex items-center gap-1">
-                          <ArrowDownCircle className="h-4 w-4 text-green-500" /> Can be produced as Output
+                          <ArrowDownCircle className="h-4 w-4 text-green-500" /> Output
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="isPowder" checked={productForm.isPowder} onCheckedChange={(checked) => setProductForm({ ...productForm, isPowder: !!checked })} data-testid="checkbox-is-powder" />
+                        <Label htmlFor="isPowder" className="text-sm font-normal cursor-pointer flex items-center gap-1">
+                          <span className="text-amber-500">◉</span> Powder
                         </Label>
                       </div>
                     </div>
@@ -566,6 +575,34 @@ export default function Inventory() {
             </Table>
           </Card>
         </TabsContent>
+
+        <TabsContent value="powders" className="space-y-4">
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">SKU</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="text-center">Category</TableHead>
+                  <TableHead className="text-right">Stock</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredProducts.filter(p => p.isPowder).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No powder products found. Mark products as "Powder" to see them here.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredProducts.filter(p => p.isPowder).map(renderProductRow)
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <Dialog open={isEditMaterialOpen} onOpenChange={setIsEditMaterialOpen}>
@@ -639,17 +676,23 @@ export default function Inventory() {
             </div>
             <div className="pt-2 border-t">
               <Label className="text-sm font-medium mb-3 block">Categories</Label>
-              <div className="flex gap-6">
+              <div className="flex flex-wrap gap-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox id="editIsInput" checked={productForm.isInput} onCheckedChange={(checked) => setProductForm({ ...productForm, isInput: !!checked })} data-testid="checkbox-edit-is-input" />
                   <Label htmlFor="editIsInput" className="text-sm font-normal cursor-pointer flex items-center gap-1">
-                    <ArrowUpCircle className="h-4 w-4 text-blue-500" /> Can be used as Input
+                    <ArrowUpCircle className="h-4 w-4 text-blue-500" /> Input
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox id="editIsOutput" checked={productForm.isOutput} onCheckedChange={(checked) => setProductForm({ ...productForm, isOutput: !!checked })} data-testid="checkbox-edit-is-output" />
                   <Label htmlFor="editIsOutput" className="text-sm font-normal cursor-pointer flex items-center gap-1">
-                    <ArrowDownCircle className="h-4 w-4 text-green-500" /> Can be produced as Output
+                    <ArrowDownCircle className="h-4 w-4 text-green-500" /> Output
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="editIsPowder" checked={productForm.isPowder} onCheckedChange={(checked) => setProductForm({ ...productForm, isPowder: !!checked })} data-testid="checkbox-edit-is-powder" />
+                  <Label htmlFor="editIsPowder" className="text-sm font-normal cursor-pointer flex items-center gap-1">
+                    <span className="text-amber-500">◉</span> Powder
                   </Label>
                 </div>
               </div>

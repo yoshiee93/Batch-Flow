@@ -746,6 +746,11 @@ function BatchCard({
   
   const totalInputKg = batchMaterials.reduce((sum, bm) => sum + parseFloat(bm.quantity), 0);
   const totalOutputKg = batchOutputs.reduce((sum, bo) => sum + parseFloat(bo.quantity), 0);
+  const nonPowderOutputKg = batchOutputs.reduce((sum, bo) => {
+    const product = outputProducts.find(p => p.id === bo.productId);
+    if (product?.isPowder) return sum;
+    return sum + parseFloat(bo.quantity);
+  }, 0);
   const waste = batch.wasteQuantity ? parseFloat(batch.wasteQuantity) : 0;
   const milling = batch.millingQuantity ? parseFloat(batch.millingQuantity) : 0;
   
@@ -786,7 +791,7 @@ function BatchCard({
                   <div className="text-right">
                     {totalInputKg > 0 ? (
                       (() => {
-                        const yieldPct = (totalOutputKg / totalInputKg) * 100;
+                        const yieldPct = (nonPowderOutputKg / totalInputKg) * 100;
                         const colorClass = yieldPct >= 12 ? 'text-green-600' : yieldPct >= 8 ? 'text-amber-500' : 'text-red-500';
                         return (
                           <div>
