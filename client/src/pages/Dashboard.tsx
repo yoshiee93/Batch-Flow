@@ -2,19 +2,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, CheckCircle2, Package, ShoppingCart, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Package, ShoppingCart, TrendingUp, AlertCircle, Loader2, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
 import { format } from 'date-fns';
-import { useOrders, useProducts, useMaterials, useOrderItems, useDashboardStats } from '@/lib/api';
+import { useProducts, useMaterials, useDashboardStats, useOrdersWithAllocation, type OrderWithAllocation } from '@/lib/api';
 
 export default function Dashboard() {
-  const { data: orders = [], isLoading: ordersLoading, isError: ordersError } = useOrders();
+  const { data: ordersWithAllocation = [], isLoading: ordersLoading, isError: ordersError } = useOrdersWithAllocation();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: stats } = useDashboardStats();
 
-  const activeOrders = orders.filter(o => ['pending', 'in_production'].includes(o.status));
+  const activeOrders = ordersWithAllocation.filter(o => ['pending', 'in_production'].includes(o.status));
   const lowStockMaterials = materials.filter(m => parseFloat(m.currentStock) <= parseFloat(m.minStock));
 
   const isLoading = ordersLoading || productsLoading || materialsLoading;
@@ -109,7 +109,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {activeOrders.map(order => (
-                <OrderCard key={order.id} order={order} products={products} />
+                <OrderCard key={order.id} order={order} />
               ))}
               {activeOrders.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
@@ -156,18 +156,29 @@ export default function Dashboard() {
   );
 }
 
-function OrderCard({ order, products }: { order: any; products: any[] }) {
-  const { data: items = [] } = useOrderItems(order.id);
-  
-  const orderItems = items.map(item => {
-    const product = products.find(p => p.id === item.productId);
-    const inStock = product ? parseFloat(product.currentStock) : 0;
-    const needed = parseFloat(item.quantity);
-    const canFulfill = inStock >= needed;
-    return { ...item, product, inStock, canFulfill, needed };
-  });
-  
-  const allFulfillable = orderItems.length > 0 && orderItems.every(i => i.canFulfill);
+function OrderCard({ order }: { order: OrderWithAllocation }) {
+  const allocationBadge = () => {
+    switch (order.allocationStatus) {
+      case 'ready_to_ship':
+        return (
+          <Badge className="bg-green-100 text-green-700 border-green-200">
+            <CheckCircle2 size={12} className="mr-1" /> Ready to Ship
+          </Badge>
+        );
+      case 'partially_allocated':
+        return (
+          <Badge className="bg-amber-100 text-amber-700 border-amber-200">
+            <Clock size={12} className="mr-1" /> Partially Allocated
+          </Badge>
+        );
+      default:
+        return (
+          <Badge className="bg-slate-100 text-slate-600 border-slate-200">
+            <AlertCircle size={12} className="mr-1" /> Awaiting Stock
+          </Badge>
+        );
+    }
+  };
 
   return (
     <div className="p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors" data-testid={`card-order-${order.id}`}>
@@ -184,41 +195,44 @@ function OrderCard({ order, products }: { order: any; products: any[] }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {items.length === 0 ? (
-            <Badge className="bg-slate-100 text-slate-600">Loading...</Badge>
-          ) : allFulfillable ? (
-            <Badge className="bg-green-100 text-green-700 border-green-200">
-              <CheckCircle2 size={12} className="mr-1" /> Stock OK
-            </Badge>
-          ) : (
-            <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-200">
-              <AlertCircle size={12} className="mr-1" /> Low Stock
-            </Badge>
-          )}
+          {allocationBadge()}
         </div>
       </div>
 
-      {orderItems.length > 0 && (
+      {order.items.length > 0 && (
         <div className="space-y-2 mt-3 pt-3 border-t">
-          {orderItems.map((item, idx) => (
-            <div key={idx} className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">{item.product?.name || 'Unknown Product'}</span>
-              <div className="flex items-center gap-3">
-                <span className={cn(
-                  "font-mono text-xs px-2 py-0.5 rounded",
-                  item.canFulfill 
-                    ? "bg-green-50 text-green-700" 
-                    : "bg-red-50 text-red-700"
-                )}>
-                  {item.inStock.toFixed(0)} / {item.needed.toFixed(0)} KG
-                </span>
-                <Progress 
-                  value={Math.min((item.inStock / item.needed) * 100, 100)} 
-                  className={cn("w-16 h-2", !item.canFulfill && "[&>div]:bg-destructive")}
-                />
+          {order.items.map((item) => {
+            const allocated = parseFloat(item.reservedQuantity);
+            const needed = parseFloat(item.quantity);
+            const percent = needed > 0 ? (allocated / needed) * 100 : 0;
+            const isFullyAllocated = allocated >= needed;
+            
+            return (
+              <div key={item.id} className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{item.productName}</span>
+                <div className="flex items-center gap-3">
+                  <span className={cn(
+                    "font-mono text-xs px-2 py-0.5 rounded",
+                    isFullyAllocated 
+                      ? "bg-green-50 text-green-700" 
+                      : allocated > 0
+                        ? "bg-amber-50 text-amber-700"
+                        : "bg-slate-50 text-slate-500"
+                  )}>
+                    {allocated.toFixed(0)} / {needed.toFixed(0)} KG allocated
+                  </span>
+                  <Progress 
+                    value={Math.min(percent, 100)} 
+                    className={cn(
+                      "w-16 h-2",
+                      !isFullyAllocated && allocated > 0 && "[&>div]:bg-amber-500",
+                      !isFullyAllocated && allocated === 0 && "[&>div]:bg-slate-300"
+                    )}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

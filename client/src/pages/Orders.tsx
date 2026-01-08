@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem, useDeleteOrderItem, useDeleteOrder, useCustomers, type Order, type OrderItem, type Product, type Customer } from '@/lib/api';
+import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem, useDeleteOrderItem, useDeleteOrder, useCustomers, useOrdersWithAllocation, type Order, type OrderItem, type Product, type Customer, type OrderWithAllocation } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Orders() {
@@ -42,7 +42,7 @@ export default function Orders() {
     notes: '',
   });
   
-  const { data: orders = [], isLoading, isError } = useOrders();
+  const { data: ordersWithAllocation = [], isLoading, isError } = useOrdersWithAllocation();
   const { data: products = [] } = useProducts();
   const { data: customers = [] } = useCustomers();
   const updateOrder = useUpdateOrder();
@@ -50,7 +50,7 @@ export default function Orders() {
   const deleteOrder = useDeleteOrder();
   const { toast } = useToast();
 
-  const filteredOrders = orders.filter(o => 
+  const filteredOrders = ordersWithAllocation.filter(o => 
     o.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     o.customerName.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -303,7 +303,6 @@ export default function Orders() {
               <OrderRow 
                 key={order.id} 
                 order={order} 
-                products={products} 
                 onStatusChange={handleStatusChange}
                 onEditClick={handleEditClick}
                 onDelete={handleDeleteOrder}
@@ -577,24 +576,39 @@ function EditOrderContent({
   );
 }
 
-function OrderRow({ order, products, onStatusChange, onEditClick, onDelete }: { 
-  order: Order; 
-  products: Product[]; 
+function OrderRow({ order, onStatusChange, onEditClick, onDelete }: { 
+  order: OrderWithAllocation; 
   onStatusChange: (id: string, status: string) => void;
   onEditClick: (order: Order) => void;
   onDelete: (order: Order) => void;
 }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const { data: items = [] } = useOrderItems(order.id);
-  
-  const orderItems = items.map(item => {
-    const product = products.find(p => p.id === item.productId);
-    const inStock = product ? parseFloat(product.currentStock) : 0;
-    const canFulfill = inStock >= parseFloat(item.quantity);
-    return { ...item, product, canFulfill };
-  });
-  
-  const allFulfillable = orderItems.length > 0 && orderItems.every(i => i.canFulfill);
+
+  const allocationBadge = () => {
+    if (order.items.length === 0) {
+      return <Badge className="bg-slate-100 text-slate-600">-</Badge>;
+    }
+    switch (order.allocationStatus) {
+      case 'ready_to_ship':
+        return (
+          <Badge className="bg-green-100 text-green-700 border-green-200">
+            <CheckCircle2 size={12} className="mr-1" /> Ready
+          </Badge>
+        );
+      case 'partially_allocated':
+        return (
+          <Badge className="bg-amber-100 text-amber-700 border-amber-200">
+            <Clock size={12} className="mr-1" /> Partial
+          </Badge>
+        );
+      default:
+        return (
+          <Badge className="bg-slate-100 text-slate-600 border-slate-200">
+            <AlertCircle size={12} className="mr-1" /> Waiting
+          </Badge>
+        );
+    }
+  };
 
   return (
     <TableRow data-testid={`row-order-${order.id}`}>
@@ -602,26 +616,20 @@ function OrderRow({ order, products, onStatusChange, onEditClick, onDelete }: {
       <TableCell>{order.customerName}</TableCell>
       <TableCell>
         <div className="space-y-1">
-          {orderItems.map((item, idx) => (
-            <div key={idx} className="text-sm">
-              {item.product?.name || 'Loading...'} <span className="text-muted-foreground font-mono">({parseFloat(item.quantity).toFixed(0)} KG)</span>
-            </div>
-          ))}
-          {items.length === 0 && <span className="text-muted-foreground text-sm italic">No items</span>}
+          {order.items.map((item) => {
+            const allocated = parseFloat(item.reservedQuantity);
+            const needed = parseFloat(item.quantity);
+            return (
+              <div key={item.id} className="text-sm">
+                {item.productName} <span className="text-muted-foreground font-mono">({allocated.toFixed(0)}/{needed.toFixed(0)} KG)</span>
+              </div>
+            );
+          })}
+          {order.items.length === 0 && <span className="text-muted-foreground text-sm italic">No items</span>}
         </div>
       </TableCell>
       <TableCell className="text-center">
-        {items.length === 0 ? (
-          <Badge className="bg-slate-100 text-slate-600">-</Badge>
-        ) : allFulfillable ? (
-          <Badge className="bg-green-100 text-green-700 border-green-200">
-            <CheckCircle2 size={12} className="mr-1" /> OK
-          </Badge>
-        ) : (
-          <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-200">
-            <AlertCircle size={12} className="mr-1" /> Low
-          </Badge>
-        )}
+        {allocationBadge()}
       </TableCell>
       <TableCell className="text-center">
         <PriorityBadge priority={order.priority} />

@@ -91,6 +91,9 @@ export interface IStorage {
 
   getTraceabilityForward(lotId: string): Promise<any>;
   getTraceabilityBackward(batchId: string): Promise<any>;
+  
+  runStockAllocation(): Promise<void>;
+  getOrdersWithAllocation(): Promise<(Order & { allocationStatus: string; items: (OrderItem & { productName: string })[] })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -531,6 +534,11 @@ export class DatabaseStorage implements IStorage {
       changes: JSON.stringify({ actualQuantity, wasteQuantity, millingQuantity, markCompleted, delta }),
     });
     
+    // Re-run stock allocation when inventory changes
+    if (delta !== 0) {
+      await this.runStockAllocation();
+    }
+    
     return updated;
   }
 
@@ -546,6 +554,7 @@ export class DatabaseStorage implements IStorage {
   async createOrder(order: InsertOrder): Promise<Order> {
     const [created] = await db.insert(orders).values(order).returning();
     await this.createAuditLog({ entityType: "order", entityId: created.id, action: "create", changes: JSON.stringify(order) });
+    await this.runStockAllocation();
     return created;
   }
 
@@ -561,6 +570,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(orderItems).where(eq(orderItems.orderId, id));
     await db.delete(orders).where(eq(orders.id, id));
     await this.createAuditLog({ entityType: "order", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
+    await this.runStockAllocation();
   }
 
   async getOrderItems(orderId: string): Promise<OrderItem[]> {
@@ -569,11 +579,13 @@ export class DatabaseStorage implements IStorage {
 
   async createOrderItem(item: InsertOrderItem): Promise<OrderItem> {
     const [created] = await db.insert(orderItems).values(item).returning();
+    await this.runStockAllocation();
     return created;
   }
 
   async deleteOrderItem(id: string): Promise<void> {
     await db.delete(orderItems).where(eq(orderItems.id, id));
+    await this.runStockAllocation();
   }
 
   async getQualityChecks(batchId: string): Promise<QualityCheck[]> {
@@ -666,6 +678,107 @@ export class DatabaseStorage implements IStorage {
         quantityUsed: r.batchMaterial.quantity,
       })),
     };
+  }
+
+  async runStockAllocation(): Promise<void> {
+    // Use a transaction to ensure consistency
+    await db.transaction(async (tx) => {
+      // Get all pending/in_production orders
+      const priorityOrder: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+      const activeOrders = await tx.select().from(orders)
+        .where(sql`${orders.status} IN ('pending', 'in_production')`);
+      
+      // Sort by priority first, then due date (all in memory after fetch)
+      const sortedOrders = [...activeOrders].sort((a, b) => {
+        const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+        if (priorityDiff !== 0) return priorityDiff;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      });
+
+      // Get all products and their current stock
+      const allProducts = await tx.select().from(products);
+      const productStock: Record<string, number> = {};
+      for (const p of allProducts) {
+        productStock[p.id] = parseFloat(p.currentStock);
+      }
+
+      // Reset all reservations first (within transaction)
+      await tx.update(orderItems).set({ reservedQuantity: "0" });
+
+      // Allocate stock to orders in sorted priority order
+      for (const order of sortedOrders) {
+        const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+        
+        for (const item of items) {
+          const availableStock = productStock[item.productId] || 0;
+          const requested = parseFloat(item.quantity);
+          const allocated = Math.min(availableStock, requested);
+          
+          if (allocated > 0) {
+            await tx.update(orderItems)
+              .set({ reservedQuantity: allocated.toFixed(3) })
+              .where(eq(orderItems.id, item.id));
+            
+            productStock[item.productId] = availableStock - allocated;
+          }
+        }
+      }
+
+      await tx.insert(auditLogs).values({
+        entityType: "system",
+        entityId: "allocation",
+        action: "run_allocation",
+        changes: JSON.stringify({ ordersProcessed: sortedOrders.length }),
+      });
+    });
+  }
+
+  async getOrdersWithAllocation(): Promise<(Order & { allocationStatus: string; items: (OrderItem & { productName: string })[] })[]> {
+    // Run allocation first to ensure data is current
+    await this.runStockAllocation();
+
+    const allOrders = await db.select().from(orders).orderBy(desc(orders.createdAt));
+    const result: (Order & { allocationStatus: string; items: (OrderItem & { productName: string })[] })[] = [];
+
+    for (const order of allOrders) {
+      const items = await db.select({
+        orderItem: orderItems,
+        product: products,
+      })
+      .from(orderItems)
+      .innerJoin(products, eq(orderItems.productId, products.id))
+      .where(eq(orderItems.orderId, order.id));
+
+      const itemsWithProduct = items.map(i => ({
+        ...i.orderItem,
+        productName: i.product.name,
+      }));
+
+      // Calculate allocation status
+      let allocationStatus = 'awaiting_stock';
+      if (itemsWithProduct.length > 0) {
+        const fullyAllocated = itemsWithProduct.every(
+          i => parseFloat(i.reservedQuantity) >= parseFloat(i.quantity)
+        );
+        const partiallyAllocated = itemsWithProduct.some(
+          i => parseFloat(i.reservedQuantity) > 0
+        );
+
+        if (fullyAllocated) {
+          allocationStatus = 'ready_to_ship';
+        } else if (partiallyAllocated) {
+          allocationStatus = 'partially_allocated';
+        }
+      }
+
+      result.push({
+        ...order,
+        allocationStatus,
+        items: itemsWithProduct,
+      });
+    }
+
+    return result;
   }
 }
 

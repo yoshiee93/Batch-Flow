@@ -127,6 +127,15 @@ export interface OrderItem {
   reservedQuantity: string;
 }
 
+export interface OrderItemWithProduct extends OrderItem {
+  productName: string;
+}
+
+export interface OrderWithAllocation extends Order {
+  allocationStatus: 'ready_to_ship' | 'partially_allocated' | 'awaiting_stock';
+  items: OrderItemWithProduct[];
+}
+
 export interface DashboardStats {
   activeBatches: number;
   pendingOrders: number;
@@ -181,6 +190,25 @@ export function useOrders() {
   return useQuery<Order[]>({
     queryKey: ["orders"],
     queryFn: () => fetchApi("/orders"),
+  });
+}
+
+export function useOrdersWithAllocation() {
+  return useQuery<OrderWithAllocation[]>({
+    queryKey: ["ordersWithAllocation"],
+    queryFn: () => fetchApi("/orders/with-allocation"),
+  });
+}
+
+export function useRunAllocation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => fetchApi("/allocation/run", { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ordersWithAllocation"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["orderItems"] });
+    },
   });
 }
 

@@ -229,6 +229,16 @@ export async function registerRoutes(
     res.json(orders);
   }));
 
+  app.get("/api/orders/with-allocation", asyncHandler(async (req, res) => {
+    const orders = await storage.getOrdersWithAllocation();
+    res.json(orders);
+  }));
+
+  app.post("/api/allocation/run", asyncHandler(async (req, res) => {
+    await storage.runStockAllocation();
+    res.json({ success: true, message: "Stock allocation completed" });
+  }));
+
   app.get("/api/orders/:id", asyncHandler(async (req, res) => {
     const order = await storage.getOrder(req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
