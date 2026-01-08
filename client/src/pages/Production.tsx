@@ -783,8 +783,17 @@ function BatchCard({
                       {isCompleted ? 'Completed' : 'In Progress'}
                     </Badge>
                   </div>
-                  <div className="text-right text-xs text-muted-foreground">
-                    {batchMaterials.length} input(s) • {batchOutputs.length} output(s)
+                  <div className="text-right">
+                    {totalInputKg > 0 ? (
+                      <div>
+                        <span className={`font-mono font-bold ${((totalOutputKg / totalInputKg) * 100) >= 8 ? 'text-green-600' : 'text-amber-600'}`}>
+                          {((totalOutputKg / totalInputKg) * 100).toFixed(1)}%
+                        </span>
+                        <div className="text-[10px] text-muted-foreground">Yield</div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">--</span>
+                    )}
                   </div>
                 </div>
               </div>
