@@ -51,7 +51,8 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to delete category";
-      res.status(400).json({ error: message });
+      const statusCode = message === "Category not found" ? 404 : 400;
+      res.status(statusCode).json({ error: message });
     }
   }));
 

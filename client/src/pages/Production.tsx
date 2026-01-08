@@ -744,13 +744,14 @@ function BatchCard({
   const { data: batchOutputs = [] } = useBatchOutputs(batch.id);
   const { data: categories = [] } = useCategories();
   
-  const totalInputKg = batchMaterials.reduce((sum, bm) => sum + parseFloat(bm.quantity), 0);
-  const totalOutputKg = batchOutputs.reduce((sum, bo) => sum + parseFloat(bo.quantity), 0);
+  const totalInputKg = batchMaterials.reduce((sum, bm) => sum + (parseFloat(bm.quantity) || 0), 0);
+  const totalOutputKg = batchOutputs.reduce((sum, bo) => sum + (parseFloat(bo.quantity) || 0), 0);
   const nonPowderOutputKg = batchOutputs.reduce((sum, bo) => {
-    const product = products.find(p => p.id === bo.productId);
-    const category = categories.find(c => c.id === product?.categoryId);
+    const outputProduct = products.find(p => p.id === bo.productId);
+    const category = outputProduct?.categoryId ? categories.find(c => c.id === outputProduct.categoryId) : null;
+    // If no category or category doesn't exclude from yield, include in yield calculation
     if (category?.excludeFromYield) return sum;
-    return sum + parseFloat(bo.quantity);
+    return sum + (parseFloat(bo.quantity) || 0);
   }, 0);
   const waste = batch.wasteQuantity ? parseFloat(batch.wasteQuantity) : 0;
   const milling = batch.millingQuantity ? parseFloat(batch.millingQuantity) : 0;

@@ -181,9 +181,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCategory(id: string): Promise<void> {
-    // Check if category is default - cannot delete default categories
+    // Check if category exists
     const [category] = await db.select().from(categories).where(eq(categories.id, id));
-    if (category?.isDefault) {
+    if (!category) {
+      throw new Error("Category not found");
+    }
+    
+    // Check if category is default - cannot delete default categories
+    if (category.isDefault) {
       throw new Error("Cannot delete default category");
     }
     
