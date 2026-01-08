@@ -245,6 +245,17 @@ export function useUpdateBatch() {
   });
 }
 
+export function useDeleteBatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => fetchApi(`/batches/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    },
+  });
+}
+
 export function useCreateOrder() {
   const queryClient = useQueryClient();
   return useMutation({

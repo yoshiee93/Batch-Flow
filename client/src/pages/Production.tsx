@@ -6,8 +6,9 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Play, CheckSquare, AlertCircle, Loader2, MoreHorizontal } from 'lucide-react';
+import { Plus, Play, CheckSquare, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   DropdownMenu,
@@ -17,11 +18,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useBatches, useProducts, useRecipes, useUpdateBatch, useCreateBatch } from '@/lib/api';
+import { useBatches, useProducts, useRecipes, useUpdateBatch, useCreateBatch, useDeleteBatch, type Batch, type Product } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Production() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isRecordOutputOpen, setIsRecordOutputOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+  
   const [newBatch, setNewBatch] = useState({
     batchNumber: '',
     productId: '',
@@ -29,12 +35,22 @@ export default function Production() {
     plannedQuantity: '',
     startDate: '',
   });
+  
+  const [editForm, setEditForm] = useState({
+    plannedQuantity: '',
+    notes: '',
+  });
+  
+  const [recordOutputForm, setRecordOutputForm] = useState({
+    actualQuantity: '',
+  });
 
   const { data: batches = [], isLoading, isError } = useBatches();
   const { data: products = [] } = useProducts();
   const { data: recipes = [] } = useRecipes();
   const updateBatch = useUpdateBatch();
   const createBatch = useCreateBatch();
+  const deleteBatch = useDeleteBatch();
   const { toast } = useToast();
 
   const handleStatusChange = async (batchId: string, newStatus: string) => {
@@ -65,6 +81,74 @@ export default function Production() {
       setNewBatch({ batchNumber: '', productId: '', recipeId: '', plannedQuantity: '', startDate: '' });
     } catch (error) {
       toast({ title: "Error", description: "Failed to create batch", variant: "destructive" });
+    }
+  };
+
+  const handleEditClick = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setEditForm({
+      plannedQuantity: batch.plannedQuantity,
+      notes: batch.notes || '',
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateBatch = async () => {
+    if (!selectedBatch) return;
+    try {
+      await updateBatch.mutateAsync({
+        id: selectedBatch.id,
+        plannedQuantity: editForm.plannedQuantity,
+        notes: editForm.notes || undefined,
+      });
+      toast({ title: "Batch updated", description: `Batch ${selectedBatch.batchNumber} updated successfully` });
+      setIsEditDialogOpen(false);
+      setSelectedBatch(null);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update batch", variant: "destructive" });
+    }
+  };
+
+  const handleRecordOutputClick = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setRecordOutputForm({
+      actualQuantity: batch.actualQuantity || '',
+    });
+    setIsRecordOutputOpen(true);
+  };
+
+  const handleRecordOutput = async () => {
+    if (!selectedBatch || !recordOutputForm.actualQuantity) {
+      toast({ title: "Missing fields", description: "Please enter the actual quantity produced", variant: "destructive" });
+      return;
+    }
+    try {
+      await updateBatch.mutateAsync({
+        id: selectedBatch.id,
+        actualQuantity: recordOutputForm.actualQuantity,
+      });
+      toast({ title: "Output recorded", description: `Recorded ${recordOutputForm.actualQuantity} KG produced` });
+      setIsRecordOutputOpen(false);
+      setSelectedBatch(null);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to record output", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteClick = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteBatch = async () => {
+    if (!selectedBatch) return;
+    try {
+      await deleteBatch.mutateAsync(selectedBatch.id);
+      toast({ title: "Batch deleted", description: `Batch ${selectedBatch.batchNumber} has been removed` });
+      setIsDeleteDialogOpen(false);
+      setSelectedBatch(null);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete batch", variant: "destructive" });
     }
   };
 
@@ -202,110 +286,241 @@ export default function Production() {
       </div>
 
       <div className="grid gap-6">
-        {batches.map((batch) => {
-          const product = products.find(p => p.id === batch.productId);
-          const planned = parseFloat(batch.plannedQuantity);
-          const actual = batch.actualQuantity ? parseFloat(batch.actualQuantity) : 0;
-          const percent = planned > 0 ? (actual / planned) * 100 : 0;
-          
-          return (
-            <Card key={batch.id} className="overflow-hidden border-l-4 border-l-primary/20 hover:border-l-primary transition-all" data-testid={`card-batch-${batch.id}`}>
-              <div className="p-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-mono text-xl font-bold">{batch.batchNumber}</h3>
-                      <StatusBadge status={batch.status} />
-                    </div>
-                    <p className="text-lg font-medium mt-1">{product?.name || 'Unknown Product'}</p>
-                    <p className="text-sm text-muted-foreground font-mono">{product?.sku}</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {batch.status === 'planned' && (
-                       <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => handleStatusChange(batch.id, 'in_progress')} data-testid={`button-release-${batch.id}`}>
-                         <Play size={16} className="mr-2" /> Release
-                       </Button>
-                    )}
-                    {batch.status === 'in_progress' && (
-                       <Button size="sm" variant="secondary" onClick={() => handleStatusChange(batch.id, 'quality_check')} data-testid={`button-qc-${batch.id}`}>
-                         <CheckSquare size={16} className="mr-2" /> Send to QC
-                       </Button>
-                    )}
-                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" data-testid={`button-batch-actions-${batch.id}`}>
-                          <MoreHorizontal size={18} />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>View Recipe</DropdownMenuItem>
-                        <DropdownMenuItem>Record Output</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleStatusChange(batch.id, 'completed')}>Mark Completed</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleStatusChange(batch.id, 'released')}>Release to Inventory</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive" onClick={() => handleStatusChange(batch.id, 'quarantined')}>Quarantine Batch</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-3 gap-6 py-4">
-                   <div className="space-y-2">
-                     <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Progress</span>
-                     <div className="flex items-center gap-2">
-                        <Progress value={percent} className="h-3" />
-                        <span className="text-xs font-mono font-medium min-w-[3rem]">{Math.round(percent)}%</span>
-                     </div>
-                     <p className="text-xs text-muted-foreground">
-                       {actual.toFixed(0)} of {planned.toFixed(0)} {product?.unit || 'KG'} produced
-                     </p>
-                   </div>
-
-                   <div className="space-y-1">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Schedule</span>
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground">Started:</span>
-                        <span className="font-mono">{batch.startDate ? format(new Date(batch.startDate), 'MMM d, HH:mm') : '-'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground">Completed:</span>
-                        <span className="font-mono">{batch.endDate ? format(new Date(batch.endDate), 'MMM d, HH:mm') : '-'}</span>
-                      </div>
-                   </div>
-
-                   <div className="space-y-1">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Quality</span>
-                      {batch.status === 'quality_check' ? (
-                        <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-2 py-1 rounded w-fit">
-                          <AlertCircle size={14} />
-                          <span className="text-xs font-medium">Pending QC Approval</span>
-                        </div>
-                      ) : batch.status === 'quarantined' ? (
-                        <div className="flex items-center gap-2 text-red-600 bg-red-50 px-2 py-1 rounded w-fit">
-                          <AlertCircle size={14} />
-                          <span className="text-xs font-medium">Quarantined</span>
-                        </div>
-                      ) : (
-                         <div className="flex items-center gap-2 text-muted-foreground">
-                            <CheckSquare size={14} />
-                            <span className="text-xs">No issues reported</span>
-                         </div>
-                      )}
-                   </div>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
+        {batches.map((batch) => (
+          <BatchCard 
+            key={batch.id} 
+            batch={batch} 
+            products={products}
+            onStatusChange={handleStatusChange}
+            onEditClick={handleEditClick}
+            onRecordOutputClick={handleRecordOutputClick}
+            onDeleteClick={handleDeleteClick}
+          />
+        ))}
         {batches.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             <p>No batches found. Create a new batch to get started.</p>
           </div>
         )}
       </div>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Batch {selectedBatch?.batchNumber}</DialogTitle>
+            <DialogDescription>Update batch details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-plannedQuantity">Planned Quantity (KG)</Label>
+              <Input
+                id="edit-plannedQuantity"
+                type="number"
+                step="0.01"
+                value={editForm.plannedQuantity}
+                onChange={(e) => setEditForm({ ...editForm, plannedQuantity: e.target.value })}
+                data-testid="input-edit-planned-quantity"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-notes">Notes</Label>
+              <Input
+                id="edit-notes"
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                placeholder="Add notes about this batch..."
+                data-testid="input-edit-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpdateBatch} disabled={updateBatch.isPending} data-testid="button-save-batch">
+              {updateBatch.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRecordOutputOpen} onOpenChange={setIsRecordOutputOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Output for {selectedBatch?.batchNumber}</DialogTitle>
+            <DialogDescription>Enter the actual quantity produced</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="actualQuantity">Actual Quantity Produced (KG)</Label>
+              <Input
+                id="actualQuantity"
+                type="number"
+                step="0.01"
+                value={recordOutputForm.actualQuantity}
+                onChange={(e) => setRecordOutputForm({ ...recordOutputForm, actualQuantity: e.target.value })}
+                placeholder={`Planned: ${selectedBatch?.plannedQuantity} KG`}
+                data-testid="input-actual-quantity"
+              />
+            </div>
+            {selectedBatch && (
+              <div className="text-sm text-muted-foreground">
+                Planned quantity: <span className="font-mono font-medium">{selectedBatch.plannedQuantity} KG</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRecordOutputOpen(false)}>Cancel</Button>
+            <Button onClick={handleRecordOutput} disabled={updateBatch.isPending} data-testid="button-record-output">
+              {updateBatch.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Record Output
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Batch</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete batch {selectedBatch?.batchNumber}? This will also remove all associated materials and quality checks. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteBatch} data-testid="button-confirm-delete-batch">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+function BatchCard({ 
+  batch, 
+  products, 
+  onStatusChange, 
+  onEditClick, 
+  onRecordOutputClick,
+  onDeleteClick 
+}: { 
+  batch: Batch; 
+  products: Product[];
+  onStatusChange: (id: string, status: string) => void;
+  onEditClick: (batch: Batch) => void;
+  onRecordOutputClick: (batch: Batch) => void;
+  onDeleteClick: (batch: Batch) => void;
+}) {
+  const product = products.find(p => p.id === batch.productId);
+  const planned = parseFloat(batch.plannedQuantity);
+  const actual = batch.actualQuantity ? parseFloat(batch.actualQuantity) : 0;
+  const percent = planned > 0 ? (actual / planned) * 100 : 0;
+  
+  return (
+    <Card className="overflow-hidden border-l-4 border-l-primary/20 hover:border-l-primary transition-all" data-testid={`card-batch-${batch.id}`}>
+      <div className="p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <h3 className="font-mono text-xl font-bold">{batch.batchNumber}</h3>
+              <StatusBadge status={batch.status} />
+            </div>
+            <p className="text-lg font-medium mt-1">{product?.name || 'Unknown Product'}</p>
+            <p className="text-sm text-muted-foreground font-mono">{product?.sku}</p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {batch.status === 'planned' && (
+               <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => onStatusChange(batch.id, 'in_progress')} data-testid={`button-release-${batch.id}`}>
+                 <Play size={16} className="mr-2" /> Release
+               </Button>
+            )}
+            {batch.status === 'in_progress' && (
+               <Button size="sm" variant="secondary" onClick={() => onStatusChange(batch.id, 'quality_check')} data-testid={`button-qc-${batch.id}`}>
+                 <CheckSquare size={16} className="mr-2" /> Send to QC
+               </Button>
+            )}
+             <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" data-testid={`button-batch-actions-${batch.id}`}>
+                  <MoreHorizontal size={18} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => onEditClick(batch)} data-testid={`button-edit-batch-${batch.id}`}>
+                  <Pencil size={14} className="mr-2" /> Edit Batch
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onRecordOutputClick(batch)} data-testid={`button-record-${batch.id}`}>
+                  <Scale size={14} className="mr-2" /> Record Output
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onStatusChange(batch.id, 'completed')}>
+                  <CheckSquare size={14} className="mr-2" /> Mark Completed
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onStatusChange(batch.id, 'released')}>
+                  Release to Inventory
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-amber-600" onClick={() => onStatusChange(batch.id, 'quarantined')}>
+                  <AlertCircle size={14} className="mr-2" /> Quarantine Batch
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={() => onDeleteClick(batch)} data-testid={`button-delete-batch-${batch.id}`}>
+                  <Trash2 size={14} className="mr-2" /> Delete Batch
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6 py-4">
+           <div className="space-y-2">
+             <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Progress</span>
+             <div className="flex items-center gap-2">
+                <Progress value={percent} className="h-3" />
+                <span className="text-xs font-mono font-medium min-w-[3rem]">{Math.round(percent)}%</span>
+             </div>
+             <p className="text-xs text-muted-foreground">
+               {actual.toFixed(0)} of {planned.toFixed(0)} {product?.unit || 'KG'} produced
+             </p>
+           </div>
+
+           <div className="space-y-1">
+              <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Schedule</span>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Started:</span>
+                <span className="font-mono">{batch.startDate ? format(new Date(batch.startDate), 'MMM d, HH:mm') : '-'}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Completed:</span>
+                <span className="font-mono">{batch.endDate ? format(new Date(batch.endDate), 'MMM d, HH:mm') : '-'}</span>
+              </div>
+           </div>
+
+           <div className="space-y-1">
+              <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Quality</span>
+              {batch.status === 'quality_check' ? (
+                <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-2 py-1 rounded w-fit">
+                  <AlertCircle size={14} />
+                  <span className="text-xs font-medium">Pending QC Approval</span>
+                </div>
+              ) : batch.status === 'quarantined' ? (
+                <div className="flex items-center gap-2 text-red-600 bg-red-50 px-2 py-1 rounded w-fit">
+                  <AlertCircle size={14} />
+                  <span className="text-xs font-medium">Quarantined</span>
+                </div>
+              ) : (
+                 <div className="flex items-center gap-2 text-muted-foreground">
+                    <CheckSquare size={14} />
+                    <span className="text-xs">No issues reported</span>
+                 </div>
+              )}
+           </div>
+        </div>
+      </div>
+    </Card>
   );
 }
 

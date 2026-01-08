@@ -63,6 +63,7 @@ export interface IStorage {
   getBatch(id: string): Promise<Batch | undefined>;
   createBatch(batch: InsertBatch): Promise<Batch>;
   updateBatch(id: string, batch: Partial<InsertBatch>): Promise<Batch | undefined>;
+  deleteBatch(id: string): Promise<void>;
   getBatchMaterials(batchId: string): Promise<BatchMaterial[]>;
   addBatchMaterial(material: InsertBatchMaterial): Promise<BatchMaterial>;
 
@@ -279,6 +280,13 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async deleteBatch(id: string): Promise<void> {
+    await db.delete(batchMaterials).where(eq(batchMaterials.batchId, id));
+    await db.delete(qualityChecks).where(eq(qualityChecks.batchId, id));
+    await db.delete(batches).where(eq(batches.id, id));
+    await this.createAuditLog({ entityType: "batch", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
+  }
+
   async getBatchMaterials(batchId: string): Promise<BatchMaterial[]> {
     return db.select().from(batchMaterials).where(eq(batchMaterials.batchId, batchId));
   }
@@ -399,7 +407,7 @@ export class DatabaseStorage implements IStorage {
     if (!batch) return null;
 
     const product = await this.getProduct(batch.productId);
-    const recipe = await this.getRecipe(batch.recipeId);
+    const recipe = batch.recipeId ? await this.getRecipe(batch.recipeId) : null;
 
     const materialsUsed = await db.select({
       batchMaterial: batchMaterials,

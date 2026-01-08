@@ -169,6 +169,11 @@ export async function registerRoutes(
     res.json(batch);
   }));
 
+  app.delete("/api/batches/:id", asyncHandler(async (req, res) => {
+    await storage.deleteBatch(req.params.id);
+    res.status(204).send();
+  }));
+
   app.get("/api/batches/:id/materials", asyncHandler(async (req, res) => {
     const materials = await storage.getBatchMaterials(req.params.id);
     res.json(materials);
