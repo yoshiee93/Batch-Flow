@@ -66,6 +66,9 @@ export interface IStorage {
   deleteBatch(id: string): Promise<void>;
   getBatchMaterials(batchId: string): Promise<BatchMaterial[]>;
   addBatchMaterial(material: InsertBatchMaterial): Promise<BatchMaterial>;
+  removeBatchMaterial(id: string): Promise<void>;
+  recordBatchInput(batchId: string, materialId: string, lotId: string, quantity: string): Promise<BatchMaterial>;
+  recordBatchOutput(batchId: string, actualQuantity: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch>;
 
   getOrders(): Promise<Order[]>;
   getOrder(id: string): Promise<Order | undefined>;
@@ -295,6 +298,147 @@ export class DatabaseStorage implements IStorage {
     const [created] = await db.insert(batchMaterials).values(material).returning();
     await this.createAuditLog({ entityType: "batch_material", entityId: created.id, action: "create", changes: JSON.stringify(material) });
     return created;
+  }
+
+  async removeBatchMaterial(id: string): Promise<void> {
+    const [bm] = await db.select().from(batchMaterials).where(eq(batchMaterials.id, id));
+    if (bm) {
+      // Restore the quantity back to the lot
+      const [lot] = await db.select().from(lots).where(eq(lots.id, bm.lotId));
+      if (lot) {
+        const restoredQuantity = (parseFloat(lot.remainingQuantity || "0") + parseFloat(bm.quantity)).toFixed(2);
+        await db.update(lots).set({ remainingQuantity: restoredQuantity }).where(eq(lots.id, bm.lotId));
+        
+        // Restore material stock
+        const [material] = await db.select().from(materials).where(eq(materials.id, bm.materialId));
+        if (material) {
+          const restoredStock = (parseFloat(material.currentStock || "0") + parseFloat(bm.quantity)).toFixed(2);
+          await db.update(materials).set({ currentStock: restoredStock }).where(eq(materials.id, bm.materialId));
+        }
+        
+        // Create reversal stock movement
+        await this.createStockMovement({
+          movementType: "adjustment",
+          materialId: bm.materialId,
+          lotId: bm.lotId,
+          batchId: bm.batchId,
+          quantity: bm.quantity, // positive = reversal of consumption
+          reason: "Batch input removed - reversal",
+        });
+      }
+      
+      await db.delete(batchMaterials).where(eq(batchMaterials.id, id));
+      await this.createAuditLog({ entityType: "batch_material", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
+    }
+  }
+
+  async recordBatchInput(batchId: string, materialId: string, lotId: string, quantity: string): Promise<BatchMaterial> {
+    const quantityNum = parseFloat(quantity);
+    
+    // Get the lot and check available quantity
+    const [lot] = await db.select().from(lots).where(eq(lots.id, lotId));
+    if (!lot) throw new Error("Lot not found");
+    
+    const remainingQty = parseFloat(lot.remainingQuantity || "0");
+    if (quantityNum > remainingQty) {
+      throw new Error(`Insufficient lot quantity. Available: ${remainingQty} KG`);
+    }
+    
+    // Deduct from lot remaining quantity
+    const newRemaining = (remainingQty - quantityNum).toFixed(2);
+    await db.update(lots).set({ remainingQuantity: newRemaining }).where(eq(lots.id, lotId));
+    
+    // Deduct from material current stock
+    const [material] = await db.select().from(materials).where(eq(materials.id, materialId));
+    if (material) {
+      const newStock = (parseFloat(material.currentStock || "0") - quantityNum).toFixed(2);
+      await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, materialId));
+    }
+    
+    // Create batch material record
+    const [batchMaterial] = await db.insert(batchMaterials).values({
+      batchId,
+      materialId,
+      lotId,
+      quantity,
+    }).returning();
+    
+    // Create stock movement
+    await this.createStockMovement({
+      movementType: "production_input",
+      materialId,
+      lotId,
+      batchId,
+      quantity: `-${quantity}`, // negative = consumed
+      reason: "Production input",
+    });
+    
+    await this.createAuditLog({
+      entityType: "batch",
+      entityId: batchId,
+      action: "input_recorded",
+      changes: JSON.stringify({ materialId, lotId, quantity }),
+    });
+    
+    return batchMaterial;
+  }
+
+  async recordBatchOutput(batchId: string, actualQuantity: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch> {
+    // Get the batch
+    const [batch] = await db.select().from(batches).where(eq(batches.id, batchId));
+    if (!batch) throw new Error("Batch not found");
+    
+    // Update batch with output quantities
+    const updateData: Partial<InsertBatch> = {
+      actualQuantity,
+      wasteQuantity,
+      millingQuantity,
+    };
+    
+    if (markCompleted) {
+      updateData.status = "completed";
+      updateData.endDate = new Date().toISOString();
+    }
+    
+    const [updated] = await db.update(batches).set(updateData).where(eq(batches.id, batchId)).returning();
+    
+    // Get the product to update stock
+    const [product] = await db.select().from(products).where(eq(products.id, batch.productId));
+    if (product) {
+      const outputQty = parseFloat(actualQuantity) || 0;
+      const newStock = (parseFloat(product.currentStock || "0") + outputQty).toFixed(2);
+      await db.update(products).set({ currentStock: newStock }).where(eq(products.id, batch.productId));
+      
+      // Create finished goods lot
+      const lotNumber = `LOT-${updated.batchNumber.replace("BATCH-", "")}`;
+      await db.insert(lots).values({
+        lotNumber,
+        productId: batch.productId,
+        quantity: actualQuantity,
+        remainingQuantity: actualQuantity,
+        status: "available",
+        sourceBatchId: batchId,
+        receivedDate: new Date().toISOString(),
+      });
+      
+      // Create production output stock movement
+      await this.createStockMovement({
+        movementType: "production_output",
+        productId: batch.productId,
+        batchId,
+        quantity: actualQuantity,
+        reason: "Production output - finished goods",
+      });
+    }
+    
+    await this.createAuditLog({
+      entityType: "batch",
+      entityId: batchId,
+      action: "output_recorded",
+      changes: JSON.stringify({ actualQuantity, wasteQuantity, millingQuantity, markCompleted }),
+    });
+    
+    return updated;
   }
 
   async getOrders(): Promise<Order[]> {
