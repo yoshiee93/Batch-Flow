@@ -1,7 +1,12 @@
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Play, CheckSquare, AlertCircle, Loader2, MoreHorizontal } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -12,13 +17,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useBatches, useProducts, useUpdateBatch } from '@/lib/api';
+import { useBatches, useProducts, useRecipes, useUpdateBatch, useCreateBatch } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Production() {
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newBatch, setNewBatch] = useState({
+    batchNumber: '',
+    productId: '',
+    recipeId: '',
+    plannedQuantity: '',
+    startDate: '',
+  });
+
   const { data: batches = [], isLoading, isError } = useBatches();
   const { data: products = [] } = useProducts();
+  const { data: recipes = [] } = useRecipes();
   const updateBatch = useUpdateBatch();
+  const createBatch = useCreateBatch();
   const { toast } = useToast();
 
   const handleStatusChange = async (batchId: string, newStatus: string) => {
@@ -28,6 +44,37 @@ export default function Production() {
     } catch (error) {
       toast({ title: "Error", description: "Failed to update batch", variant: "destructive" });
     }
+  };
+
+  const handleCreateBatch = async () => {
+    if (!newBatch.batchNumber || !newBatch.productId || !newBatch.plannedQuantity) {
+      toast({ title: "Missing fields", description: "Please fill in batch number, product, and planned quantity", variant: "destructive" });
+      return;
+    }
+    try {
+      await createBatch.mutateAsync({
+        batchNumber: newBatch.batchNumber,
+        productId: newBatch.productId,
+        recipeId: newBatch.recipeId || undefined,
+        plannedQuantity: newBatch.plannedQuantity,
+        status: 'planned',
+        startDate: newBatch.startDate ? new Date(newBatch.startDate).toISOString() : undefined,
+      });
+      toast({ title: "Batch created", description: `Batch ${newBatch.batchNumber} created successfully` });
+      setIsCreateDialogOpen(false);
+      setNewBatch({ batchNumber: '', productId: '', recipeId: '', plannedQuantity: '', startDate: '' });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to create batch", variant: "destructive" });
+    }
+  };
+
+  const generateBatchNumber = () => {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `BATCH-${year}${month}${day}-${random}`;
   };
 
   if (isLoading) {
@@ -56,9 +103,102 @@ export default function Production() {
           <h1 className="text-3xl font-bold tracking-tight font-mono" data-testid="text-production-title">Production Control</h1>
           <p className="text-muted-foreground mt-1">Manage batches and execution.</p>
         </div>
-        <Button size="lg" className="font-mono" data-testid="button-create-batch">
-          <Plus size={16} className="mr-2" /> Create New Batch
-        </Button>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="lg" className="font-mono" data-testid="button-create-batch">
+              <Plus size={16} className="mr-2" /> Create New Batch
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Batch</DialogTitle>
+              <DialogDescription>Start a new production batch</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="batchNumber">Batch Number *</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="batchNumber"
+                    placeholder="e.g. BATCH-20260108-001"
+                    value={newBatch.batchNumber}
+                    onChange={(e) => setNewBatch({ ...newBatch, batchNumber: e.target.value })}
+                    data-testid="input-batch-number"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setNewBatch({ ...newBatch, batchNumber: generateBatchNumber() })}
+                    data-testid="button-generate-batch-number"
+                  >
+                    Generate
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="product">Product *</Label>
+                <Select value={newBatch.productId} onValueChange={(v) => setNewBatch({ ...newBatch, productId: v })}>
+                  <SelectTrigger data-testid="select-product">
+                    <SelectValue placeholder="Select a product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map(product => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.sku} - {product.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="recipe">Recipe (Optional)</Label>
+                <Select value={newBatch.recipeId} onValueChange={(v) => setNewBatch({ ...newBatch, recipeId: v })}>
+                  <SelectTrigger data-testid="select-recipe">
+                    <SelectValue placeholder="Select a recipe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {recipes.map(recipe => (
+                      <SelectItem key={recipe.id} value={recipe.id}>
+                        {recipe.name} (v{recipe.version})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="plannedQuantity">Planned Quantity (KG) *</Label>
+                  <Input
+                    id="plannedQuantity"
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g. 500"
+                    value={newBatch.plannedQuantity}
+                    onChange={(e) => setNewBatch({ ...newBatch, plannedQuantity: e.target.value })}
+                    data-testid="input-planned-quantity"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="startDate">Start Date</Label>
+                  <Input
+                    id="startDate"
+                    type="datetime-local"
+                    value={newBatch.startDate}
+                    onChange={(e) => setNewBatch({ ...newBatch, startDate: e.target.value })}
+                    data-testid="input-start-date"
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleCreateBatch} disabled={createBatch.isPending} data-testid="button-submit-batch">
+                {createBatch.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create Batch
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid gap-6">

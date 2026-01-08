@@ -97,7 +97,7 @@ export const batches = pgTable("batches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   batchNumber: varchar("batch_number", { length: 50 }).notNull().unique(),
   productId: varchar("product_id").notNull().references(() => products.id),
-  recipeId: varchar("recipe_id").notNull().references(() => recipes.id),
+  recipeId: varchar("recipe_id").references(() => recipes.id),
   status: batchStatusEnum("status").notNull().default("planned"),
   plannedQuantity: decimal("planned_quantity", { precision: 12, scale: 3 }).notNull(),
   actualQuantity: decimal("actual_quantity", { precision: 12, scale: 3 }),
