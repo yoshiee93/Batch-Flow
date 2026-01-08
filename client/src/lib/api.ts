@@ -81,10 +81,12 @@ export interface Batch {
   id: string;
   batchNumber: string;
   productId: string;
-  recipeId: string;
+  recipeId: string | null;
   status: "planned" | "in_progress" | "quality_check" | "completed" | "released" | "quarantined";
   plannedQuantity: string;
   actualQuantity: string | null;
+  wasteQuantity: string | null;
+  millingQuantity: string | null;
   startDate: string | null;
   endDate: string | null;
   assignedTo: string | null;

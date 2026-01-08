@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Play, CheckSquare, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale } from 'lucide-react';
+import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   DropdownMenu,
@@ -33,7 +33,6 @@ export default function Production() {
     productId: '',
     recipeId: '',
     plannedQuantity: '',
-    startDate: '',
   });
   
   const [editForm, setEditForm] = useState({
@@ -43,6 +42,8 @@ export default function Production() {
   
   const [recordOutputForm, setRecordOutputForm] = useState({
     actualQuantity: '',
+    wasteQuantity: '',
+    millingQuantity: '',
   });
 
   const { data: batches = [], isLoading, isError } = useBatches();
@@ -52,15 +53,6 @@ export default function Production() {
   const createBatch = useCreateBatch();
   const deleteBatch = useDeleteBatch();
   const { toast } = useToast();
-
-  const handleStatusChange = async (batchId: string, newStatus: string) => {
-    try {
-      await updateBatch.mutateAsync({ id: batchId, status: newStatus as any });
-      toast({ title: "Batch updated", description: `Status changed to ${newStatus.replace('_', ' ')}` });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to update batch", variant: "destructive" });
-    }
-  };
 
   const handleCreateBatch = async () => {
     if (!newBatch.batchNumber || !newBatch.productId || !newBatch.plannedQuantity) {
@@ -73,12 +65,11 @@ export default function Production() {
         productId: newBatch.productId,
         recipeId: newBatch.recipeId || undefined,
         plannedQuantity: newBatch.plannedQuantity,
-        status: 'planned',
-        startDate: newBatch.startDate ? new Date(newBatch.startDate).toISOString() : undefined,
+        status: 'in_progress',
       });
       toast({ title: "Batch created", description: `Batch ${newBatch.batchNumber} created successfully` });
       setIsCreateDialogOpen(false);
-      setNewBatch({ batchNumber: '', productId: '', recipeId: '', plannedQuantity: '', startDate: '' });
+      setNewBatch({ batchNumber: '', productId: '', recipeId: '', plannedQuantity: '' });
     } catch (error) {
       toast({ title: "Error", description: "Failed to create batch", variant: "destructive" });
     }
@@ -113,25 +104,39 @@ export default function Production() {
     setSelectedBatch(batch);
     setRecordOutputForm({
       actualQuantity: batch.actualQuantity || '',
+      wasteQuantity: batch.wasteQuantity || '',
+      millingQuantity: batch.millingQuantity || '',
     });
     setIsRecordOutputOpen(true);
   };
 
   const handleRecordOutput = async () => {
-    if (!selectedBatch || !recordOutputForm.actualQuantity) {
-      toast({ title: "Missing fields", description: "Please enter the actual quantity produced", variant: "destructive" });
-      return;
-    }
+    if (!selectedBatch) return;
     try {
       await updateBatch.mutateAsync({
         id: selectedBatch.id,
-        actualQuantity: recordOutputForm.actualQuantity,
+        actualQuantity: recordOutputForm.actualQuantity || undefined,
+        wasteQuantity: recordOutputForm.wasteQuantity || undefined,
+        millingQuantity: recordOutputForm.millingQuantity || undefined,
       });
-      toast({ title: "Output recorded", description: `Recorded ${recordOutputForm.actualQuantity} KG produced` });
+      toast({ title: "Output recorded", description: "Production output has been recorded" });
       setIsRecordOutputOpen(false);
       setSelectedBatch(null);
     } catch (error) {
       toast({ title: "Error", description: "Failed to record output", variant: "destructive" });
+    }
+  };
+
+  const handleMarkComplete = async (batch: Batch) => {
+    try {
+      await updateBatch.mutateAsync({
+        id: batch.id,
+        status: 'completed',
+        endDate: new Date().toISOString(),
+      });
+      toast({ title: "Batch completed", description: `Batch ${batch.batchNumber} marked as completed` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to complete batch", variant: "destructive" });
     }
   };
 
@@ -185,7 +190,7 @@ export default function Production() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight font-mono" data-testid="text-production-title">Production Control</h1>
-          <p className="text-muted-foreground mt-1">Manage batches and execution.</p>
+          <p className="text-muted-foreground mt-1">Manage batches and record output.</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -249,29 +254,17 @@ export default function Production() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="plannedQuantity">Planned Quantity (KG) *</Label>
-                  <Input
-                    id="plannedQuantity"
-                    type="number"
-                    step="0.01"
-                    placeholder="e.g. 500"
-                    value={newBatch.plannedQuantity}
-                    onChange={(e) => setNewBatch({ ...newBatch, plannedQuantity: e.target.value })}
-                    data-testid="input-planned-quantity"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="startDate">Start Date</Label>
-                  <Input
-                    id="startDate"
-                    type="datetime-local"
-                    value={newBatch.startDate}
-                    onChange={(e) => setNewBatch({ ...newBatch, startDate: e.target.value })}
-                    data-testid="input-start-date"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="plannedQuantity">Planned Quantity (KG) *</Label>
+                <Input
+                  id="plannedQuantity"
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 500"
+                  value={newBatch.plannedQuantity}
+                  onChange={(e) => setNewBatch({ ...newBatch, plannedQuantity: e.target.value })}
+                  data-testid="input-planned-quantity"
+                />
               </div>
             </div>
             <DialogFooter>
@@ -291,9 +284,9 @@ export default function Production() {
             key={batch.id} 
             batch={batch} 
             products={products}
-            onStatusChange={handleStatusChange}
             onEditClick={handleEditClick}
             onRecordOutputClick={handleRecordOutputClick}
+            onMarkComplete={handleMarkComplete}
             onDeleteClick={handleDeleteClick}
           />
         ))}
@@ -347,26 +340,50 @@ export default function Production() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Record Output for {selectedBatch?.batchNumber}</DialogTitle>
-            <DialogDescription>Enter the actual quantity produced</DialogDescription>
+            <DialogDescription>Enter the quantities produced</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {selectedBatch && (
+              <div className="text-sm text-muted-foreground mb-4 p-3 bg-muted rounded-md">
+                Planned quantity: <span className="font-mono font-medium">{selectedBatch.plannedQuantity} KG</span>
+              </div>
+            )}
             <div className="space-y-2">
-              <Label htmlFor="actualQuantity">Actual Quantity Produced (KG)</Label>
+              <Label htmlFor="actualQuantity">Product Output (KG)</Label>
               <Input
                 id="actualQuantity"
                 type="number"
                 step="0.01"
                 value={recordOutputForm.actualQuantity}
                 onChange={(e) => setRecordOutputForm({ ...recordOutputForm, actualQuantity: e.target.value })}
-                placeholder={`Planned: ${selectedBatch?.plannedQuantity} KG`}
+                placeholder="Finished product quantity"
                 data-testid="input-actual-quantity"
               />
             </div>
-            {selectedBatch && (
-              <div className="text-sm text-muted-foreground">
-                Planned quantity: <span className="font-mono font-medium">{selectedBatch.plannedQuantity} KG</span>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="wasteQuantity">Waste (KG)</Label>
+              <Input
+                id="wasteQuantity"
+                type="number"
+                step="0.01"
+                value={recordOutputForm.wasteQuantity}
+                onChange={(e) => setRecordOutputForm({ ...recordOutputForm, wasteQuantity: e.target.value })}
+                placeholder="Waste quantity"
+                data-testid="input-waste-quantity"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="millingQuantity">Milling (KG)</Label>
+              <Input
+                id="millingQuantity"
+                type="number"
+                step="0.01"
+                value={recordOutputForm.millingQuantity}
+                onChange={(e) => setRecordOutputForm({ ...recordOutputForm, millingQuantity: e.target.value })}
+                placeholder="Milling quantity"
+                data-testid="input-milling-quantity"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsRecordOutputOpen(false)}>Cancel</Button>
@@ -383,7 +400,7 @@ export default function Production() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Batch</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete batch {selectedBatch?.batchNumber}? This will also remove all associated materials and quality checks. This action cannot be undone.
+              Are you sure you want to delete batch {selectedBatch?.batchNumber}? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -401,48 +418,49 @@ export default function Production() {
 function BatchCard({ 
   batch, 
   products, 
-  onStatusChange, 
   onEditClick, 
   onRecordOutputClick,
+  onMarkComplete,
   onDeleteClick 
 }: { 
   batch: Batch; 
   products: Product[];
-  onStatusChange: (id: string, status: string) => void;
   onEditClick: (batch: Batch) => void;
   onRecordOutputClick: (batch: Batch) => void;
+  onMarkComplete: (batch: Batch) => void;
   onDeleteClick: (batch: Batch) => void;
 }) {
   const product = products.find(p => p.id === batch.productId);
   const planned = parseFloat(batch.plannedQuantity);
   const actual = batch.actualQuantity ? parseFloat(batch.actualQuantity) : 0;
-  const percent = planned > 0 ? (actual / planned) * 100 : 0;
+  const waste = batch.wasteQuantity ? parseFloat(batch.wasteQuantity) : 0;
+  const milling = batch.millingQuantity ? parseFloat(batch.millingQuantity) : 0;
+  const totalOutput = actual + waste + milling;
+  const percent = planned > 0 ? (totalOutput / planned) * 100 : 0;
+  const isCompleted = batch.status === 'completed';
   
   return (
-    <Card className="overflow-hidden border-l-4 border-l-primary/20 hover:border-l-primary transition-all" data-testid={`card-batch-${batch.id}`}>
+    <Card className={`overflow-hidden border-l-4 transition-all ${isCompleted ? 'border-l-green-500 bg-green-50/30' : 'border-l-blue-500'}`} data-testid={`card-batch-${batch.id}`}>
       <div className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <div>
             <div className="flex items-center gap-3">
               <h3 className="font-mono text-xl font-bold">{batch.batchNumber}</h3>
-              <StatusBadge status={batch.status} />
+              <Badge variant="outline" className={`font-mono uppercase text-[10px] ${isCompleted ? 'bg-green-100 text-green-700 border-green-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                {isCompleted ? 'Completed' : 'In Progress'}
+              </Badge>
             </div>
             <p className="text-lg font-medium mt-1">{product?.name || 'Unknown Product'}</p>
             <p className="text-sm text-muted-foreground font-mono">{product?.sku}</p>
           </div>
           
           <div className="flex items-center gap-2">
-            {batch.status === 'planned' && (
-               <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => onStatusChange(batch.id, 'in_progress')} data-testid={`button-release-${batch.id}`}>
-                 <Play size={16} className="mr-2" /> Release
-               </Button>
+            {!isCompleted && (
+              <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => onMarkComplete(batch)} data-testid={`button-complete-${batch.id}`}>
+                <CheckCircle size={16} className="mr-2" /> Mark Complete
+              </Button>
             )}
-            {batch.status === 'in_progress' && (
-               <Button size="sm" variant="secondary" onClick={() => onStatusChange(batch.id, 'quality_check')} data-testid={`button-qc-${batch.id}`}>
-                 <CheckSquare size={16} className="mr-2" /> Send to QC
-               </Button>
-            )}
-             <DropdownMenu>
+            <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" data-testid={`button-batch-actions-${batch.id}`}>
                   <MoreHorizontal size={18} />
@@ -457,16 +475,6 @@ function BatchCard({
                   <Scale size={14} className="mr-2" /> Record Output
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onStatusChange(batch.id, 'completed')}>
-                  <CheckSquare size={14} className="mr-2" /> Mark Completed
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onStatusChange(batch.id, 'released')}>
-                  Release to Inventory
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-amber-600" onClick={() => onStatusChange(batch.id, 'quarantined')}>
-                  <AlertCircle size={14} className="mr-2" /> Quarantine Batch
-                </DropdownMenuItem>
                 <DropdownMenuItem className="text-destructive" onClick={() => onDeleteClick(batch)} data-testid={`button-delete-batch-${batch.id}`}>
                   <Trash2 size={14} className="mr-2" /> Delete Batch
                 </DropdownMenuItem>
@@ -475,68 +483,49 @@ function BatchCard({
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 py-4">
-           <div className="space-y-2">
-             <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Progress</span>
-             <div className="flex items-center gap-2">
-                <Progress value={percent} className="h-3" />
-                <span className="text-xs font-mono font-medium min-w-[3rem]">{Math.round(percent)}%</span>
-             </div>
-             <p className="text-xs text-muted-foreground">
-               {actual.toFixed(0)} of {planned.toFixed(0)} {product?.unit || 'KG'} produced
-             </p>
-           </div>
+        <div className="grid md:grid-cols-2 gap-6 py-4">
+          <div className="space-y-3">
+            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Progress</span>
+            <div className="flex items-center gap-2">
+              <Progress value={Math.min(percent, 100)} className="h-3" />
+              <span className="text-xs font-mono font-medium min-w-[3rem]">{Math.round(percent)}%</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {totalOutput.toFixed(1)} of {planned.toFixed(1)} KG accounted for
+            </p>
+          </div>
 
-           <div className="space-y-1">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Schedule</span>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Started:</span>
-                <span className="font-mono">{batch.startDate ? format(new Date(batch.startDate), 'MMM d, HH:mm') : '-'}</span>
+          <div className="space-y-2">
+            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Output Breakdown</span>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-2 bg-muted rounded">
+                <div className="text-lg font-mono font-bold text-green-600">{actual.toFixed(1)}</div>
+                <div className="text-[10px] text-muted-foreground uppercase">Product</div>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Completed:</span>
-                <span className="font-mono">{batch.endDate ? format(new Date(batch.endDate), 'MMM d, HH:mm') : '-'}</span>
+              <div className="text-center p-2 bg-muted rounded">
+                <div className="text-lg font-mono font-bold text-red-600">{waste.toFixed(1)}</div>
+                <div className="text-[10px] text-muted-foreground uppercase">Waste</div>
               </div>
-           </div>
+              <div className="text-center p-2 bg-muted rounded">
+                <div className="text-lg font-mono font-bold text-amber-600">{milling.toFixed(1)}</div>
+                <div className="text-[10px] text-muted-foreground uppercase">Milling</div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-           <div className="space-y-1">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Quality</span>
-              {batch.status === 'quality_check' ? (
-                <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-2 py-1 rounded w-fit">
-                  <AlertCircle size={14} />
-                  <span className="text-xs font-medium">Pending QC Approval</span>
-                </div>
-              ) : batch.status === 'quarantined' ? (
-                <div className="flex items-center gap-2 text-red-600 bg-red-50 px-2 py-1 rounded w-fit">
-                  <AlertCircle size={14} />
-                  <span className="text-xs font-medium">Quarantined</span>
-                </div>
-              ) : (
-                 <div className="flex items-center gap-2 text-muted-foreground">
-                    <CheckSquare size={14} />
-                    <span className="text-xs">No issues reported</span>
-                 </div>
-              )}
-           </div>
+        {batch.notes && (
+          <div className="mt-4 pt-4 border-t">
+            <span className="text-xs text-muted-foreground">Notes: </span>
+            <span className="text-sm">{batch.notes}</span>
+          </div>
+        )}
+
+        <div className="mt-4 pt-4 border-t flex items-center gap-4 text-xs text-muted-foreground">
+          <span>Created: {format(new Date(batch.createdAt), 'MMM d, yyyy HH:mm')}</span>
+          {batch.endDate && <span>Completed: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
         </div>
       </div>
     </Card>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    planned: "bg-slate-100 text-slate-700 border-slate-200",
-    in_progress: "bg-blue-100 text-blue-700 border-blue-200 animate-pulse",
-    quality_check: "bg-amber-100 text-amber-700 border-amber-200",
-    completed: "bg-green-100 text-green-700 border-green-200",
-    released: "bg-green-100 text-green-700 border-green-200",
-    quarantined: "bg-red-100 text-red-700 border-red-200",
-  };
-
-  return (
-    <Badge variant="outline" className={`font-mono uppercase text-[10px] ${styles[status]}`}>
-      {status.replace('_', ' ')}
-    </Badge>
   );
 }
