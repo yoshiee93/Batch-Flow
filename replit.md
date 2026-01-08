@@ -12,6 +12,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 8, 2026**: Implemented multi-product batch output system. Batches can now produce multiple different products (e.g., freeze-dried strawberries producing both diced and crumble). New batchOutputs table tracks each product output. BatchOutputsEditor component provides add/remove outputs, waste/milling tracking, and finalize workflow. New API endpoints: GET/POST `/api/batches/:id/outputs`, DELETE `/api/batch-outputs/:id`, POST `/api/batches/:id/finalize`.
 - **Jan 8, 2026**: Simplified Record Input to remove lot requirement. Now just select material and quantity - inventory is deducted directly from material stock. Made lotId optional in batchMaterials table.
 - **Jan 8, 2026**: Added inventory categorization system. Products can now be flagged as "Input" (can be used in production) and/or "Output" (can be produced). This enables scenarios like "Strawberry Slice" being an output of one batch and an input to another. Category badges shown in Products table, checkboxes in create/edit forms. New API endpoints: `/api/items/inputs` and `/api/items/outputs`.
 - **Jan 8, 2026**: Implemented priority-based stock allocation system. Orders are allocated stock based on priority level (urgent > high > normal > low), then by due date (soonest first). Dashboard and Orders page show allocation status: Ready to Ship (green), Partially Allocated (amber), Awaiting Stock (grey). Auto-reallocation triggers on inventory changes and order modifications. Uses database transactions to prevent race conditions.
@@ -70,6 +71,7 @@ The backend follows a modular structure:
 - **recipeItems** - Bill of materials for each recipe
 - **batches** - Production batches with status workflow (planned → in_progress → quality_check → completed → released)
 - **batchMaterials** - Material lots used in each batch (for traceability)
+- **batchOutputs** - Multiple product outputs per batch with quantities
 - **orders** - Customer orders with priority and status
 - **orderItems** - Line items for each order
 - **qualityChecks** - QC records for batches
@@ -85,7 +87,10 @@ The backend follows a modular structure:
 - `GET/POST /api/batches` - Batch management
 - `GET /api/batches/:id/materials` - Batch materials used
 - `POST /api/batches/:id/input` - Record production input (deducts from inventory)
-- `POST /api/batches/:id/output` - Record production output (adds to inventory)
+- `POST /api/batches/:id/output` - Record production output (legacy, single output)
+- `GET/POST /api/batches/:id/outputs` - Get/add batch outputs (multiple products per batch)
+- `DELETE /api/batch-outputs/:id` - Remove batch output (reverses inventory change)
+- `POST /api/batches/:id/finalize` - Finalize batch with waste/milling and optional completion
 - `DELETE /api/batch-materials/:id` - Remove batch material (returns to inventory)
 - `PATCH /api/batch-materials/:id` - Update batch material quantity (adjusts inventory with delta)
 - `GET/POST /api/orders` - Order management
