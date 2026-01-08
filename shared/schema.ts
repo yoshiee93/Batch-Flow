@@ -33,6 +33,15 @@ export const customers = pgTable("customers", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const categories = pgTable("categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  excludeFromYield: boolean("exclude_from_yield").notNull().default(false),
+  isDefault: boolean("is_default").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   sku: varchar("sku", { length: 50 }).notNull().unique(),
@@ -41,9 +50,7 @@ export const products = pgTable("products", {
   unit: varchar("unit", { length: 10 }).notNull().default("KG"),
   minStock: decimal("min_stock", { precision: 12, scale: 3 }).notNull().default("0"),
   currentStock: decimal("current_stock", { precision: 12, scale: 3 }).notNull().default("0"),
-  isInput: boolean("is_input").notNull().default(false),
-  isOutput: boolean("is_output").notNull().default(true),
-  isPowder: boolean("is_powder").notNull().default(false),
+  categoryId: varchar("category_id").references(() => categories.id),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -277,6 +284,7 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true });
+export const insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
 export const insertMaterialSchema = createInsertSchema(materials).omit({ id: true, createdAt: true });
 export const insertLotSchema = createInsertSchema(lots).omit({ id: true, createdAt: true });
@@ -300,6 +308,8 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 export type Customer = typeof customers.$inferSelect;
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
+export type Category = typeof categories.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
