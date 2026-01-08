@@ -314,6 +314,9 @@ export class DatabaseStorage implements IStorage {
       // Delete batch materials
       await tx.delete(batchMaterials).where(eq(batchMaterials.batchId, id));
       
+      // Delete batch outputs
+      await tx.delete(batchOutputs).where(eq(batchOutputs.batchId, id));
+      
       // Delete quality checks
       await tx.delete(qualityChecks).where(eq(qualityChecks.batchId, id));
       
