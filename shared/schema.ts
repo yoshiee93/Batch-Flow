@@ -122,6 +122,15 @@ export const batchMaterials = pgTable("batch_materials", {
   addedBy: varchar("added_by").references(() => users.id),
 });
 
+export const batchOutputs = pgTable("batch_outputs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchId: varchar("batch_id").notNull().references(() => batches.id),
+  productId: varchar("product_id").notNull().references(() => products.id),
+  quantity: decimal("quantity", { precision: 12, scale: 3 }).notNull(),
+  addedAt: timestamp("added_at").notNull().defaultNow(),
+  addedBy: varchar("added_by").references(() => users.id),
+});
+
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderNumber: varchar("order_number", { length: 50 }).notNull().unique(),
@@ -274,6 +283,7 @@ export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, c
 export const insertRecipeItemSchema = createInsertSchema(recipeItems).omit({ id: true });
 export const insertBatchSchema = createInsertSchema(batches).omit({ id: true, createdAt: true });
 export const insertBatchMaterialSchema = createInsertSchema(batchMaterials).omit({ id: true, addedAt: true });
+export const insertBatchOutputSchema = createInsertSchema(batchOutputs).omit({ id: true, addedAt: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true }).extend({
   dueDate: z.union([z.string(), z.date()]).transform((val) => typeof val === 'string' ? new Date(val) : val),
 });
@@ -300,6 +310,8 @@ export type InsertBatch = z.infer<typeof insertBatchSchema>;
 export type Batch = typeof batches.$inferSelect;
 export type InsertBatchMaterial = z.infer<typeof insertBatchMaterialSchema>;
 export type BatchMaterial = typeof batchMaterials.$inferSelect;
+export type InsertBatchOutput = z.infer<typeof insertBatchOutputSchema>;
+export type BatchOutput = typeof batchOutputs.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;

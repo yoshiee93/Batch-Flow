@@ -392,6 +392,75 @@ export function useRecordBatchOutput() {
   });
 }
 
+export interface BatchOutput {
+  id: string;
+  batchId: string;
+  productId: string;
+  quantity: string;
+  addedAt: string;
+}
+
+export function useBatchOutputs(batchId: string) {
+  return useQuery<BatchOutput[]>({
+    queryKey: ["batchOutputs", batchId],
+    queryFn: () => fetchApi(`/batches/${batchId}/outputs`),
+    enabled: !!batchId,
+  });
+}
+
+export function useAddBatchOutput() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ batchId, productId, quantity }: { batchId: string; productId: string; quantity: string }) =>
+      fetchApi<BatchOutput>(`/batches/${batchId}/outputs`, { 
+        method: "POST", 
+        body: JSON.stringify({ productId, quantity }) 
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batchOutputs", variables.batchId] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["outputItems"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    },
+  });
+}
+
+export function useRemoveBatchOutput() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => fetchApi(`/batch-outputs/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batchOutputs"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["outputItems"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    },
+  });
+}
+
+export function useFinalizeBatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ batchId, wasteQuantity, millingQuantity, markCompleted }: { 
+      batchId: string; 
+      wasteQuantity: string; 
+      millingQuantity: string;
+      markCompleted: boolean;
+    }) =>
+      fetchApi<Batch>(`/batches/${batchId}/finalize`, { 
+        method: "POST", 
+        body: JSON.stringify({ wasteQuantity, millingQuantity, markCompleted }) 
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    },
+  });
+}
+
 export function useCreateOrder() {
   const queryClient = useQueryClient();
   return useMutation({

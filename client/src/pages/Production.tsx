@@ -19,10 +19,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { 
-  useBatches, useProducts, useRecipes, useMaterials, useLots, 
+  useBatches, useProducts, useRecipes, useMaterials, useLots, useOutputItems,
   useUpdateBatch, useCreateBatch, useDeleteBatch,
   useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useUpdateBatchMaterial, useRecordBatchOutput,
-  type Batch, type Product, type Material, type Lot, type BatchMaterial
+  useBatchOutputs, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch,
+  type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput
 } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -478,68 +479,20 @@ export default function Production() {
       </Dialog>
 
       <Dialog open={isRecordOutputOpen} onOpenChange={setIsRecordOutputOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Record Output for {selectedBatch?.batchNumber}</DialogTitle>
-            <DialogDescription>Enter production output. Product output will be added to inventory.</DialogDescription>
+            <DialogTitle>Manage Outputs for {selectedBatch?.batchNumber}</DialogTitle>
+            <DialogDescription>Add multiple product outputs from this batch. Each output will be added to product inventory.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="actualQuantity">Product Output (KG)</Label>
-              <Input
-                id="actualQuantity"
-                type="number"
-                step="0.01"
-                value={recordOutputForm.actualQuantity}
-                onChange={(e) => setRecordOutputForm({ ...recordOutputForm, actualQuantity: e.target.value })}
-                placeholder="Finished product quantity"
-                data-testid="input-actual-quantity"
-              />
-              <p className="text-xs text-muted-foreground">This will be added to product inventory</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="wasteQuantity">Waste (KG)</Label>
-              <Input
-                id="wasteQuantity"
-                type="number"
-                step="0.01"
-                value={recordOutputForm.wasteQuantity}
-                onChange={(e) => setRecordOutputForm({ ...recordOutputForm, wasteQuantity: e.target.value })}
-                placeholder="Waste quantity"
-                data-testid="input-waste-quantity"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="millingQuantity">Milling (KG)</Label>
-              <Input
-                id="millingQuantity"
-                type="number"
-                step="0.01"
-                value={recordOutputForm.millingQuantity}
-                onChange={(e) => setRecordOutputForm({ ...recordOutputForm, millingQuantity: e.target.value })}
-                placeholder="Milling quantity"
-                data-testid="input-milling-quantity"
-              />
-            </div>
-            <div className="flex items-center space-x-2 pt-2 border-t">
-              <Checkbox
-                id="markCompleted"
-                checked={recordOutputForm.markCompleted}
-                onCheckedChange={(checked) => setRecordOutputForm({ ...recordOutputForm, markCompleted: !!checked })}
-                data-testid="checkbox-mark-completed"
-              />
-              <Label htmlFor="markCompleted" className="text-sm font-normal cursor-pointer">
-                Mark batch as completed
-              </Label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRecordOutputOpen(false)}>Cancel</Button>
-            <Button onClick={handleRecordOutput} disabled={recordBatchOutput.isPending} data-testid="button-record-output">
-              {recordBatchOutput.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Record Output
-            </Button>
-          </DialogFooter>
+          {selectedBatch && (
+            <BatchOutputsEditor
+              batchId={selectedBatch.id}
+              isCompleted={selectedBatch.status === 'completed'}
+              wasteQuantity={selectedBatch.wasteQuantity || '0'}
+              millingQuantity={selectedBatch.millingQuantity || '0'}
+              onClose={() => setIsRecordOutputOpen(false)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -950,5 +903,241 @@ function BatchCard({
         </div>
       </div>
     </Card>
+  );
+}
+
+function BatchOutputsEditor({ 
+  batchId,
+  isCompleted,
+  wasteQuantity: initialWaste,
+  millingQuantity: initialMilling,
+  onClose,
+}: { 
+  batchId: string;
+  isCompleted: boolean;
+  wasteQuantity: string;
+  millingQuantity: string;
+  onClose: () => void;
+}) {
+  const [newOutputForm, setNewOutputForm] = useState({ productId: '', quantity: '' });
+  const [wasteQuantity, setWasteQuantity] = useState(initialWaste);
+  const [millingQuantity, setMillingQuantity] = useState(initialMilling);
+  const [markCompleted, setMarkCompleted] = useState(false);
+  
+  const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
+  const { data: outputProducts = [] } = useOutputItems();
+  const addBatchOutput = useAddBatchOutput();
+  const removeBatchOutput = useRemoveBatchOutput();
+  const finalizeBatch = useFinalizeBatch();
+  const { toast } = useToast();
+  
+  const handleAddOutput = async () => {
+    if (!newOutputForm.productId || !newOutputForm.quantity) {
+      toast({ title: "Missing fields", description: "Please select product and enter quantity", variant: "destructive" });
+      return;
+    }
+    try {
+      await addBatchOutput.mutateAsync({
+        batchId,
+        productId: newOutputForm.productId,
+        quantity: newOutputForm.quantity,
+      });
+      toast({ title: "Output added", description: "Product output has been added to batch and inventory" });
+      setNewOutputForm({ productId: '', quantity: '' });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to add output", variant: "destructive" });
+    }
+  };
+  
+  const handleRemoveOutput = async (outputId: string) => {
+    try {
+      await removeBatchOutput.mutateAsync(outputId);
+      toast({ title: "Output removed", description: "Product output removed and inventory adjusted" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to remove output", variant: "destructive" });
+    }
+  };
+  
+  const handleFinalize = async () => {
+    try {
+      await finalizeBatch.mutateAsync({
+        batchId,
+        wasteQuantity: wasteQuantity || "0",
+        millingQuantity: millingQuantity || "0",
+        markCompleted,
+      });
+      toast({ 
+        title: markCompleted ? "Batch completed" : "Batch updated", 
+        description: markCompleted 
+          ? "Batch has been finalized and marked as complete" 
+          : "Batch waste/milling quantities updated"
+      });
+      onClose();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to finalize batch", variant: "destructive" });
+    }
+  };
+  
+  const totalOutputQuantity = outputs.reduce((sum, o) => sum + parseFloat(o.quantity), 0);
+  
+  return (
+    <div className="space-y-4 py-2">
+      {!isCompleted && (
+        <div className="space-y-4 pb-4 border-b">
+          <h4 className="font-medium text-sm">Add Product Output</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="output-product">Product</Label>
+              <Select 
+                value={newOutputForm.productId} 
+                onValueChange={(v) => setNewOutputForm({ ...newOutputForm, productId: v })}
+              >
+                <SelectTrigger data-testid="select-output-product">
+                  <SelectValue placeholder="Select product" />
+                </SelectTrigger>
+                <SelectContent>
+                  {outputProducts.map(product => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {product.sku} - {product.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="output-quantity">Quantity (KG)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="output-quantity"
+                  type="number"
+                  step="0.01"
+                  value={newOutputForm.quantity}
+                  onChange={(e) => setNewOutputForm({ ...newOutputForm, quantity: e.target.value })}
+                  placeholder="0.00"
+                  data-testid="input-output-quantity"
+                />
+                <Button 
+                  onClick={handleAddOutput} 
+                  disabled={addBatchOutput.isPending}
+                  data-testid="button-add-output"
+                >
+                  {addBatchOutput.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus size={16} />}
+                  Add
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div>
+        <h4 className="font-medium text-sm mb-2">Product Outputs ({outputs.length})</h4>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </div>
+        ) : outputs.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-2">No outputs recorded yet</p>
+        ) : (
+          <div className="space-y-2">
+            {outputs.map((output) => {
+              const product = outputProducts.find(p => p.id === output.productId);
+              return (
+                <div 
+                  key={output.id} 
+                  className="flex items-center justify-between p-2 bg-muted rounded text-sm"
+                  data-testid={`output-row-${output.id}`}
+                >
+                  <div>
+                    <span className="font-mono text-muted-foreground">{product?.sku}</span>
+                    <span className="mx-2">-</span>
+                    <span>{product?.name || 'Unknown Product'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono">{output.quantity} KG</span>
+                    {!isCompleted && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 text-destructive hover:text-destructive"
+                        onClick={() => handleRemoveOutput(output.id)}
+                        disabled={removeBatchOutput.isPending}
+                        data-testid={`button-remove-output-${output.id}`}
+                      >
+                        <X size={14} />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="flex justify-between items-center pt-2 font-medium text-sm">
+              <span>Total Output:</span>
+              <span className="font-mono">{totalOutputQuantity.toFixed(2)} KG</span>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {!isCompleted && (
+        <>
+          <div className="space-y-4 pt-4 border-t">
+            <h4 className="font-medium text-sm">Waste & Milling</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="waste">Waste (KG)</Label>
+                <Input
+                  id="waste"
+                  type="number"
+                  step="0.01"
+                  value={wasteQuantity}
+                  onChange={(e) => setWasteQuantity(e.target.value)}
+                  placeholder="0.00"
+                  data-testid="input-finalize-waste"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="milling">Milling (KG)</Label>
+                <Input
+                  id="milling"
+                  type="number"
+                  step="0.01"
+                  value={millingQuantity}
+                  onChange={(e) => setMillingQuantity(e.target.value)}
+                  placeholder="0.00"
+                  data-testid="input-finalize-milling"
+                />
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2 pt-2">
+            <Checkbox
+              id="markCompletedFinal"
+              checked={markCompleted}
+              onCheckedChange={(checked) => setMarkCompleted(!!checked)}
+              data-testid="checkbox-finalize-completed"
+            />
+            <Label htmlFor="markCompletedFinal" className="text-sm font-normal cursor-pointer">
+              Mark batch as completed (cannot add more outputs after)
+            </Label>
+          </div>
+          
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={handleFinalize} disabled={finalizeBatch.isPending} data-testid="button-finalize-batch">
+              {finalizeBatch.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {markCompleted ? 'Finalize & Complete' : 'Save Changes'}
+            </Button>
+          </div>
+        </>
+      )}
+      
+      {isCompleted && (
+        <div className="flex justify-end pt-4 border-t">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </div>
+      )}
+    </div>
   );
 }

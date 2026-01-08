@@ -234,6 +234,40 @@ export async function registerRoutes(
     res.json(batch);
   }));
 
+  app.get("/api/batches/:id/outputs", asyncHandler(async (req, res) => {
+    const outputs = await storage.getBatchOutputs(req.params.id);
+    res.json(outputs);
+  }));
+
+  app.post("/api/batches/:id/outputs", asyncHandler(async (req, res) => {
+    const { productId, quantity } = req.body;
+    if (!productId || !quantity) {
+      return res.status(400).json({ error: "productId and quantity are required" });
+    }
+    const qty = parseFloat(quantity);
+    if (isNaN(qty) || qty <= 0) {
+      return res.status(400).json({ error: "quantity must be a positive number" });
+    }
+    const output = await storage.addBatchOutput(req.params.id, productId, quantity);
+    res.status(201).json(output);
+  }));
+
+  app.delete("/api/batch-outputs/:id", asyncHandler(async (req, res) => {
+    await storage.removeBatchOutput(req.params.id);
+    res.status(204).send();
+  }));
+
+  app.post("/api/batches/:id/finalize", asyncHandler(async (req, res) => {
+    const { wasteQuantity, millingQuantity, markCompleted } = req.body;
+    const batch = await storage.finalizeBatch(
+      req.params.id,
+      wasteQuantity || "0",
+      millingQuantity || "0",
+      markCompleted || false
+    );
+    res.json(batch);
+  }));
+
   app.get("/api/orders", asyncHandler(async (req, res) => {
     const orders = await storage.getOrders();
     res.json(orders);

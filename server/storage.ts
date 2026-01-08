@@ -2,7 +2,7 @@ import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, products, materials, lots, recipes, recipeItems,
-  batches, batchMaterials, orders, orderItems, qualityChecks,
+  batches, batchMaterials, batchOutputs, orders, orderItems, qualityChecks,
   stockMovements, auditLogs, customers,
   type User, type InsertUser,
   type Customer, type InsertCustomer,
@@ -13,6 +13,7 @@ import {
   type RecipeItem, type InsertRecipeItem,
   type Batch, type InsertBatch,
   type BatchMaterial, type InsertBatchMaterial,
+  type BatchOutput, type InsertBatchOutput,
   type Order, type InsertOrder,
   type OrderItem, type InsertOrderItem,
   type QualityCheck, type InsertQualityCheck,
@@ -71,6 +72,10 @@ export interface IStorage {
   removeBatchMaterial(id: string): Promise<void>;
   updateBatchMaterial(id: string, quantity: string): Promise<BatchMaterial>;
   recordBatchInput(batchId: string, materialId: string, quantity: string): Promise<BatchMaterial>;
+  getBatchOutputs(batchId: string): Promise<BatchOutput[]>;
+  addBatchOutput(batchId: string, productId: string, quantity: string): Promise<BatchOutput>;
+  removeBatchOutput(id: string): Promise<void>;
+  finalizeBatch(batchId: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch>;
   recordBatchOutput(batchId: string, actualQuantity: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch>;
 
   getOrders(): Promise<Order[]>;
@@ -485,6 +490,122 @@ export class DatabaseStorage implements IStorage {
     });
     
     return batchMaterial;
+  }
+
+  async getBatchOutputs(batchId: string): Promise<BatchOutput[]> {
+    return db.select().from(batchOutputs).where(eq(batchOutputs.batchId, batchId));
+  }
+
+  async addBatchOutput(batchId: string, productId: string, quantity: string): Promise<BatchOutput> {
+    const quantityNum = parseFloat(quantity);
+    
+    // Verify batch exists and is not completed
+    const [batch] = await db.select().from(batches).where(eq(batches.id, batchId));
+    if (!batch) throw new Error("Batch not found");
+    if (batch.status === "completed") throw new Error("Cannot add output to completed batch");
+    
+    // Verify product exists
+    const [product] = await db.select().from(products).where(eq(products.id, productId));
+    if (!product) throw new Error("Product not found");
+    
+    // Create batch output record
+    const [output] = await db.insert(batchOutputs).values({
+      batchId,
+      productId,
+      quantity,
+    }).returning();
+    
+    // Add to product stock
+    const newStock = (parseFloat(product.currentStock || "0") + quantityNum).toFixed(2);
+    await db.update(products).set({ currentStock: newStock }).where(eq(products.id, productId));
+    
+    // Create stock movement
+    await this.createStockMovement({
+      movementType: "production_output",
+      productId,
+      batchId,
+      quantity,
+      reference: `Production output: ${product.name}`,
+    });
+    
+    await this.createAuditLog({
+      entityType: "batch",
+      entityId: batchId,
+      action: "output_added",
+      changes: JSON.stringify({ productId, quantity }),
+    });
+    
+    // Re-run allocation when stock changes
+    await this.runStockAllocation();
+    
+    return output;
+  }
+
+  async removeBatchOutput(id: string): Promise<void> {
+    const [output] = await db.select().from(batchOutputs).where(eq(batchOutputs.id, id));
+    if (!output) return;
+    
+    // Verify batch is not completed
+    const [batch] = await db.select().from(batches).where(eq(batches.id, output.batchId));
+    if (batch && batch.status === "completed") throw new Error("Cannot remove output from completed batch");
+    
+    // Deduct from product stock
+    const [product] = await db.select().from(products).where(eq(products.id, output.productId));
+    if (product) {
+      const newStock = (parseFloat(product.currentStock || "0") - parseFloat(output.quantity)).toFixed(2);
+      await db.update(products).set({ currentStock: newStock }).where(eq(products.id, output.productId));
+    }
+    
+    // Create reversal stock movement
+    await this.createStockMovement({
+      movementType: "adjustment",
+      productId: output.productId,
+      batchId: output.batchId,
+      quantity: `-${output.quantity}`,
+      reference: "Production output removed - reversal",
+    });
+    
+    await db.delete(batchOutputs).where(eq(batchOutputs.id, id));
+    
+    await this.createAuditLog({
+      entityType: "batch",
+      entityId: output.batchId,
+      action: "output_removed",
+      changes: JSON.stringify({ productId: output.productId, quantity: output.quantity }),
+    });
+    
+    await this.runStockAllocation();
+  }
+
+  async finalizeBatch(batchId: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch> {
+    const [batch] = await db.select().from(batches).where(eq(batches.id, batchId));
+    if (!batch) throw new Error("Batch not found");
+    
+    // Calculate total output from batch outputs
+    const outputs = await this.getBatchOutputs(batchId);
+    const totalOutput = outputs.reduce((sum, o) => sum + parseFloat(o.quantity), 0);
+    
+    const updateData: Partial<InsertBatch> = {
+      actualQuantity: totalOutput.toFixed(2),
+      wasteQuantity,
+      millingQuantity,
+    };
+    
+    if (markCompleted) {
+      updateData.status = "completed";
+      updateData.endDate = new Date();
+    }
+    
+    const [updated] = await db.update(batches).set(updateData).where(eq(batches.id, batchId)).returning();
+    
+    await this.createAuditLog({
+      entityType: "batch",
+      entityId: batchId,
+      action: markCompleted ? "completed" : "updated",
+      changes: JSON.stringify({ totalOutput, wasteQuantity, millingQuantity, markCompleted }),
+    });
+    
+    return updated;
   }
 
   async recordBatchOutput(batchId: string, actualQuantity: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch> {
