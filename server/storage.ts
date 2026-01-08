@@ -305,7 +305,27 @@ export class DatabaseStorage implements IStorage {
   async deleteBatch(id: string): Promise<void> {
     // Use transaction to ensure consistency
     await db.transaction(async (tx) => {
-      // First, delete stock movements that reference this batch
+      // Get batch outputs to reverse inventory
+      const outputs = await tx.select().from(batchOutputs).where(eq(batchOutputs.batchId, id));
+      for (const output of outputs) {
+        const [product] = await tx.select().from(products).where(eq(products.id, output.productId));
+        if (product) {
+          const newStock = Math.max(0, parseFloat(product.currentStock || "0") - parseFloat(output.quantity)).toFixed(2);
+          await tx.update(products).set({ currentStock: newStock }).where(eq(products.id, output.productId));
+        }
+      }
+      
+      // Get batch materials to restore inventory
+      const inputMaterials = await tx.select().from(batchMaterials).where(eq(batchMaterials.batchId, id));
+      for (const bm of inputMaterials) {
+        const [material] = await tx.select().from(materials).where(eq(materials.id, bm.materialId));
+        if (material) {
+          const restoredStock = (parseFloat(material.currentStock || "0") + parseFloat(bm.quantity)).toFixed(2);
+          await tx.update(materials).set({ currentStock: restoredStock }).where(eq(materials.id, bm.materialId));
+        }
+      }
+      
+      // Delete stock movements that reference this batch
       await tx.delete(stockMovements).where(eq(stockMovements.batchId, id));
       
       // Delete lots that were created from this batch (finished goods)
@@ -328,9 +348,12 @@ export class DatabaseStorage implements IStorage {
         entityType: "batch",
         entityId: id,
         action: "delete",
-        changes: JSON.stringify({ deleted: true }),
+        changes: JSON.stringify({ deleted: true, outputsReversed: outputs.length, materialsRestored: inputMaterials.length }),
       });
     });
+    
+    // Re-run stock allocation after inventory changes
+    await this.runStockAllocation();
   }
 
   async getBatchMaterials(batchId: string): Promise<BatchMaterial[]> {
