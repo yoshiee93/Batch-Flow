@@ -8,13 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Package, Box, Layers, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Package, Box, Layers } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-  useMaterials, useProducts,
+  useMaterials, useProducts, useCategories,
   useCreateMaterial, useUpdateMaterial, useDeleteMaterial, 
   useCreateProduct, useUpdateProduct, useDeleteProduct,
-  type Material, type Product 
+  type Material, type Product, type Category 
 } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,11 +33,12 @@ export default function Inventory() {
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState({
-    sku: '', name: '', description: '', minStock: '0', currentStock: '0', isInput: false, isOutput: true, isPowder: false,
+    sku: '', name: '', description: '', minStock: '0', currentStock: '0', categoryId: '' as string | null,
   });
 
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
+  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
   
   const createMaterial = useCreateMaterial();
   const updateMaterial = useUpdateMaterial();
@@ -114,7 +115,7 @@ export default function Inventory() {
     }
   };
 
-  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', minStock: '0', currentStock: '0', isInput: false, isOutput: true, isPowder: false });
+  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', minStock: '0', currentStock: '0', categoryId: null });
 
   const handleCreateProduct = async () => {
     if (!productForm.sku || !productForm.name) {
@@ -125,7 +126,7 @@ export default function Inventory() {
       await createProduct.mutateAsync({
         sku: productForm.sku, name: productForm.name, description: productForm.description || null,
         unit: 'KG', minStock: productForm.minStock, currentStock: productForm.currentStock, 
-        isInput: productForm.isInput, isOutput: productForm.isOutput, isPowder: productForm.isPowder, active: true,
+        categoryId: productForm.categoryId || null, active: true,
       });
       toast({ title: "Product created", description: `Product ${productForm.name} created successfully` });
       setIsCreateProductOpen(false);
@@ -140,7 +141,7 @@ export default function Inventory() {
     setProductForm({
       sku: product.sku, name: product.name, description: product.description || '',
       minStock: product.minStock, currentStock: product.currentStock,
-      isInput: product.isInput, isOutput: product.isOutput, isPowder: product.isPowder,
+      categoryId: product.categoryId,
     });
     setIsEditProductOpen(true);
   };
@@ -151,7 +152,7 @@ export default function Inventory() {
       await updateProduct.mutateAsync({
         id: selectedProduct.id, name: productForm.name, description: productForm.description || null,
         minStock: productForm.minStock, currentStock: productForm.currentStock,
-        isInput: productForm.isInput, isOutput: productForm.isOutput, isPowder: productForm.isPowder,
+        categoryId: productForm.categoryId || null,
       });
       toast({ title: "Product updated", description: `Product ${productForm.name} updated successfully` });
       setIsEditProductOpen(false);
@@ -248,6 +249,7 @@ export default function Inventory() {
 
   const renderProductRow = (product: Product) => {
     const isLow = parseFloat(product.currentStock) <= parseFloat(product.minStock);
+    const productCategory = categories.find(c => c.id === product.categoryId);
     return (
       <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
         <TableCell className="font-mono font-medium">{product.sku}</TableCell>
@@ -258,10 +260,11 @@ export default function Inventory() {
           </div>
         </TableCell>
         <TableCell className="text-center">
-          <div className="flex justify-center gap-1">
-            {product.isInput && <Badge variant="outline" className="text-blue-600 border-blue-200"><ArrowUpCircle className="h-3 w-3 mr-1" />Input</Badge>}
-            {product.isOutput && <Badge variant="outline" className="text-green-600 border-green-200"><ArrowDownCircle className="h-3 w-3 mr-1" />Output</Badge>}
-          </div>
+          {productCategory ? (
+            <Badge variant="outline" className="text-primary border-primary/30">{productCategory.name}</Badge>
+          ) : (
+            <span className="text-muted-foreground text-xs">-</span>
+          )}
         </TableCell>
         <TableCell className="text-right font-mono">{parseFloat(product.currentStock).toFixed(2)} KG</TableCell>
         <TableCell className="text-center">
@@ -349,9 +352,11 @@ export default function Inventory() {
           <TabsTrigger value="goods" className="flex items-center gap-2" data-testid="tab-goods">
             <Package size={16} /> Goods
           </TabsTrigger>
-          <TabsTrigger value="powders" className="flex items-center gap-2" data-testid="tab-powders">
-            <span className="text-amber-500">◉</span> Powders
-          </TabsTrigger>
+          {categories.filter(c => c.excludeFromYield).map((category) => (
+            <TabsTrigger key={category.id} value={`cat-${category.id}`} className="flex items-center gap-2" data-testid={`tab-category-${category.id}`}>
+              <span className="text-amber-500">◉</span> {category.name}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -434,28 +439,21 @@ export default function Inventory() {
                       <Input type="number" value={productForm.minStock} onChange={(e) => setProductForm({ ...productForm, minStock: e.target.value })} data-testid="input-product-min-stock" />
                     </div>
                   </div>
-                  <div className="pt-2 border-t">
-                    <Label className="text-sm font-medium mb-3 block">Categories</Label>
-                    <div className="flex flex-wrap gap-4">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="isInput" checked={productForm.isInput} onCheckedChange={(checked) => setProductForm({ ...productForm, isInput: !!checked })} data-testid="checkbox-is-input" />
-                        <Label htmlFor="isInput" className="text-sm font-normal cursor-pointer flex items-center gap-1">
-                          <ArrowUpCircle className="h-4 w-4 text-blue-500" /> Input
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="isOutput" checked={productForm.isOutput} onCheckedChange={(checked) => setProductForm({ ...productForm, isOutput: !!checked })} data-testid="checkbox-is-output" />
-                        <Label htmlFor="isOutput" className="text-sm font-normal cursor-pointer flex items-center gap-1">
-                          <ArrowDownCircle className="h-4 w-4 text-green-500" /> Output
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="isPowder" checked={productForm.isPowder} onCheckedChange={(checked) => setProductForm({ ...productForm, isPowder: !!checked })} data-testid="checkbox-is-powder" />
-                        <Label htmlFor="isPowder" className="text-sm font-normal cursor-pointer flex items-center gap-1">
-                          <span className="text-amber-500">◉</span> Powder
-                        </Label>
-                      </div>
-                    </div>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select
+                      value={productForm.categoryId || ''}
+                      onValueChange={(v) => setProductForm({ ...productForm, categoryId: v || null })}
+                    >
+                      <SelectTrigger data-testid="select-product-category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <DialogFooter>
@@ -576,33 +574,38 @@ export default function Inventory() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="powders" className="space-y-4">
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">SKU</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Category</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.filter(p => p.isPowder).length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No powder products found. Mark products as "Powder" to see them here.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredProducts.filter(p => p.isPowder).map(renderProductRow)
-                )}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
+        {categories.filter(c => c.excludeFromYield).map((category) => {
+          const categoryProducts = filteredProducts.filter(p => p.categoryId === category.id);
+          return (
+            <TabsContent key={category.id} value={`cat-${category.id}`} className="space-y-4">
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[100px]">SKU</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="text-center">Category</TableHead>
+                      <TableHead className="text-right">Stock</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {categoryProducts.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No {category.name} products found.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      categoryProducts.map(renderProductRow)
+                    )}
+                  </TableBody>
+                </Table>
+              </Card>
+            </TabsContent>
+          );
+        })}
       </Tabs>
 
       <Dialog open={isEditMaterialOpen} onOpenChange={setIsEditMaterialOpen}>
@@ -674,28 +677,21 @@ export default function Inventory() {
                 <Input type="number" value={productForm.minStock} onChange={(e) => setProductForm({ ...productForm, minStock: e.target.value })} data-testid="input-edit-product-min-stock" />
               </div>
             </div>
-            <div className="pt-2 border-t">
-              <Label className="text-sm font-medium mb-3 block">Categories</Label>
-              <div className="flex flex-wrap gap-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="editIsInput" checked={productForm.isInput} onCheckedChange={(checked) => setProductForm({ ...productForm, isInput: !!checked })} data-testid="checkbox-edit-is-input" />
-                  <Label htmlFor="editIsInput" className="text-sm font-normal cursor-pointer flex items-center gap-1">
-                    <ArrowUpCircle className="h-4 w-4 text-blue-500" /> Input
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="editIsOutput" checked={productForm.isOutput} onCheckedChange={(checked) => setProductForm({ ...productForm, isOutput: !!checked })} data-testid="checkbox-edit-is-output" />
-                  <Label htmlFor="editIsOutput" className="text-sm font-normal cursor-pointer flex items-center gap-1">
-                    <ArrowDownCircle className="h-4 w-4 text-green-500" /> Output
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="editIsPowder" checked={productForm.isPowder} onCheckedChange={(checked) => setProductForm({ ...productForm, isPowder: !!checked })} data-testid="checkbox-edit-is-powder" />
-                  <Label htmlFor="editIsPowder" className="text-sm font-normal cursor-pointer flex items-center gap-1">
-                    <span className="text-amber-500">◉</span> Powder
-                  </Label>
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select
+                value={productForm.categoryId || ''}
+                onValueChange={(v) => setProductForm({ ...productForm, categoryId: v || null })}
+              >
+                <SelectTrigger data-testid="select-edit-product-category">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
