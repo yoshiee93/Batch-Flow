@@ -12,6 +12,8 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 8, 2026**: Added customer management section with dedicated customers table and full CRUD operations. Customers can now be linked to orders.
+- **Jan 8, 2026**: Enhanced order management with edit order dialog and order items management (add/remove products from orders).
 - **Jan 7, 2026**: Connected all frontend pages to real PostgreSQL database via REST API with React Query. Added proper loading and error states to all pages.
 - **Jan 7, 2026**: Created complete database schema with 15+ tables including products, materials, lots, recipes, batches, orders, quality checks, stock movements, and audit logs.
 - **Jan 7, 2026**: Implemented database seeding with sample data for testing.
