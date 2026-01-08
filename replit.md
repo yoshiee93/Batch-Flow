@@ -12,6 +12,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 8, 2026**: Merged Products and Inventory pages into unified Inventory page with tabs for Raw Materials, Finished Goods, and Lots. Removed separate Products page and navigation link. /products route now redirects to /inventory.
 - **Jan 8, 2026**: Implemented production-inventory integration with Record Input and Record Output functionality. Recording inputs deducts from material/lot inventory. Recording outputs creates finished goods lots and adds to product stock. Stock movements tracked for audit trail.
 - **Jan 8, 2026**: Simplified batch workflow to two states: In Progress and Completed. Added waste and milling quantity tracking separate from finished product output.
 - **Jan 8, 2026**: Added customer management section with dedicated customers table and full CRUD operations. Customers can now be linked to orders.
@@ -31,7 +32,7 @@ Preferred communication style: Simple, everyday language.
 - **Build Tool**: Vite
 
 The frontend is organized with:
-- Pages in `client/src/pages/` for each major feature (Dashboard, Orders, Production, Inventory, Products, Traceability)
+- Pages in `client/src/pages/` for each major feature (Dashboard, Orders, Customers, Production, Inventory, Traceability)
 - Reusable UI components in `client/src/components/ui/`
 - Layout components in `client/src/components/layout/`
 - Custom hooks in `client/src/hooks/`
