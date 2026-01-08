@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X } from 'lucide-react';
+import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   DropdownMenu,
@@ -32,6 +32,7 @@ export default function Production() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isRecordInputOpen, setIsRecordInputOpen] = useState(false);
   const [isRecordOutputOpen, setIsRecordOutputOpen] = useState(false);
+  const [isAddOutputOpen, setIsAddOutputOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   
@@ -39,6 +40,7 @@ export default function Production() {
     batchNumber: '',
     productId: '',
     recipeId: '',
+    startDate: format(new Date(), 'yyyy-MM-dd'),
   });
   
   const [editForm, setEditForm] = useState({
@@ -84,10 +86,11 @@ export default function Production() {
         recipeId: newBatch.recipeId || undefined,
         plannedQuantity: "0",
         status: 'in_progress',
-      });
+        startDate: newBatch.startDate,
+      } as any);
       toast({ title: "Batch created", description: `Batch ${newBatch.batchNumber} created successfully` });
       setIsCreateDialogOpen(false);
-      setNewBatch({ batchNumber: '', productId: '', recipeId: '' });
+      setNewBatch({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
     } catch (error) {
       toast({ title: "Error", description: "Failed to create batch", variant: "destructive" });
     }
@@ -126,6 +129,11 @@ export default function Production() {
     setSelectedBatch(batch);
     setRecordInputForm({ materialId: '', quantity: '' });
     setIsRecordInputOpen(true);
+  };
+
+  const handleAddOutputClick = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setIsAddOutputOpen(true);
   };
 
   const handleRecordInput = async () => {
@@ -308,6 +316,17 @@ export default function Production() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="startDate">Batch Date</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={newBatch.startDate}
+                  onChange={(e) => setNewBatch({ ...newBatch, startDate: e.target.value })}
+                  data-testid="input-batch-date"
+                />
+                <p className="text-xs text-muted-foreground">Defaults to today. Change if recording a previous day's batch.</p>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
@@ -331,6 +350,7 @@ export default function Production() {
             onEditClick={handleEditClick}
             onRecordInputClick={handleRecordInputClick}
             onRecordOutputClick={handleRecordOutputClick}
+            onAddOutputClick={handleAddOutputClick}
             onMarkComplete={handleMarkComplete}
             onDeleteClick={handleDeleteClick}
           />
@@ -491,6 +511,24 @@ export default function Production() {
               wasteQuantity={selectedBatch.wasteQuantity || '0'}
               millingQuantity={selectedBatch.millingQuantity || '0'}
               onClose={() => setIsRecordOutputOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAddOutputOpen} onOpenChange={setIsAddOutputOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Output for {selectedBatch?.batchNumber}</DialogTitle>
+            <DialogDescription>Record finished products from this batch. Each output will be added to inventory.</DialogDescription>
+          </DialogHeader>
+          {selectedBatch && (
+            <BatchOutputsEditor
+              batchId={selectedBatch.id}
+              isCompleted={selectedBatch.status === 'completed'}
+              wasteQuantity={selectedBatch.wasteQuantity || '0'}
+              millingQuantity={selectedBatch.millingQuantity || '0'}
+              onClose={() => setIsAddOutputOpen(false)}
             />
           )}
         </DialogContent>
@@ -682,6 +720,7 @@ function BatchCard({
   onEditClick, 
   onRecordInputClick,
   onRecordOutputClick,
+  onAddOutputClick,
   onMarkComplete,
   onDeleteClick 
 }: { 
@@ -692,6 +731,7 @@ function BatchCard({
   onEditClick: (batch: Batch) => void;
   onRecordInputClick: (batch: Batch) => void;
   onRecordOutputClick: (batch: Batch) => void;
+  onAddOutputClick: (batch: Batch) => void;
   onMarkComplete: (batch: Batch) => void;
   onDeleteClick: (batch: Batch) => void;
 }) {
@@ -755,6 +795,9 @@ function BatchCard({
               <>
                 <Button size="sm" variant="outline" onClick={() => onRecordInputClick(batch)} data-testid={`button-input-${batch.id}`}>
                   <Package size={16} className="mr-2" /> Record Input
+                </Button>
+                <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50" onClick={() => onAddOutputClick(batch)} data-testid={`button-add-output-${batch.id}`}>
+                  <ArrowDownCircle size={16} className="mr-2" /> Add Output
                 </Button>
                 <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => onMarkComplete(batch)} data-testid={`button-complete-${batch.id}`}>
                   <CheckCircle size={16} className="mr-2" /> Mark Complete
@@ -898,7 +941,8 @@ function BatchCard({
         )}
 
         <div className="mt-4 pt-4 border-t flex items-center gap-4 text-xs text-muted-foreground">
-          <span>Created: {format(new Date(batch.createdAt), 'MMM d, yyyy HH:mm')}</span>
+          {batch.startDate && <span>Batch Date: {format(new Date(batch.startDate), 'MMM d, yyyy')}</span>}
+          {!batch.startDate && <span>Created: {format(new Date(batch.createdAt), 'MMM d, yyyy')}</span>}
           {batch.endDate && <span>Completed: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
         </div>
       </div>
