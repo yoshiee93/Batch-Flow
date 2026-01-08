@@ -12,6 +12,8 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 8, 2026**: Implemented production-inventory integration with Record Input and Record Output functionality. Recording inputs deducts from material/lot inventory. Recording outputs creates finished goods lots and adds to product stock. Stock movements tracked for audit trail.
+- **Jan 8, 2026**: Simplified batch workflow to two states: In Progress and Completed. Added waste and milling quantity tracking separate from finished product output.
 - **Jan 8, 2026**: Added customer management section with dedicated customers table and full CRUD operations. Customers can now be linked to orders.
 - **Jan 8, 2026**: Enhanced order management with edit order dialog and order items management (add/remove products from orders).
 - **Jan 7, 2026**: Connected all frontend pages to real PostgreSQL database via REST API with React Query. Added proper loading and error states to all pages.
@@ -76,6 +78,10 @@ The backend follows a modular structure:
 - `GET/POST /api/recipes` - Recipe management
 - `GET /api/recipes/:id/items` - Recipe ingredients
 - `GET/POST /api/batches` - Batch management
+- `GET /api/batches/:id/materials` - Batch materials used
+- `POST /api/batches/:id/input` - Record production input (deducts from inventory)
+- `POST /api/batches/:id/output` - Record production output (adds to inventory)
+- `DELETE /api/batch-materials/:id` - Remove batch material (returns to inventory)
 - `GET/POST /api/orders` - Order management
 - `GET /api/orders/:id/items` - Order line items
 - `GET /api/dashboard/stats` - Dashboard statistics
