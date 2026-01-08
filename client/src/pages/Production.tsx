@@ -785,12 +785,18 @@ function BatchCard({
                   </div>
                   <div className="text-right">
                     {totalInputKg > 0 ? (
-                      <div>
-                        <span className={`font-mono font-bold ${((totalOutputKg / totalInputKg) * 100) >= 8 ? 'text-green-600' : 'text-amber-600'}`}>
-                          {((totalOutputKg / totalInputKg) * 100).toFixed(1)}%
-                        </span>
-                        <div className="text-[10px] text-muted-foreground">Yield</div>
-                      </div>
+                      (() => {
+                        const yieldPct = (totalOutputKg / totalInputKg) * 100;
+                        const colorClass = yieldPct >= 12 ? 'text-green-600' : yieldPct >= 8 ? 'text-amber-500' : 'text-red-500';
+                        return (
+                          <div>
+                            <span className={`font-mono font-bold ${colorClass}`}>
+                              {yieldPct.toFixed(1)}%
+                            </span>
+                            <div className="text-[10px] text-muted-foreground">Yield</div>
+                          </div>
+                        );
+                      })()
                     ) : (
                       <span className="text-xs text-muted-foreground">--</span>
                     )}
