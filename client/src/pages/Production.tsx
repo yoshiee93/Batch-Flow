@@ -5,10 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale } from 'lucide-react';
+import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   DropdownMenu,
@@ -18,12 +19,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useBatches, useProducts, useRecipes, useUpdateBatch, useCreateBatch, useDeleteBatch, type Batch, type Product } from '@/lib/api';
+import { 
+  useBatches, useProducts, useRecipes, useMaterials, useLots, 
+  useUpdateBatch, useCreateBatch, useDeleteBatch,
+  useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useRecordBatchOutput,
+  type Batch, type Product, type Material, type Lot, type BatchMaterial
+} from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Production() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isRecordInputOpen, setIsRecordInputOpen] = useState(false);
   const [isRecordOutputOpen, setIsRecordOutputOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
@@ -40,18 +47,29 @@ export default function Production() {
     notes: '',
   });
   
+  const [recordInputForm, setRecordInputForm] = useState({
+    materialId: '',
+    lotId: '',
+    quantity: '',
+  });
+  
   const [recordOutputForm, setRecordOutputForm] = useState({
     actualQuantity: '',
     wasteQuantity: '',
     millingQuantity: '',
+    markCompleted: false,
   });
 
   const { data: batches = [], isLoading, isError } = useBatches();
   const { data: products = [] } = useProducts();
   const { data: recipes = [] } = useRecipes();
+  const { data: materials = [] } = useMaterials();
+  const { data: lots = [] } = useLots();
   const updateBatch = useUpdateBatch();
   const createBatch = useCreateBatch();
   const deleteBatch = useDeleteBatch();
+  const recordBatchInput = useRecordBatchInput();
+  const recordBatchOutput = useRecordBatchOutput();
   const { toast } = useToast();
 
   const handleCreateBatch = async () => {
@@ -100,12 +118,39 @@ export default function Production() {
     }
   };
 
+  const handleRecordInputClick = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setRecordInputForm({ materialId: '', lotId: '', quantity: '' });
+    setIsRecordInputOpen(true);
+  };
+
+  const handleRecordInput = async () => {
+    if (!selectedBatch) return;
+    if (!recordInputForm.materialId || !recordInputForm.lotId || !recordInputForm.quantity) {
+      toast({ title: "Missing fields", description: "Please select material, lot, and enter quantity", variant: "destructive" });
+      return;
+    }
+    try {
+      await recordBatchInput.mutateAsync({
+        batchId: selectedBatch.id,
+        materialId: recordInputForm.materialId,
+        lotId: recordInputForm.lotId,
+        quantity: recordInputForm.quantity,
+      });
+      toast({ title: "Input recorded", description: "Material has been added to batch and deducted from inventory" });
+      setRecordInputForm({ materialId: '', lotId: '', quantity: '' });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to record input", variant: "destructive" });
+    }
+  };
+
   const handleRecordOutputClick = (batch: Batch) => {
     setSelectedBatch(batch);
     setRecordOutputForm({
       actualQuantity: batch.actualQuantity || '',
       wasteQuantity: batch.wasteQuantity || '',
       millingQuantity: batch.millingQuantity || '',
+      markCompleted: false,
     });
     setIsRecordOutputOpen(true);
   };
@@ -113,13 +158,19 @@ export default function Production() {
   const handleRecordOutput = async () => {
     if (!selectedBatch) return;
     try {
-      await updateBatch.mutateAsync({
-        id: selectedBatch.id,
-        actualQuantity: recordOutputForm.actualQuantity || undefined,
-        wasteQuantity: recordOutputForm.wasteQuantity || undefined,
-        millingQuantity: recordOutputForm.millingQuantity || undefined,
+      await recordBatchOutput.mutateAsync({
+        batchId: selectedBatch.id,
+        actualQuantity: recordOutputForm.actualQuantity || "0",
+        wasteQuantity: recordOutputForm.wasteQuantity || "0",
+        millingQuantity: recordOutputForm.millingQuantity || "0",
+        markCompleted: recordOutputForm.markCompleted,
       });
-      toast({ title: "Output recorded", description: "Production output has been recorded" });
+      toast({ 
+        title: "Output recorded", 
+        description: recordOutputForm.markCompleted 
+          ? "Production output recorded and batch marked complete. Finished goods added to inventory." 
+          : "Production output has been recorded. Finished goods added to inventory."
+      });
       setIsRecordOutputOpen(false);
       setSelectedBatch(null);
     } catch (error) {
@@ -166,6 +217,13 @@ export default function Production() {
     return `BATCH-${year}${month}${day}-${random}`;
   };
 
+  const availableLots = lots.filter(lot => 
+    lot.materialId === recordInputForm.materialId && 
+    parseFloat(lot.remainingQuantity || "0") > 0
+  );
+
+  const selectedLot = lots.find(l => l.id === recordInputForm.lotId);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -190,7 +248,7 @@ export default function Production() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight font-mono" data-testid="text-production-title">Production Control</h1>
-          <p className="text-muted-foreground mt-1">Manage batches and record output.</p>
+          <p className="text-muted-foreground mt-1">Manage batches, record inputs and outputs.</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -284,7 +342,10 @@ export default function Production() {
             key={batch.id} 
             batch={batch} 
             products={products}
+            materials={materials}
+            lots={lots}
             onEditClick={handleEditClick}
+            onRecordInputClick={handleRecordInputClick}
             onRecordOutputClick={handleRecordOutputClick}
             onMarkComplete={handleMarkComplete}
             onDeleteClick={handleDeleteClick}
@@ -336,11 +397,91 @@ export default function Production() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isRecordInputOpen} onOpenChange={setIsRecordInputOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Record Input for {selectedBatch?.batchNumber}</DialogTitle>
+            <DialogDescription>Add materials used in production. This will deduct from inventory.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="input-material">Material *</Label>
+              <Select 
+                value={recordInputForm.materialId} 
+                onValueChange={(v) => setRecordInputForm({ ...recordInputForm, materialId: v, lotId: '' })}
+              >
+                <SelectTrigger data-testid="select-input-material">
+                  <SelectValue placeholder="Select a material" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materials.map(material => (
+                    <SelectItem key={material.id} value={material.id}>
+                      {material.sku} - {material.name} ({material.currentStock} KG in stock)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {recordInputForm.materialId && (
+              <div className="space-y-2">
+                <Label htmlFor="input-lot">Lot *</Label>
+                <Select 
+                  value={recordInputForm.lotId} 
+                  onValueChange={(v) => setRecordInputForm({ ...recordInputForm, lotId: v })}
+                >
+                  <SelectTrigger data-testid="select-input-lot">
+                    <SelectValue placeholder="Select a lot" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableLots.length === 0 ? (
+                      <SelectItem value="none" disabled>No available lots for this material</SelectItem>
+                    ) : (
+                      availableLots.map(lot => (
+                        <SelectItem key={lot.id} value={lot.id}>
+                          {lot.lotNumber} - {lot.remainingQuantity} KG remaining
+                          {lot.expiryDate && ` (Exp: ${format(new Date(lot.expiryDate), 'MMM d, yyyy')})`}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {selectedLot && (
+                  <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
+                    Available: <span className="font-mono font-medium">{selectedLot.remainingQuantity} KG</span>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="input-quantity">Quantity (KG) *</Label>
+              <Input
+                id="input-quantity"
+                type="number"
+                step="0.01"
+                value={recordInputForm.quantity}
+                onChange={(e) => setRecordInputForm({ ...recordInputForm, quantity: e.target.value })}
+                placeholder="Enter quantity to use"
+                data-testid="input-material-quantity"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRecordInputOpen(false)}>Close</Button>
+            <Button onClick={handleRecordInput} disabled={recordBatchInput.isPending} data-testid="button-add-input">
+              {recordBatchInput.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Add to Batch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isRecordOutputOpen} onOpenChange={setIsRecordOutputOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Record Output for {selectedBatch?.batchNumber}</DialogTitle>
-            <DialogDescription>Enter the quantities produced</DialogDescription>
+            <DialogDescription>Enter production output. Product output will be added to inventory.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {selectedBatch && (
@@ -359,6 +500,7 @@ export default function Production() {
                 placeholder="Finished product quantity"
                 data-testid="input-actual-quantity"
               />
+              <p className="text-xs text-muted-foreground">This will be added to product inventory</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="wasteQuantity">Waste (KG)</Label>
@@ -384,11 +526,22 @@ export default function Production() {
                 data-testid="input-milling-quantity"
               />
             </div>
+            <div className="flex items-center space-x-2 pt-2 border-t">
+              <Checkbox
+                id="markCompleted"
+                checked={recordOutputForm.markCompleted}
+                onCheckedChange={(checked) => setRecordOutputForm({ ...recordOutputForm, markCompleted: !!checked })}
+                data-testid="checkbox-mark-completed"
+              />
+              <Label htmlFor="markCompleted" className="text-sm font-normal cursor-pointer">
+                Mark batch as completed
+              </Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsRecordOutputOpen(false)}>Cancel</Button>
-            <Button onClick={handleRecordOutput} disabled={updateBatch.isPending} data-testid="button-record-output">
-              {updateBatch.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button onClick={handleRecordOutput} disabled={recordBatchOutput.isPending} data-testid="button-record-output">
+              {recordBatchOutput.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Record Output
             </Button>
           </DialogFooter>
@@ -418,14 +571,20 @@ export default function Production() {
 function BatchCard({ 
   batch, 
   products, 
+  materials,
+  lots,
   onEditClick, 
+  onRecordInputClick,
   onRecordOutputClick,
   onMarkComplete,
   onDeleteClick 
 }: { 
   batch: Batch; 
   products: Product[];
+  materials: Material[];
+  lots: Lot[];
   onEditClick: (batch: Batch) => void;
+  onRecordInputClick: (batch: Batch) => void;
   onRecordOutputClick: (batch: Batch) => void;
   onMarkComplete: (batch: Batch) => void;
   onDeleteClick: (batch: Batch) => void;
@@ -438,6 +597,19 @@ function BatchCard({
   const totalOutput = actual + waste + milling;
   const percent = planned > 0 ? (totalOutput / planned) * 100 : 0;
   const isCompleted = batch.status === 'completed';
+  
+  const { data: batchMaterials = [] } = useBatchMaterials(batch.id);
+  const removeBatchMaterial = useRemoveBatchMaterial();
+  const { toast } = useToast();
+  
+  const handleRemoveMaterial = async (materialId: string) => {
+    try {
+      await removeBatchMaterial.mutateAsync(materialId);
+      toast({ title: "Material removed", description: "Material returned to inventory" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to remove material", variant: "destructive" });
+    }
+  };
   
   return (
     <Card className={`overflow-hidden border-l-4 transition-all ${isCompleted ? 'border-l-green-500 bg-green-50/30' : 'border-l-blue-500'}`} data-testid={`card-batch-${batch.id}`}>
@@ -456,9 +628,14 @@ function BatchCard({
           
           <div className="flex items-center gap-2">
             {!isCompleted && (
-              <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => onMarkComplete(batch)} data-testid={`button-complete-${batch.id}`}>
-                <CheckCircle size={16} className="mr-2" /> Mark Complete
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={() => onRecordInputClick(batch)} data-testid={`button-input-${batch.id}`}>
+                  <Package size={16} className="mr-2" /> Record Input
+                </Button>
+                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => onMarkComplete(batch)} data-testid={`button-complete-${batch.id}`}>
+                  <CheckCircle size={16} className="mr-2" /> Mark Complete
+                </Button>
+              </>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -470,6 +647,9 @@ function BatchCard({
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => onEditClick(batch)} data-testid={`button-edit-batch-${batch.id}`}>
                   <Pencil size={14} className="mr-2" /> Edit Batch
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onRecordInputClick(batch)} data-testid={`menu-record-input-${batch.id}`}>
+                  <Package size={14} className="mr-2" /> Record Input
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onRecordOutputClick(batch)} data-testid={`button-record-${batch.id}`}>
                   <Scale size={14} className="mr-2" /> Record Output
@@ -513,6 +693,41 @@ function BatchCard({
             </div>
           </div>
         </div>
+
+        {batchMaterials.length > 0 && (
+          <div className="mt-4 pt-4 border-t">
+            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Materials Used</span>
+            <div className="mt-2 space-y-2">
+              {batchMaterials.map((bm) => {
+                const material = materials.find(m => m.id === bm.materialId);
+                const lot = lots.find(l => l.id === bm.lotId);
+                return (
+                  <div key={bm.id} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm" data-testid={`batch-material-${bm.id}`}>
+                    <div>
+                      <span className="font-medium">{material?.name || 'Unknown'}</span>
+                      <span className="text-muted-foreground ml-2">Lot: {lot?.lotNumber || 'Unknown'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono">{bm.quantity} KG</span>
+                      {!isCompleted && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-destructive hover:text-destructive"
+                          onClick={() => handleRemoveMaterial(bm.id)}
+                          disabled={removeBatchMaterial.isPending}
+                          data-testid={`button-remove-material-${bm.id}`}
+                        >
+                          <X size={14} />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {batch.notes && (
           <div className="mt-4 pt-4 border-t">

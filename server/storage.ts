@@ -388,6 +388,10 @@ export class DatabaseStorage implements IStorage {
     const [batch] = await db.select().from(batches).where(eq(batches.id, batchId));
     if (!batch) throw new Error("Batch not found");
     
+    const previousActual = parseFloat(batch.actualQuantity || "0");
+    const newActual = parseFloat(actualQuantity) || 0;
+    const delta = newActual - previousActual;
+    
     // Update batch with output quantities
     const updateData: Partial<InsertBatch> = {
       actualQuantity,
@@ -402,40 +406,55 @@ export class DatabaseStorage implements IStorage {
     
     const [updated] = await db.update(batches).set(updateData).where(eq(batches.id, batchId)).returning();
     
-    // Get the product to update stock
-    const [product] = await db.select().from(products).where(eq(products.id, batch.productId));
-    if (product) {
-      const outputQty = parseFloat(actualQuantity) || 0;
-      const newStock = (parseFloat(product.currentStock || "0") + outputQty).toFixed(2);
-      await db.update(products).set({ currentStock: newStock }).where(eq(products.id, batch.productId));
-      
-      // Create finished goods lot
-      const lotNumber = `LOT-${updated.batchNumber.replace("BATCH-", "")}`;
-      await db.insert(lots).values({
-        lotNumber,
-        productId: batch.productId,
-        quantity: actualQuantity,
-        remainingQuantity: actualQuantity,
-        status: "available",
-        sourceBatchId: batchId,
-        receivedDate: new Date().toISOString(),
-      });
-      
-      // Create production output stock movement
-      await this.createStockMovement({
-        movementType: "production_output",
-        productId: batch.productId,
-        batchId,
-        quantity: actualQuantity,
-        reason: "Production output - finished goods",
-      });
+    // Only update inventory if there's a change in actual quantity
+    if (delta !== 0) {
+      // Get the product to update stock
+      const [product] = await db.select().from(products).where(eq(products.id, batch.productId));
+      if (product) {
+        // Adjust product stock by the delta
+        const newStock = (parseFloat(product.currentStock || "0") + delta).toFixed(2);
+        await db.update(products).set({ currentStock: newStock }).where(eq(products.id, batch.productId));
+        
+        // Check if finished goods lot already exists for this batch
+        const [existingLot] = await db.select().from(lots).where(eq(lots.sourceBatchId, batchId));
+        
+        if (existingLot) {
+          // Update existing lot quantity
+          const newLotQty = (parseFloat(existingLot.quantity) + delta).toFixed(2);
+          const newRemainingQty = (parseFloat(existingLot.remainingQuantity || "0") + delta).toFixed(2);
+          await db.update(lots).set({ 
+            quantity: newLotQty,
+            remainingQuantity: newRemainingQty
+          }).where(eq(lots.id, existingLot.id));
+        } else {
+          // Create new finished goods lot
+          const lotNumber = `LOT-${updated.batchNumber.replace("BATCH-", "")}`;
+          await db.insert(lots).values({
+            lotNumber,
+            productId: batch.productId,
+            quantity: actualQuantity,
+            remainingQuantity: actualQuantity,
+            sourceBatchId: batchId,
+            receivedDate: new Date(),
+          });
+        }
+        
+        // Create stock movement for the delta
+        await this.createStockMovement({
+          movementType: "production_output",
+          productId: batch.productId,
+          batchId,
+          quantity: delta.toFixed(2),
+          reason: delta > 0 ? "Production output - finished goods" : "Production output adjustment",
+        });
+      }
     }
     
     await this.createAuditLog({
       entityType: "batch",
       entityId: batchId,
       action: "output_recorded",
-      changes: JSON.stringify({ actualQuantity, wasteQuantity, millingQuantity, markCompleted }),
+      changes: JSON.stringify({ actualQuantity, wasteQuantity, millingQuantity, markCompleted, delta }),
     });
     
     return updated;
