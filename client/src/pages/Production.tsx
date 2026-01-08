@@ -38,11 +38,9 @@ export default function Production() {
     batchNumber: '',
     productId: '',
     recipeId: '',
-    plannedQuantity: '',
   });
   
   const [editForm, setEditForm] = useState({
-    plannedQuantity: '',
     actualQuantity: '',
     wasteQuantity: '',
     millingQuantity: '',
@@ -75,8 +73,8 @@ export default function Production() {
   const { toast } = useToast();
 
   const handleCreateBatch = async () => {
-    if (!newBatch.batchNumber || !newBatch.productId || !newBatch.plannedQuantity) {
-      toast({ title: "Missing fields", description: "Please fill in batch number, product, and planned quantity", variant: "destructive" });
+    if (!newBatch.batchNumber || !newBatch.productId) {
+      toast({ title: "Missing fields", description: "Please fill in batch number and product", variant: "destructive" });
       return;
     }
     try {
@@ -84,12 +82,12 @@ export default function Production() {
         batchNumber: newBatch.batchNumber,
         productId: newBatch.productId,
         recipeId: newBatch.recipeId || undefined,
-        plannedQuantity: newBatch.plannedQuantity,
+        plannedQuantity: "0",
         status: 'in_progress',
       });
       toast({ title: "Batch created", description: `Batch ${newBatch.batchNumber} created successfully` });
       setIsCreateDialogOpen(false);
-      setNewBatch({ batchNumber: '', productId: '', recipeId: '', plannedQuantity: '' });
+      setNewBatch({ batchNumber: '', productId: '', recipeId: '' });
     } catch (error) {
       toast({ title: "Error", description: "Failed to create batch", variant: "destructive" });
     }
@@ -98,7 +96,6 @@ export default function Production() {
   const handleEditClick = (batch: Batch) => {
     setSelectedBatch(batch);
     setEditForm({
-      plannedQuantity: batch.plannedQuantity,
       actualQuantity: batch.actualQuantity || '',
       wasteQuantity: batch.wasteQuantity || '',
       millingQuantity: batch.millingQuantity || '',
@@ -112,7 +109,6 @@ export default function Production() {
     try {
       await updateBatch.mutateAsync({
         id: selectedBatch.id,
-        plannedQuantity: editForm.plannedQuantity,
         actualQuantity: editForm.actualQuantity || undefined,
         wasteQuantity: editForm.wasteQuantity || undefined,
         millingQuantity: editForm.millingQuantity || undefined,
@@ -320,18 +316,6 @@ export default function Production() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="plannedQuantity">Planned Quantity (KG) *</Label>
-                <Input
-                  id="plannedQuantity"
-                  type="number"
-                  step="0.01"
-                  placeholder="e.g. 500"
-                  value={newBatch.plannedQuantity}
-                  onChange={(e) => setNewBatch({ ...newBatch, plannedQuantity: e.target.value })}
-                  data-testid="input-planned-quantity"
-                />
-              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
@@ -373,18 +357,6 @@ export default function Production() {
             <DialogDescription>Update batch details and manage material inputs</DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-plannedQuantity">Planned Quantity (KG)</Label>
-              <Input
-                id="edit-plannedQuantity"
-                type="number"
-                step="0.01"
-                value={editForm.plannedQuantity}
-                onChange={(e) => setEditForm({ ...editForm, plannedQuantity: e.target.value })}
-                data-testid="input-edit-planned-quantity"
-              />
-            </div>
-
             <div className="space-y-3">
               <Label className="text-sm font-medium">Output Breakdown (KG)</Label>
               <div className="grid grid-cols-3 gap-4">
@@ -547,11 +519,6 @@ export default function Production() {
             <DialogDescription>Enter production output. Product output will be added to inventory.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {selectedBatch && (
-              <div className="text-sm text-muted-foreground mb-4 p-3 bg-muted rounded-md">
-                Planned quantity: <span className="font-mono font-medium">{selectedBatch.plannedQuantity} KG</span>
-              </div>
-            )}
             <div className="space-y-2">
               <Label htmlFor="actualQuantity">Product Output (KG)</Label>
               <Input
@@ -811,7 +778,6 @@ function BatchCard({
   onDeleteClick: (batch: Batch) => void;
 }) {
   const product = products.find(p => p.id === batch.productId);
-  const planned = parseFloat(batch.plannedQuantity);
   const actual = batch.actualQuantity ? parseFloat(batch.actualQuantity) : 0;
   const waste = batch.wasteQuantity ? parseFloat(batch.wasteQuantity) : 0;
   const milling = batch.millingQuantity ? parseFloat(batch.millingQuantity) : 0;
@@ -905,10 +871,7 @@ function BatchCard({
 
         <div className="py-4">
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Output</span>
-              <span className="text-xs text-muted-foreground">Planned: {planned.toFixed(1)} KG</span>
-            </div>
+            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Output</span>
             <div className="grid grid-cols-3 gap-4">
               <div className="text-center p-3 bg-muted rounded">
                 <div className="text-xl font-mono font-bold text-green-600">{actual.toFixed(1)}</div>
