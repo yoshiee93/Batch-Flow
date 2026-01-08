@@ -5,10 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle } from 'lucide-react';
+import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   DropdownMenu,
@@ -735,218 +736,207 @@ function BatchCard({
   onMarkComplete: (batch: Batch) => void;
   onDeleteClick: (batch: Batch) => void;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
   const product = products.find(p => p.id === batch.productId);
-  const actual = batch.actualQuantity ? parseFloat(batch.actualQuantity) : 0;
-  const waste = batch.wasteQuantity ? parseFloat(batch.wasteQuantity) : 0;
-  const milling = batch.millingQuantity ? parseFloat(batch.millingQuantity) : 0;
   const isCompleted = batch.status === 'completed';
   
-  const [editingMaterial, setEditingMaterial] = useState<BatchMaterial | null>(null);
-  const [editQuantity, setEditQuantity] = useState('');
-  
   const { data: batchMaterials = [] } = useBatchMaterials(batch.id);
-  const removeBatchMaterial = useRemoveBatchMaterial();
-  const updateBatchMaterial = useUpdateBatchMaterial();
-  const { toast } = useToast();
+  const { data: batchOutputs = [] } = useBatchOutputs(batch.id);
+  const { data: outputProducts = [] } = useOutputItems();
   
-  const handleRemoveMaterial = async (materialId: string) => {
-    try {
-      await removeBatchMaterial.mutateAsync(materialId);
-      toast({ title: "Material removed", description: "Material returned to inventory" });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to remove material", variant: "destructive" });
-    }
-  };
-  
-  const handleEditMaterialClick = (bm: BatchMaterial) => {
-    setEditingMaterial(bm);
-    setEditQuantity(bm.quantity);
-  };
-  
-  const handleUpdateMaterial = async () => {
-    if (!editingMaterial) return;
-    try {
-      await updateBatchMaterial.mutateAsync({ id: editingMaterial.id, quantity: editQuantity });
-      toast({ title: "Material updated", description: "Quantity has been updated and inventory adjusted" });
-      setEditingMaterial(null);
-      setEditQuantity('');
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to update material", variant: "destructive" });
-    }
-  };
+  const totalInputKg = batchMaterials.reduce((sum, bm) => sum + parseFloat(bm.quantity), 0);
+  const totalOutputKg = batchOutputs.reduce((sum, bo) => sum + parseFloat(bo.quantity), 0);
+  const waste = batch.wasteQuantity ? parseFloat(batch.wasteQuantity) : 0;
+  const milling = batch.millingQuantity ? parseFloat(batch.millingQuantity) : 0;
   
   return (
-    <Card className={`overflow-hidden border-l-4 transition-all ${isCompleted ? 'border-l-green-500 bg-green-50/30' : 'border-l-blue-500'}`} data-testid={`card-batch-${batch.id}`}>
-      <div className="p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h3 className="font-mono text-xl font-bold">{batch.batchNumber}</h3>
-              <Badge variant="outline" className={`font-mono uppercase text-[10px] ${isCompleted ? 'bg-green-100 text-green-700 border-green-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
-                {isCompleted ? 'Completed' : 'In Progress'}
-              </Badge>
-            </div>
-            <p className="text-lg font-medium mt-1">{product?.name || 'Unknown Product'}</p>
-            <p className="text-sm text-muted-foreground font-mono">{product?.sku}</p>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {!isCompleted && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => onRecordInputClick(batch)} data-testid={`button-input-${batch.id}`}>
-                  <Package size={16} className="mr-2" /> Record Input
-                </Button>
-                <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50" onClick={() => onAddOutputClick(batch)} data-testid={`button-add-output-${batch.id}`}>
-                  <ArrowDownCircle size={16} className="mr-2" /> Add Output
-                </Button>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => onMarkComplete(batch)} data-testid={`button-complete-${batch.id}`}>
-                  <CheckCircle size={16} className="mr-2" /> Mark Complete
-                </Button>
-              </>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" data-testid={`button-batch-actions-${batch.id}`}>
-                  <MoreHorizontal size={18} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => onEditClick(batch)} data-testid={`button-edit-batch-${batch.id}`}>
-                  <Pencil size={14} className="mr-2" /> Edit Batch
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onRecordInputClick(batch)} data-testid={`menu-record-input-${batch.id}`}>
-                  <Package size={14} className="mr-2" /> Record Input
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onRecordOutputClick(batch)} data-testid={`button-record-${batch.id}`}>
-                  <Scale size={14} className="mr-2" /> Record Output
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive" onClick={() => onDeleteClick(batch)} data-testid={`button-delete-batch-${batch.id}`}>
-                  <Trash2 size={14} className="mr-2" /> Delete Batch
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        <div className="py-4">
-          <div className="space-y-2">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Output</span>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-3 bg-muted rounded">
-                <div className="text-xl font-mono font-bold text-green-600">{actual.toFixed(1)}</div>
-                <div className="text-[10px] text-muted-foreground uppercase">Product (KG)</div>
-              </div>
-              <div className="text-center p-3 bg-muted rounded">
-                <div className="text-xl font-mono font-bold text-red-600">{waste.toFixed(1)}</div>
-                <div className="text-[10px] text-muted-foreground uppercase">Waste (KG)</div>
-              </div>
-              <div className="text-center p-3 bg-muted rounded">
-                <div className="text-xl font-mono font-bold text-amber-600">{milling.toFixed(1)}</div>
-                <div className="text-[10px] text-muted-foreground uppercase">Milling (KG)</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {batchMaterials.length > 0 && (
-          <div className="mt-4 pt-4 border-t">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Materials Used</span>
-            <div className="mt-2 space-y-2">
-              {batchMaterials.map((bm) => {
-                const material = materials.find(m => m.id === bm.materialId);
-                const lot = lots.find(l => l.id === bm.lotId);
-                const isEditing = editingMaterial?.id === bm.id;
-                return (
-                  <div key={bm.id} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm" data-testid={`batch-material-${bm.id}`}>
-                    <div>
-                      <span className="font-medium">{material?.name || 'Unknown'}</span>
-                      <span className="text-muted-foreground ml-2">Lot: {lot?.lotNumber || 'Unknown'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isEditing ? (
-                        <>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            value={editQuantity}
-                            onChange={(e) => setEditQuantity(e.target.value)}
-                            className="w-24 h-7 text-sm font-mono"
-                            data-testid={`input-edit-material-${bm.id}`}
-                          />
-                          <span className="text-xs text-muted-foreground">KG</span>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6 text-green-600 hover:text-green-700"
-                            onClick={handleUpdateMaterial}
-                            disabled={updateBatchMaterial.isPending}
-                            data-testid={`button-save-material-${bm.id}`}
-                          >
-                            <CheckCircle size={14} />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6"
-                            onClick={() => { setEditingMaterial(null); setEditQuantity(''); }}
-                            data-testid={`button-cancel-edit-${bm.id}`}
-                          >
-                            <X size={14} />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-mono">{bm.quantity} KG</span>
-                          {!isCompleted && (
-                            <>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6"
-                                onClick={() => handleEditMaterialClick(bm)}
-                                data-testid={`button-edit-material-${bm.id}`}
-                              >
-                                <Pencil size={14} />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6 text-destructive hover:text-destructive"
-                                onClick={() => handleRemoveMaterial(bm.id)}
-                                disabled={removeBatchMaterial.isPending}
-                                data-testid={`button-remove-material-${bm.id}`}
-                              >
-                                <X size={14} />
-                              </Button>
-                            </>
-                          )}
-                        </>
-                      )}
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className={`overflow-hidden border-l-4 transition-all ${isCompleted ? 'border-l-green-500 bg-green-50/30' : 'border-l-blue-500'}`} data-testid={`card-batch-${batch.id}`}>
+        <CollapsibleTrigger asChild>
+          <div className="p-4 cursor-pointer hover:bg-muted/30 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4 flex-1">
+                <div className="flex items-center gap-2">
+                  {isOpen ? <ChevronDown size={18} className="text-muted-foreground" /> : <ChevronRight size={18} className="text-muted-foreground" />}
+                </div>
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                  <div>
+                    <div className="font-mono font-bold text-sm">{batch.batchNumber}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {batch.startDate ? format(new Date(batch.startDate), 'MMM d, yyyy') : format(new Date(batch.createdAt), 'MMM d')}
                     </div>
                   </div>
-                );
-              })}
+                  <div>
+                    <div className="font-medium text-sm">{product?.name || 'Unknown'}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{product?.sku}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm font-mono">
+                      <span className="text-blue-600 font-medium">{totalInputKg.toFixed(1)}</span>
+                      <span className="text-muted-foreground mx-1">→</span>
+                      <span className="text-green-600 font-medium">{totalOutputKg.toFixed(1)}</span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">Input → Output (KG)</div>
+                  </div>
+                  <div className="text-center">
+                    <Badge variant="outline" className={`font-mono uppercase text-[10px] ${isCompleted ? 'bg-green-100 text-green-700 border-green-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                      {isCompleted ? 'Completed' : 'In Progress'}
+                    </Badge>
+                  </div>
+                  <div className="text-right text-xs text-muted-foreground">
+                    {batchMaterials.length} input(s) • {batchOutputs.length} output(s)
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 ml-4" onClick={(e) => e.stopPropagation()}>
+                {!isCompleted && (
+                  <>
+                    <Button size="icon" variant="ghost" onClick={() => onRecordInputClick(batch)} title="Record Input" data-testid={`button-input-${batch.id}`}>
+                      <Package size={16} />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="text-green-600" onClick={() => onAddOutputClick(batch)} title="Add Output" data-testid={`button-add-output-${batch.id}`}>
+                      <ArrowDownCircle size={16} />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="text-green-600" onClick={() => onMarkComplete(batch)} title="Complete" data-testid={`button-complete-${batch.id}`}>
+                      <CheckCircle size={16} />
+                    </Button>
+                  </>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" data-testid={`button-batch-actions-${batch.id}`}>
+                      <MoreHorizontal size={16} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => onEditClick(batch)} data-testid={`button-edit-batch-${batch.id}`}>
+                      <Pencil size={14} className="mr-2" /> Edit Batch
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onRecordInputClick(batch)} data-testid={`menu-record-input-${batch.id}`}>
+                      <Package size={14} className="mr-2" /> Record Input
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onRecordOutputClick(batch)} data-testid={`button-record-${batch.id}`}>
+                      <Scale size={14} className="mr-2" /> Manage Outputs
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={() => onDeleteClick(batch)} data-testid={`button-delete-batch-${batch.id}`}>
+                      <Trash2 size={14} className="mr-2" /> Delete Batch
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
-        )}
-
-        {batch.notes && (
-          <div className="mt-4 pt-4 border-t">
-            <span className="text-xs text-muted-foreground">Notes: </span>
-            <span className="text-sm">{batch.notes}</span>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent>
+          <div className="px-4 pb-4 border-t bg-muted/20">
+            <div className="grid md:grid-cols-2 gap-6 pt-4">
+              <div>
+                <h4 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                  <Package size={14} /> Inputs Used
+                </h4>
+                {batchMaterials.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">No inputs recorded</p>
+                ) : (
+                  <div className="space-y-2">
+                    {batchMaterials.map((bm) => {
+                      const material = materials.find(m => m.id === bm.materialId);
+                      return (
+                        <div key={bm.id} className="flex items-center justify-between p-2 bg-background rounded border text-sm" data-testid={`batch-material-${bm.id}`}>
+                          <div>
+                            <span className="font-medium">{material?.name || 'Unknown'}</span>
+                            <span className="text-muted-foreground text-xs ml-2">({material?.sku})</span>
+                          </div>
+                          <span className="font-mono text-blue-600">{parseFloat(bm.quantity).toFixed(2)} KG</span>
+                        </div>
+                      );
+                    })}
+                    <div className="flex justify-between pt-2 border-t text-sm font-medium">
+                      <span>Total Input</span>
+                      <span className="font-mono text-blue-600">{totalInputKg.toFixed(2)} KG</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div>
+                <h4 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                  <ArrowDownCircle size={14} /> Outputs Created
+                </h4>
+                {batchOutputs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">No outputs recorded</p>
+                ) : (
+                  <div className="space-y-2">
+                    {batchOutputs.map((bo) => {
+                      const outputProduct = outputProducts.find(p => p.id === bo.productId);
+                      return (
+                        <div key={bo.id} className="flex items-center justify-between p-2 bg-background rounded border text-sm" data-testid={`batch-output-${bo.id}`}>
+                          <div>
+                            <span className="font-medium">{outputProduct?.name || 'Unknown'}</span>
+                            <span className="text-muted-foreground text-xs ml-2">({outputProduct?.sku})</span>
+                          </div>
+                          <span className="font-mono text-green-600">{parseFloat(bo.quantity).toFixed(2)} KG</span>
+                        </div>
+                      );
+                    })}
+                    <div className="flex justify-between pt-2 border-t text-sm font-medium">
+                      <span>Total Output</span>
+                      <span className="font-mono text-green-600">{totalOutputKg.toFixed(2)} KG</span>
+                    </div>
+                  </div>
+                )}
+                
+                {(waste > 0 || milling > 0) && (
+                  <div className="mt-4 pt-3 border-t space-y-1">
+                    {waste > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Waste</span>
+                        <span className="font-mono text-red-500">{waste.toFixed(2)} KG</span>
+                      </div>
+                    )}
+                    {milling > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Milling</span>
+                        <span className="font-mono text-amber-500">{milling.toFixed(2)} KG</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {batch.notes && (
+              <div className="mt-4 pt-3 border-t">
+                <span className="text-xs text-muted-foreground">Notes: </span>
+                <span className="text-sm">{batch.notes}</span>
+              </div>
+            )}
+            
+            <div className="mt-4 pt-3 border-t flex items-center justify-between">
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                {batch.startDate && <span>Batch Date: {format(new Date(batch.startDate), 'MMM d, yyyy')}</span>}
+                {batch.endDate && <span>Completed: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
+              </div>
+              {!isCompleted && (
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => onRecordInputClick(batch)}>
+                    <Package size={14} className="mr-2" /> Add Input
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-green-600 border-green-200" onClick={() => onAddOutputClick(batch)}>
+                    <ArrowDownCircle size={14} className="mr-2" /> Add Output
+                  </Button>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => onMarkComplete(batch)}>
+                    <CheckCircle size={14} className="mr-2" /> Complete
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
-        )}
-
-        <div className="mt-4 pt-4 border-t flex items-center gap-4 text-xs text-muted-foreground">
-          {batch.startDate && <span>Batch Date: {format(new Date(batch.startDate), 'MMM d, yyyy')}</span>}
-          {!batch.startDate && <span>Created: {format(new Date(batch.createdAt), 'MMM d, yyyy')}</span>}
-          {batch.endDate && <span>Completed: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
-        </div>
-      </div>
-    </Card>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
 
