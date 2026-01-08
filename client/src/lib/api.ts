@@ -17,6 +17,15 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   return res.json();
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  excludeFromYield: boolean;
+  isDefault: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -25,9 +34,7 @@ export interface Product {
   unit: string;
   minStock: string;
   currentStock: string;
-  isInput: boolean;
-  isOutput: boolean;
-  isPowder: boolean;
+  categoryId: string | null;
   active: boolean;
   createdAt: string;
 }
@@ -146,6 +153,52 @@ export interface DashboardStats {
   totalProducts: number;
 }
 
+export function useCategories() {
+  return useQuery<Category[]>({
+    queryKey: ["categories"],
+    queryFn: () => fetchApi("/categories"),
+  });
+}
+
+export function useCreateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<Category, "id" | "createdAt">) =>
+      fetchApi<Category>("/categories", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+    },
+  });
+}
+
+export function useUpdateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<Category> & { id: string }) =>
+      fetchApi<Category>(`/categories/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+    },
+  });
+}
+
+export function useDeleteCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetchApi(`/categories/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+    },
+  });
+}
+
 export function useProducts() {
   return useQuery<Product[]>({
     queryKey: ["products"],
@@ -153,17 +206,11 @@ export function useProducts() {
   });
 }
 
-export function useInputItems() {
+export function useProductsByCategory(categoryId: string | null) {
   return useQuery<Product[]>({
-    queryKey: ["inputItems"],
-    queryFn: () => fetchApi("/items/inputs"),
-  });
-}
-
-export function useOutputItems() {
-  return useQuery<Product[]>({
-    queryKey: ["outputItems"],
-    queryFn: () => fetchApi("/items/outputs"),
+    queryKey: ["products", "category", categoryId],
+    queryFn: () => fetchApi(`/products/by-category/${categoryId}`),
+    enabled: !!categoryId,
   });
 }
 
