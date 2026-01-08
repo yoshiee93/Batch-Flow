@@ -12,6 +12,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 8, 2026**: Added inline editing for batch material inputs. Pencil button allows editing quantity with automatic inventory adjustments (delta-based). Validation prevents negative/invalid quantities. Output editing works via Record Output button which pre-fills existing values.
 - **Jan 8, 2026**: Merged Products and Inventory pages into unified Inventory page with tabs for Raw Materials, Finished Goods, and Lots. Removed separate Products page and navigation link. /products route now redirects to /inventory.
 - **Jan 8, 2026**: Implemented production-inventory integration with Record Input and Record Output functionality. Recording inputs deducts from material/lot inventory. Recording outputs creates finished goods lots and adds to product stock. Stock movements tracked for audit trail.
 - **Jan 8, 2026**: Simplified batch workflow to two states: In Progress and Completed. Added waste and milling quantity tracking separate from finished product output.
@@ -83,6 +84,7 @@ The backend follows a modular structure:
 - `POST /api/batches/:id/input` - Record production input (deducts from inventory)
 - `POST /api/batches/:id/output` - Record production output (adds to inventory)
 - `DELETE /api/batch-materials/:id` - Remove batch material (returns to inventory)
+- `PATCH /api/batch-materials/:id` - Update batch material quantity (adjusts inventory with delta)
 - `GET/POST /api/orders` - Order management
 - `GET /api/orders/:id/items` - Order line items
 - `GET /api/dashboard/stats` - Dashboard statistics
