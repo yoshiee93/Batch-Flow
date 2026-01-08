@@ -46,8 +46,13 @@ export async function registerRoutes(
   }));
 
   app.delete("/api/categories/:id", asyncHandler(async (req, res) => {
-    await storage.deleteCategory(req.params.id);
-    res.status(204).send();
+    try {
+      await storage.deleteCategory(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete category";
+      res.status(400).json({ error: message });
+    }
   }));
 
   app.get("/api/products", asyncHandler(async (req, res) => {
