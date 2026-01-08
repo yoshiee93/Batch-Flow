@@ -44,6 +44,11 @@ export async function registerRoutes(
     res.json(product);
   }));
 
+  app.delete("/api/products/:id", asyncHandler(async (req, res) => {
+    await storage.deleteProduct(req.params.id);
+    res.status(204).send();
+  }));
+
   app.get("/api/materials", asyncHandler(async (req, res) => {
     const materials = await storage.getMaterials();
     res.json(materials);
@@ -66,6 +71,11 @@ export async function registerRoutes(
     const material = await storage.updateMaterial(req.params.id, data);
     if (!material) return res.status(404).json({ error: "Material not found" });
     res.json(material);
+  }));
+
+  app.delete("/api/materials/:id", asyncHandler(async (req, res) => {
+    await storage.deleteMaterial(req.params.id);
+    res.status(204).send();
   }));
 
   app.get("/api/lots", asyncHandler(async (req, res) => {
@@ -95,6 +105,11 @@ export async function registerRoutes(
     const lot = await storage.updateLot(req.params.id, data);
     if (!lot) return res.status(404).json({ error: "Lot not found" });
     res.json(lot);
+  }));
+
+  app.delete("/api/lots/:id", asyncHandler(async (req, res) => {
+    await storage.deleteLot(req.params.id);
+    res.status(204).send();
   }));
 
   app.get("/api/recipes", asyncHandler(async (req, res) => {
@@ -189,6 +204,11 @@ export async function registerRoutes(
     res.json(order);
   }));
 
+  app.delete("/api/orders/:id", asyncHandler(async (req, res) => {
+    await storage.deleteOrder(req.params.id);
+    res.status(204).send();
+  }));
+
   app.get("/api/orders/:id/items", asyncHandler(async (req, res) => {
     const items = await storage.getOrderItems(req.params.id);
     res.json(items);
@@ -227,6 +247,11 @@ export async function registerRoutes(
     const customer = await storage.updateCustomer(req.params.id, data);
     if (!customer) return res.status(404).json({ error: "Customer not found" });
     res.json(customer);
+  }));
+
+  app.delete("/api/customers/:id", asyncHandler(async (req, res) => {
+    await storage.deleteCustomer(req.params.id);
+    res.status(204).send();
   }));
 
   app.get("/api/batches/:id/quality-checks", asyncHandler(async (req, res) => {

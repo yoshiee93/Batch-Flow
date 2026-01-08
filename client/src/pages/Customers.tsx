@@ -5,9 +5,10 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Search, Plus, Loader2, AlertCircle, Pencil, Building2, Mail, Phone, MapPin } from 'lucide-react';
-import { useCustomers, useCreateCustomer, useUpdateCustomer, type Customer } from '@/lib/api';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Building2, Mail, Phone } from 'lucide-react';
+import { useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, type Customer } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Customers() {
@@ -28,6 +29,7 @@ export default function Customers() {
   const { data: customers = [], isLoading, isError } = useCustomers();
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
+  const deleteCustomer = useDeleteCustomer();
   const { toast } = useToast();
 
   const filteredCustomers = customers.filter(c => 
@@ -100,6 +102,15 @@ export default function Customers() {
       resetForm();
     } catch (error) {
       toast({ title: "Error", description: "Failed to update customer", variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async (customer: Customer) => {
+    try {
+      await deleteCustomer.mutateAsync(customer.id);
+      toast({ title: "Customer deleted", description: `Customer ${customer.name} has been removed` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete customer", variant: "destructive" });
     }
   };
 
@@ -298,14 +309,41 @@ export default function Customers() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditClick(customer)}
-                        data-testid={`button-edit-customer-${customer.id}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditClick(customer)}
+                          data-testid={`button-edit-customer-${customer.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              data-testid={`button-delete-customer-${customer.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete {customer.name}? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(customer)} data-testid="button-confirm-delete">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

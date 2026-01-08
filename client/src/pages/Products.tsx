@@ -4,15 +4,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Search, Package, FileText, Plus, Loader2, AlertCircle } from 'lucide-react';
-import { useProducts, useRecipes, useMaterials, useRecipeItems, useCreateProduct } from '@/lib/api';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Search, Package, FileText, Plus, Loader2, AlertCircle, Pencil, Trash2 } from 'lucide-react';
+import { useProducts, useRecipes, useMaterials, useRecipeItems, useCreateProduct, useUpdateProduct, useDeleteProduct, type Product } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Products() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newProduct, setNewProduct] = useState({
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [formData, setFormData] = useState({
     sku: '',
     name: '',
     description: '',
@@ -24,6 +27,8 @@ export default function Products() {
   const { data: recipes = [], isLoading: recipesLoading, isError: recipesError } = useRecipes();
   const { data: materials = [] } = useMaterials();
   const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
+  const deleteProduct = useDeleteProduct();
   const { toast } = useToast();
 
   const isLoading = productsLoading || recipesLoading;
@@ -34,26 +39,73 @@ export default function Products() {
     p.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const resetForm = () => {
+    setFormData({ sku: '', name: '', description: '', minStock: '0', currentStock: '0' });
+  };
+
   const handleCreateProduct = async () => {
-    if (!newProduct.sku || !newProduct.name) {
+    if (!formData.sku || !formData.name) {
       toast({ title: "Missing fields", description: "Please fill in SKU and Name", variant: "destructive" });
       return;
     }
     try {
       await createProduct.mutateAsync({
-        sku: newProduct.sku,
-        name: newProduct.name,
-        description: newProduct.description || null,
+        sku: formData.sku,
+        name: formData.name,
+        description: formData.description || null,
         unit: 'KG',
-        minStock: newProduct.minStock,
-        currentStock: newProduct.currentStock,
+        minStock: formData.minStock,
+        currentStock: formData.currentStock,
         active: true,
       });
-      toast({ title: "Product created", description: `Product ${newProduct.name} created successfully` });
+      toast({ title: "Product created", description: `Product ${formData.name} created successfully` });
       setIsCreateDialogOpen(false);
-      setNewProduct({ sku: '', name: '', description: '', minStock: '0', currentStock: '0' });
+      resetForm();
     } catch (error) {
       toast({ title: "Error", description: "Failed to create product", variant: "destructive" });
+    }
+  };
+
+  const handleEditClick = (product: Product) => {
+    setSelectedProduct(product);
+    setFormData({
+      sku: product.sku,
+      name: product.name,
+      description: product.description || '',
+      minStock: product.minStock,
+      currentStock: product.currentStock,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!selectedProduct || !formData.name) {
+      toast({ title: "Missing fields", description: "Please fill in the Name", variant: "destructive" });
+      return;
+    }
+    try {
+      await updateProduct.mutateAsync({
+        id: selectedProduct.id,
+        name: formData.name,
+        description: formData.description || null,
+        minStock: formData.minStock,
+        currentStock: formData.currentStock,
+      });
+      toast({ title: "Product updated", description: `Product ${formData.name} updated successfully` });
+      setIsEditDialogOpen(false);
+      setSelectedProduct(null);
+      resetForm();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update product", variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async (product: Product) => {
+    try {
+      await deleteProduct.mutateAsync(product.id);
+      toast({ title: "Product deleted", description: `Product ${product.name} has been removed` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete product", variant: "destructive" });
     }
   };
 
@@ -92,6 +144,7 @@ export default function Products() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Product</DialogTitle>
+              <DialogDescription>Create a new finished good product</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -99,8 +152,8 @@ export default function Products() {
                 <Input
                   id="sku"
                   placeholder="e.g. FG-005"
-                  value={newProduct.sku}
-                  onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
+                  value={formData.sku}
+                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   data-testid="input-product-sku"
                 />
               </div>
@@ -109,8 +162,8 @@ export default function Products() {
                 <Input
                   id="name"
                   placeholder="e.g. Industrial Solvent"
-                  value={newProduct.name}
-                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   data-testid="input-product-name"
                 />
               </div>
@@ -119,8 +172,8 @@ export default function Products() {
                 <Input
                   id="description"
                   placeholder="Optional description"
-                  value={newProduct.description}
-                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   data-testid="input-product-description"
                 />
               </div>
@@ -130,8 +183,8 @@ export default function Products() {
                   <Input
                     id="currentStock"
                     type="number"
-                    value={newProduct.currentStock}
-                    onChange={(e) => setNewProduct({ ...newProduct, currentStock: e.target.value })}
+                    value={formData.currentStock}
+                    onChange={(e) => setFormData({ ...formData, currentStock: e.target.value })}
                     data-testid="input-product-current-stock"
                   />
                 </div>
@@ -140,8 +193,8 @@ export default function Products() {
                   <Input
                     id="minStock"
                     type="number"
-                    value={newProduct.minStock}
-                    onChange={(e) => setNewProduct({ ...newProduct, minStock: e.target.value })}
+                    value={formData.minStock}
+                    onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
                     data-testid="input-product-min-stock"
                   />
                 </div>
@@ -203,7 +256,41 @@ export default function Products() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" data-testid={`button-edit-${product.id}`}>Edit</Button>
+                    <div className="flex justify-end gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleEditClick(product)}
+                        data-testid={`button-edit-product-${product.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-testid={`button-delete-product-${product.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete {product.name}? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(product)} data-testid="button-confirm-delete-product">
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -218,6 +305,68 @@ export default function Products() {
           </TableBody>
         </Table>
       </Card>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+            <DialogDescription>Update product details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>SKU</Label>
+              <Input value={formData.sku} disabled className="bg-muted font-mono" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Product Name *</Label>
+              <Input
+                id="edit-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                data-testid="input-edit-product-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Input
+                id="edit-description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                data-testid="input-edit-product-description"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-currentStock">Current Stock (KG)</Label>
+                <Input
+                  id="edit-currentStock"
+                  type="number"
+                  value={formData.currentStock}
+                  onChange={(e) => setFormData({ ...formData, currentStock: e.target.value })}
+                  data-testid="input-edit-product-current-stock"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-minStock">Min Stock (KG)</Label>
+                <Input
+                  id="edit-minStock"
+                  type="number"
+                  value={formData.minStock}
+                  onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
+                  data-testid="input-edit-product-min-stock"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedProduct(null); resetForm(); }}>Cancel</Button>
+            <Button onClick={handleUpdateProduct} disabled={updateProduct.isPending} data-testid="button-update-product">
+              {updateProduct.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

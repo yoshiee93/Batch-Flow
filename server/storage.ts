@@ -30,16 +30,19 @@ export interface IStorage {
   getCustomer(id: string): Promise<Customer | undefined>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
+  deleteCustomer(id: string): Promise<void>;
 
   getProducts(): Promise<Product[]>;
   getProduct(id: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
+  deleteProduct(id: string): Promise<void>;
 
   getMaterials(): Promise<Material[]>;
   getMaterial(id: string): Promise<Material | undefined>;
   createMaterial(material: InsertMaterial): Promise<Material>;
   updateMaterial(id: string, material: Partial<InsertMaterial>): Promise<Material | undefined>;
+  deleteMaterial(id: string): Promise<void>;
 
   getLots(): Promise<Lot[]>;
   getLot(id: string): Promise<Lot | undefined>;
@@ -47,6 +50,7 @@ export interface IStorage {
   getLotsByProduct(productId: string): Promise<Lot[]>;
   createLot(lot: InsertLot): Promise<Lot>;
   updateLot(id: string, lot: Partial<InsertLot>): Promise<Lot | undefined>;
+  deleteLot(id: string): Promise<void>;
 
   getRecipes(): Promise<Recipe[]>;
   getRecipe(id: string): Promise<Recipe | undefined>;
@@ -66,6 +70,7 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order | undefined>;
+  deleteOrder(id: string): Promise<void>;
   getOrderItems(orderId: string): Promise<OrderItem[]>;
   createOrderItem(item: InsertOrderItem): Promise<OrderItem>;
   deleteOrderItem(id: string): Promise<void>;
@@ -126,6 +131,11 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async deleteCustomer(id: string): Promise<void> {
+    await db.update(customers).set({ active: false }).where(eq(customers.id, id));
+    await this.createAuditLog({ entityType: "customer", entityId: id, action: "delete", changes: JSON.stringify({ active: false }) });
+  }
+
   async getProducts(): Promise<Product[]> {
     return db.select().from(products).where(eq(products.active, true)).orderBy(products.name);
   }
@@ -149,6 +159,11 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async deleteProduct(id: string): Promise<void> {
+    await db.update(products).set({ active: false }).where(eq(products.id, id));
+    await this.createAuditLog({ entityType: "product", entityId: id, action: "delete", changes: JSON.stringify({ active: false }) });
+  }
+
   async getMaterials(): Promise<Material[]> {
     return db.select().from(materials).where(eq(materials.active, true)).orderBy(materials.name);
   }
@@ -170,6 +185,11 @@ export class DatabaseStorage implements IStorage {
       await this.createAuditLog({ entityType: "material", entityId: id, action: "update", changes: JSON.stringify(material) });
     }
     return updated;
+  }
+
+  async deleteMaterial(id: string): Promise<void> {
+    await db.update(materials).set({ active: false }).where(eq(materials.id, id));
+    await this.createAuditLog({ entityType: "material", entityId: id, action: "delete", changes: JSON.stringify({ active: false }) });
   }
 
   async getLots(): Promise<Lot[]> {
@@ -201,6 +221,11 @@ export class DatabaseStorage implements IStorage {
       await this.createAuditLog({ entityType: "lot", entityId: id, action: "update", changes: JSON.stringify(lot) });
     }
     return updated;
+  }
+
+  async deleteLot(id: string): Promise<void> {
+    await db.delete(lots).where(eq(lots.id, id));
+    await this.createAuditLog({ entityType: "lot", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
   }
 
   async getRecipes(): Promise<Recipe[]> {
@@ -285,6 +310,12 @@ export class DatabaseStorage implements IStorage {
       await this.createAuditLog({ entityType: "order", entityId: id, action: "update", changes: JSON.stringify(order) });
     }
     return updated;
+  }
+
+  async deleteOrder(id: string): Promise<void> {
+    await db.delete(orderItems).where(eq(orderItems.orderId, id));
+    await db.delete(orders).where(eq(orders.id, id));
+    await this.createAuditLog({ entityType: "order", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
   }
 
   async getOrderItems(orderId: string): Promise<OrderItem[]> {

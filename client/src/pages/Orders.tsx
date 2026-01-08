@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
@@ -18,8 +18,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from 'lucide-react';
-import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem, useDeleteOrderItem, useCustomers, type Order, type OrderItem, type Product, type Customer } from '@/lib/api';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem, useDeleteOrderItem, useDeleteOrder, useCustomers, type Order, type OrderItem, type Product, type Customer } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Orders() {
@@ -47,6 +47,7 @@ export default function Orders() {
   const { data: customers = [] } = useCustomers();
   const updateOrder = useUpdateOrder();
   const createOrder = useCreateOrder();
+  const deleteOrder = useDeleteOrder();
   const { toast } = useToast();
 
   const filteredOrders = orders.filter(o => 
@@ -127,6 +128,15 @@ export default function Orders() {
       } else {
         setEditOrder({ ...editOrder, customerId, customerName: customer.name });
       }
+    }
+  };
+
+  const handleDeleteOrder = async (order: Order) => {
+    try {
+      await deleteOrder.mutateAsync(order.id);
+      toast({ title: "Order deleted", description: `Order ${order.orderNumber} has been removed` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete order", variant: "destructive" });
     }
   };
 
@@ -283,6 +293,7 @@ export default function Orders() {
                 products={products} 
                 onStatusChange={handleStatusChange}
                 onEditClick={handleEditClick}
+                onDelete={handleDeleteOrder}
               />
             ))}
             {filteredOrders.length === 0 && (
@@ -553,12 +564,14 @@ function EditOrderContent({
   );
 }
 
-function OrderRow({ order, products, onStatusChange, onEditClick }: { 
+function OrderRow({ order, products, onStatusChange, onEditClick, onDelete }: { 
   order: Order; 
   products: Product[]; 
   onStatusChange: (id: string, status: string) => void;
   onEditClick: (order: Order) => void;
+  onDelete: (order: Order) => void;
 }) {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: items = [] } = useOrderItems(order.id);
   
   const orderItems = items.map(item => {
@@ -632,8 +645,31 @@ function OrderRow({ order, products, onStatusChange, onEditClick }: {
             <DropdownMenuItem className="text-destructive" onClick={() => onStatusChange(order.id, 'cancelled')}>
               Cancel Order
             </DropdownMenuItem>
+            <DropdownMenuItem 
+              className="text-destructive" 
+              onClick={() => setIsDeleteDialogOpen(true)}
+              data-testid={`button-delete-order-${order.id}`}
+            >
+              <Trash2 size={14} className="mr-2" /> Delete Order
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Order</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete order {order.orderNumber}? This will also remove all associated items. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onDelete(order)} data-testid="button-confirm-delete-order">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </TableCell>
     </TableRow>
   );
