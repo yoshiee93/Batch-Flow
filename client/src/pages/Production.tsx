@@ -359,39 +359,50 @@ export default function Production() {
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Batch {selectedBatch?.batchNumber}</DialogTitle>
-            <DialogDescription>Update batch details</DialogDescription>
+            <DialogDescription>Update batch details and manage material inputs</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-plannedQuantity">Planned Quantity (KG)</Label>
-              <Input
-                id="edit-plannedQuantity"
-                type="number"
-                step="0.01"
-                value={editForm.plannedQuantity}
-                onChange={(e) => setEditForm({ ...editForm, plannedQuantity: e.target.value })}
-                data-testid="input-edit-planned-quantity"
-              />
+          <div className="space-y-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-plannedQuantity">Planned Quantity (KG)</Label>
+                <Input
+                  id="edit-plannedQuantity"
+                  type="number"
+                  step="0.01"
+                  value={editForm.plannedQuantity}
+                  onChange={(e) => setEditForm({ ...editForm, plannedQuantity: e.target.value })}
+                  data-testid="input-edit-planned-quantity"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-notes">Notes</Label>
+                <Input
+                  id="edit-notes"
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  placeholder="Add notes about this batch..."
+                  data-testid="input-edit-notes"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-notes">Notes</Label>
-              <Input
-                id="edit-notes"
-                value={editForm.notes}
-                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                placeholder="Add notes about this batch..."
-                data-testid="input-edit-notes"
+            
+            {selectedBatch && (
+              <BatchMaterialsEditor 
+                batchId={selectedBatch.id} 
+                materials={materials} 
+                lots={lots}
+                isCompleted={selectedBatch.status === 'completed'}
               />
-            </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Close</Button>
             <Button onClick={handleUpdateBatch} disabled={updateBatch.isPending} data-testid="button-save-batch">
               {updateBatch.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
+              Save Batch Details
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -564,6 +575,164 @@ export default function Production() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function BatchMaterialsEditor({ 
+  batchId, 
+  materials, 
+  lots,
+  isCompleted 
+}: { 
+  batchId: string; 
+  materials: Material[];
+  lots: Lot[];
+  isCompleted: boolean;
+}) {
+  const [editingMaterial, setEditingMaterial] = useState<BatchMaterial | null>(null);
+  const [editQuantity, setEditQuantity] = useState('');
+  
+  const { data: batchMaterials = [], isLoading } = useBatchMaterials(batchId);
+  const removeBatchMaterial = useRemoveBatchMaterial();
+  const updateBatchMaterial = useUpdateBatchMaterial();
+  const { toast } = useToast();
+  
+  const handleRemoveMaterial = async (materialId: string) => {
+    try {
+      await removeBatchMaterial.mutateAsync(materialId);
+      toast({ title: "Material removed", description: "Material returned to inventory" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to remove material", variant: "destructive" });
+    }
+  };
+  
+  const handleEditMaterialClick = (bm: BatchMaterial) => {
+    setEditingMaterial(bm);
+    setEditQuantity(bm.quantity);
+  };
+  
+  const handleUpdateMaterial = async () => {
+    if (!editingMaterial) return;
+    try {
+      await updateBatchMaterial.mutateAsync({ id: editingMaterial.id, quantity: editQuantity });
+      toast({ title: "Material updated", description: "Quantity has been updated and inventory adjusted" });
+      setEditingMaterial(null);
+      setEditQuantity('');
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to update material", variant: "destructive" });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-4">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">Material Inputs</Label>
+        <span className="text-xs text-muted-foreground">{batchMaterials.length} material(s)</span>
+      </div>
+      
+      {batchMaterials.length === 0 ? (
+        <div className="text-center py-6 text-muted-foreground bg-muted/30 rounded-lg border border-dashed">
+          <Package className="mx-auto h-8 w-8 mb-2 opacity-50" />
+          <p className="text-sm">No materials recorded yet</p>
+          <p className="text-xs mt-1">Use "Record Input" to add materials to this batch</p>
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+          {batchMaterials.map((bm) => {
+            const material = materials.find(m => m.id === bm.materialId);
+            const lot = lots.find(l => l.id === bm.lotId);
+            const isEditing = editingMaterial?.id === bm.id;
+            
+            return (
+              <div 
+                key={bm.id} 
+                className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border" 
+                data-testid={`edit-batch-material-${bm.id}`}
+              >
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{material?.name || 'Unknown Material'}</div>
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-mono">{material?.sku}</span>
+                    <span className="mx-2">•</span>
+                    <span>Lot: {lot?.lotNumber || 'Unknown'}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isEditing ? (
+                    <>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        value={editQuantity}
+                        onChange={(e) => setEditQuantity(e.target.value)}
+                        className="w-24 h-8 text-sm font-mono"
+                        data-testid={`input-edit-material-qty-${bm.id}`}
+                      />
+                      <span className="text-xs text-muted-foreground">KG</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100"
+                        onClick={handleUpdateMaterial}
+                        disabled={updateBatchMaterial.isPending}
+                        data-testid={`button-save-material-qty-${bm.id}`}
+                      >
+                        <CheckCircle size={14} />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7"
+                        onClick={() => { setEditingMaterial(null); setEditQuantity(''); }}
+                        data-testid={`button-cancel-edit-qty-${bm.id}`}
+                      >
+                        <X size={14} />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-mono text-sm font-medium">{bm.quantity} KG</span>
+                      {!isCompleted && (
+                        <>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleEditMaterialClick(bm)}
+                            data-testid={`button-edit-material-qty-${bm.id}`}
+                          >
+                            <Pencil size={14} />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleRemoveMaterial(bm.id)}
+                            disabled={removeBatchMaterial.isPending}
+                            data-testid={`button-remove-material-${bm.id}`}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
