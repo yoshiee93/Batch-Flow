@@ -288,10 +288,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteBatch(id: string): Promise<void> {
-    await db.delete(batchMaterials).where(eq(batchMaterials.batchId, id));
-    await db.delete(qualityChecks).where(eq(qualityChecks.batchId, id));
-    await db.delete(batches).where(eq(batches.id, id));
-    await this.createAuditLog({ entityType: "batch", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
+    // Use transaction to ensure consistency
+    await db.transaction(async (tx) => {
+      // First, delete stock movements that reference this batch
+      await tx.delete(stockMovements).where(eq(stockMovements.batchId, id));
+      
+      // Delete lots that were created from this batch (finished goods)
+      await tx.delete(lots).where(eq(lots.sourceBatchId, id));
+      
+      // Delete batch materials
+      await tx.delete(batchMaterials).where(eq(batchMaterials.batchId, id));
+      
+      // Delete quality checks
+      await tx.delete(qualityChecks).where(eq(qualityChecks.batchId, id));
+      
+      // Finally delete the batch itself
+      await tx.delete(batches).where(eq(batches.id, id));
+      
+      // Create audit log
+      await tx.insert(auditLogs).values({
+        entityType: "batch",
+        entityId: id,
+        action: "delete",
+        changes: JSON.stringify({ deleted: true }),
+      });
+    });
   }
 
   async getBatchMaterials(batchId: string): Promise<BatchMaterial[]> {
