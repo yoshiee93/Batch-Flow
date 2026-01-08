@@ -2,7 +2,6 @@ import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { 
   LayoutDashboard, 
-  Package, 
   Factory, 
   ClipboardCheck, 
   History, 
@@ -22,7 +21,6 @@ const navItems = [
   { label: 'Customers', icon: Users, href: '/customers' },
   { label: 'Production', icon: Factory, href: '/production' },
   { label: 'Inventory', icon: Box, href: '/inventory' },
-  { label: 'Products & BOM', icon: Package, href: '/products' },
   { label: 'Traceability', icon: History, href: '/traceability' },
   { label: 'Quality Control', icon: ClipboardCheck, href: '/quality' },
 ];
