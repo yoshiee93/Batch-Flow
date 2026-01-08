@@ -12,6 +12,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 8, 2026**: Implemented priority-based stock allocation system. Orders are allocated stock based on priority level (urgent > high > normal > low), then by due date (soonest first). Dashboard and Orders page show allocation status: Ready to Ship (green), Partially Allocated (amber), Awaiting Stock (grey). Auto-reallocation triggers on inventory changes and order modifications. Uses database transactions to prevent race conditions.
 - **Jan 8, 2026**: Added inline editing for batch material inputs. Pencil button allows editing quantity with automatic inventory adjustments (delta-based). Validation prevents negative/invalid quantities. Output editing works via Record Output button which pre-fills existing values.
 - **Jan 8, 2026**: Merged Products and Inventory pages into unified Inventory page with tabs for Raw Materials, Finished Goods, and Lots. Removed separate Products page and navigation link. /products route now redirects to /inventory.
 - **Jan 8, 2026**: Implemented production-inventory integration with Record Input and Record Output functionality. Recording inputs deducts from material/lot inventory. Recording outputs creates finished goods lots and adds to product stock. Stock movements tracked for audit trail.
@@ -87,6 +88,8 @@ The backend follows a modular structure:
 - `PATCH /api/batch-materials/:id` - Update batch material quantity (adjusts inventory with delta)
 - `GET/POST /api/orders` - Order management
 - `GET /api/orders/:id/items` - Order line items
+- `GET /api/orders/with-allocation` - Orders with allocation status and reserved quantities
+- `POST /api/allocation/run` - Manually trigger stock allocation
 - `GET /api/dashboard/stats` - Dashboard statistics
 - `GET /api/traceability/forward/:lotId` - Forward lot traceability
 - `GET /api/traceability/backward/:batchId` - Backward batch traceability
