@@ -9,7 +9,8 @@ import {
   Settings, 
   Box,
   Menu,
-  ShoppingCart
+  ShoppingCart,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
   { label: 'Orders', icon: ShoppingCart, href: '/orders' },
+  { label: 'Customers', icon: Users, href: '/customers' },
   { label: 'Production', icon: Factory, href: '/production' },
   { label: 'Inventory', icon: Box, href: '/inventory' },
   { label: 'Products & BOM', icon: Package, href: '/products' },

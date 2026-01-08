@@ -5,9 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2 } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
@@ -19,21 +19,32 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from 'lucide-react';
-import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder } from '@/lib/api';
+import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem, useDeleteOrderItem, useCustomers, type Order, type OrderItem, type Product, type Customer } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Orders() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [newOrder, setNewOrder] = useState({
     orderNumber: '',
     customerName: '',
+    customerId: '',
     priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent',
     dueDate: '',
+  });
+  const [editOrder, setEditOrder] = useState({
+    customerName: '',
+    customerId: '',
+    priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent',
+    dueDate: '',
+    notes: '',
   });
   
   const { data: orders = [], isLoading, isError } = useOrders();
   const { data: products = [] } = useProducts();
+  const { data: customers = [] } = useCustomers();
   const updateOrder = useUpdateOrder();
   const createOrder = useCreateOrder();
   const { toast } = useToast();
@@ -61,15 +72,61 @@ export default function Orders() {
       await createOrder.mutateAsync({
         orderNumber: newOrder.orderNumber,
         customerName: newOrder.customerName,
+        customerId: newOrder.customerId || null,
         priority: newOrder.priority,
         dueDate: new Date(newOrder.dueDate).toISOString(),
         status: 'pending',
       });
       toast({ title: "Order created", description: `Order ${newOrder.orderNumber} created successfully` });
       setIsCreateDialogOpen(false);
-      setNewOrder({ orderNumber: '', customerName: '', priority: 'normal', dueDate: '' });
+      setNewOrder({ orderNumber: '', customerName: '', customerId: '', priority: 'normal', dueDate: '' });
     } catch (error) {
       toast({ title: "Error", description: "Failed to create order", variant: "destructive" });
+    }
+  };
+
+  const handleEditClick = (order: Order) => {
+    setSelectedOrder(order);
+    setEditOrder({
+      customerName: order.customerName,
+      customerId: order.customerId || '',
+      priority: order.priority,
+      dueDate: order.dueDate.split('T')[0],
+      notes: order.notes || '',
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!selectedOrder || !editOrder.customerName) {
+      toast({ title: "Missing fields", description: "Please fill in the customer name", variant: "destructive" });
+      return;
+    }
+    try {
+      await updateOrder.mutateAsync({
+        id: selectedOrder.id,
+        customerName: editOrder.customerName,
+        customerId: editOrder.customerId || null,
+        priority: editOrder.priority,
+        dueDate: new Date(editOrder.dueDate).toISOString(),
+        notes: editOrder.notes || null,
+      });
+      toast({ title: "Order updated", description: `Order ${selectedOrder.orderNumber} updated successfully` });
+      setIsEditDialogOpen(false);
+      setSelectedOrder(null);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update order", variant: "destructive" });
+    }
+  };
+
+  const handleCustomerSelect = (customerId: string, isCreate: boolean) => {
+    const customer = customers.find(c => c.id === customerId);
+    if (customer) {
+      if (isCreate) {
+        setNewOrder({ ...newOrder, customerId, customerName: customer.name });
+      } else {
+        setEditOrder({ ...editOrder, customerId, customerName: customer.name });
+      }
     }
   };
 
@@ -121,14 +178,38 @@ export default function Orders() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="customerName">Customer Name *</Label>
-                <Input
-                  id="customerName"
-                  placeholder="e.g. Acme Corporation"
-                  value={newOrder.customerName}
-                  onChange={(e) => setNewOrder({ ...newOrder, customerName: e.target.value })}
-                  data-testid="input-customer-name"
-                />
+                <Label htmlFor="customer">Customer *</Label>
+                {customers.length > 0 ? (
+                  <Select value={newOrder.customerId} onValueChange={(v) => handleCustomerSelect(v, true)}>
+                    <SelectTrigger data-testid="select-customer">
+                      <SelectValue placeholder="Select a customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map(customer => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.code} - {customer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    id="customerName"
+                    placeholder="e.g. Acme Corporation"
+                    value={newOrder.customerName}
+                    onChange={(e) => setNewOrder({ ...newOrder, customerName: e.target.value })}
+                    data-testid="input-customer-name"
+                  />
+                )}
+                {customers.length > 0 && !newOrder.customerId && (
+                  <Input
+                    placeholder="Or enter customer name manually"
+                    value={newOrder.customerName}
+                    onChange={(e) => setNewOrder({ ...newOrder, customerName: e.target.value, customerId: '' })}
+                    className="mt-2"
+                    data-testid="input-customer-name-manual"
+                  />
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="priority">Priority</Label>
@@ -201,6 +282,7 @@ export default function Orders() {
                 order={order} 
                 products={products} 
                 onStatusChange={handleStatusChange}
+                onEditClick={handleEditClick}
               />
             ))}
             {filteredOrders.length === 0 && (
@@ -213,11 +295,270 @@ export default function Orders() {
           </TableBody>
         </Table>
       </Card>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Order {selectedOrder?.orderNumber}</DialogTitle>
+            <DialogDescription>Update order details and manage order items</DialogDescription>
+          </DialogHeader>
+          {selectedOrder && (
+            <EditOrderContent
+              order={selectedOrder}
+              editOrder={editOrder}
+              setEditOrder={setEditOrder}
+              customers={customers}
+              products={products}
+              onCustomerSelect={(id) => handleCustomerSelect(id, false)}
+              onSave={handleUpdateOrder}
+              isPending={updateOrder.isPending}
+              onClose={() => setIsEditDialogOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function OrderRow({ order, products, onStatusChange }: { order: any; products: any[]; onStatusChange: (id: string, status: string) => void }) {
+function EditOrderContent({
+  order,
+  editOrder,
+  setEditOrder,
+  customers,
+  products,
+  onCustomerSelect,
+  onSave,
+  isPending,
+  onClose,
+}: {
+  order: Order;
+  editOrder: { customerName: string; customerId: string; priority: string; dueDate: string; notes: string };
+  setEditOrder: (value: any) => void;
+  customers: Customer[];
+  products: Product[];
+  onCustomerSelect: (id: string) => void;
+  onSave: () => void;
+  isPending: boolean;
+  onClose: () => void;
+}) {
+  const { data: orderItems = [], isLoading: itemsLoading } = useOrderItems(order.id);
+  const createOrderItem = useCreateOrderItem();
+  const deleteOrderItem = useDeleteOrderItem();
+  const { toast } = useToast();
+  
+  const [newItem, setNewItem] = useState({ productId: '', quantity: '' });
+
+  const handleAddItem = async () => {
+    if (!newItem.productId || !newItem.quantity) {
+      toast({ title: "Missing fields", description: "Please select a product and enter quantity", variant: "destructive" });
+      return;
+    }
+    try {
+      await createOrderItem.mutateAsync({
+        orderId: order.id,
+        productId: newItem.productId,
+        quantity: newItem.quantity,
+      });
+      toast({ title: "Item added", description: "Order item added successfully" });
+      setNewItem({ productId: '', quantity: '' });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to add order item", variant: "destructive" });
+    }
+  };
+
+  const handleRemoveItem = async (itemId: string) => {
+    try {
+      await deleteOrderItem.mutateAsync(itemId);
+      toast({ title: "Item removed", description: "Order item removed successfully" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to remove order item", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-6 py-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Customer *</Label>
+          {customers.length > 0 ? (
+            <Select value={editOrder.customerId} onValueChange={onCustomerSelect}>
+              <SelectTrigger data-testid="select-edit-customer">
+                <SelectValue placeholder="Select a customer" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map(customer => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.code} - {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              value={editOrder.customerName}
+              onChange={(e) => setEditOrder({ ...editOrder, customerName: e.target.value })}
+              data-testid="input-edit-customer-name"
+            />
+          )}
+          {customers.length > 0 && (
+            <Input
+              placeholder="Or enter name manually"
+              value={editOrder.customerName}
+              onChange={(e) => setEditOrder({ ...editOrder, customerName: e.target.value, customerId: '' })}
+              className="mt-2"
+              data-testid="input-edit-customer-name-manual"
+            />
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label>Priority</Label>
+          <Select value={editOrder.priority} onValueChange={(v) => setEditOrder({ ...editOrder, priority: v })}>
+            <SelectTrigger data-testid="select-edit-priority">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="normal">Normal</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Due Date *</Label>
+          <Input
+            type="date"
+            value={editOrder.dueDate}
+            onChange={(e) => setEditOrder({ ...editOrder, dueDate: e.target.value })}
+            data-testid="input-edit-due-date"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Notes</Label>
+          <Input
+            value={editOrder.notes}
+            onChange={(e) => setEditOrder({ ...editOrder, notes: e.target.value })}
+            placeholder="Additional notes..."
+            data-testid="input-edit-notes"
+          />
+        </div>
+      </div>
+
+      <div className="border-t pt-4">
+        <h3 className="font-semibold mb-3 flex items-center gap-2">
+          <Package className="h-4 w-4" />
+          Order Items
+        </h3>
+        
+        {itemsLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            <div className="rounded-md border mb-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead className="text-right">Quantity (KG)</TableHead>
+                    <TableHead className="text-right">In Stock</TableHead>
+                    <TableHead className="w-[60px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orderItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
+                        No items in this order. Add products below.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    orderItems.map((item) => {
+                      const product = products.find(p => p.id === item.productId);
+                      return (
+                        <TableRow key={item.id} data-testid={`row-order-item-${item.id}`}>
+                          <TableCell>{product?.name || 'Unknown Product'}</TableCell>
+                          <TableCell className="text-right font-mono">{parseFloat(item.quantity).toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {product ? parseFloat(product.currentStock).toFixed(2) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveItem(item.id)}
+                              disabled={deleteOrderItem.isPending}
+                              data-testid={`button-remove-item-${item.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 space-y-2">
+                <Label>Add Product</Label>
+                <Select value={newItem.productId} onValueChange={(v) => setNewItem({ ...newItem, productId: v })}>
+                  <SelectTrigger data-testid="select-add-product">
+                    <SelectValue placeholder="Select product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map(product => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.sku} - {product.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-32 space-y-2">
+                <Label>Quantity (KG)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={newItem.quantity}
+                  onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
+                  placeholder="0.00"
+                  data-testid="input-add-quantity"
+                />
+              </div>
+              <Button
+                onClick={handleAddItem}
+                disabled={createOrderItem.isPending}
+                data-testid="button-add-item"
+              >
+                {createOrderItem.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button onClick={onSave} disabled={isPending} data-testid="button-save-order">
+          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Save Changes
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+function OrderRow({ order, products, onStatusChange, onEditClick }: { 
+  order: Order; 
+  products: Product[]; 
+  onStatusChange: (id: string, status: string) => void;
+  onEditClick: (order: Order) => void;
+}) {
   const { data: items = [] } = useOrderItems(order.id);
   
   const orderItems = items.map(item => {
@@ -274,6 +615,10 @@ function OrderRow({ order, products, onStatusChange }: { order: any; products: a
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => onEditClick(order)} data-testid={`button-edit-order-${order.id}`}>
+              <Pencil size={14} className="mr-2" /> Edit Order
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onStatusChange(order.id, 'in_production')}>
               <Clock size={14} className="mr-2" /> Start Production
             </DropdownMenuItem>

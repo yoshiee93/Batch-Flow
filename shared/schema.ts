@@ -20,6 +20,19 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const customers = pgTable("customers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  name: text("name").notNull(),
+  contactName: text("contact_name"),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   sku: varchar("sku", { length: 50 }).notNull().unique(),
@@ -108,6 +121,7 @@ export const batchMaterials = pgTable("batch_materials", {
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderNumber: varchar("order_number", { length: 50 }).notNull().unique(),
+  customerId: varchar("customer_id").references(() => customers.id),
   customerName: text("customer_name").notNull(),
   status: orderStatusEnum("status").notNull().default("pending"),
   priority: orderPriorityEnum("priority").notNull().default("normal"),
@@ -165,6 +179,10 @@ export const usersRelations = relations(users, ({ many }) => ({
   auditLogs: many(auditLogs),
 }));
 
+export const customersRelations = relations(customers, ({ many }) => ({
+  orders: many(orders),
+}));
+
 export const productsRelations = relations(products, ({ many }) => ({
   lots: many(lots),
   recipes: many(recipes),
@@ -214,7 +232,8 @@ export const batchMaterialsRelations = relations(batchMaterials, ({ one }) => ({
   addedByUser: one(users, { fields: [batchMaterials.addedBy], references: [users.id] }),
 }));
 
-export const ordersRelations = relations(orders, ({ many }) => ({
+export const ordersRelations = relations(orders, ({ one, many }) => ({
+  customer: one(customers, { fields: [orders.customerId], references: [customers.id] }),
   items: many(orderItems),
   stockMovements: many(stockMovements),
 }));
@@ -243,6 +262,7 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
 }));
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
+export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
 export const insertMaterialSchema = createInsertSchema(materials).omit({ id: true, createdAt: true });
 export const insertLotSchema = createInsertSchema(lots).omit({ id: true, createdAt: true });
@@ -260,6 +280,8 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: tru
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
+export type Customer = typeof customers.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;

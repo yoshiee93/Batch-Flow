@@ -3,8 +3,9 @@ import { db } from "./db";
 import {
   users, products, materials, lots, recipes, recipeItems,
   batches, batchMaterials, orders, orderItems, qualityChecks,
-  stockMovements, auditLogs,
+  stockMovements, auditLogs, customers,
   type User, type InsertUser,
+  type Customer, type InsertCustomer,
   type Product, type InsertProduct,
   type Material, type InsertMaterial,
   type Lot, type InsertLot,
@@ -24,6 +25,11 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getUsers(): Promise<User[]>;
+
+  getCustomers(): Promise<Customer[]>;
+  getCustomer(id: string): Promise<Customer | undefined>;
+  createCustomer(customer: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
 
   getProducts(): Promise<Product[]>;
   getProduct(id: string): Promise<Product | undefined>;
@@ -62,6 +68,7 @@ export interface IStorage {
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order | undefined>;
   getOrderItems(orderId: string): Promise<OrderItem[]>;
   createOrderItem(item: InsertOrderItem): Promise<OrderItem>;
+  deleteOrderItem(id: string): Promise<void>;
 
   getQualityChecks(batchId: string): Promise<QualityCheck[]>;
   createQualityCheck(check: InsertQualityCheck): Promise<QualityCheck>;
@@ -94,6 +101,29 @@ export class DatabaseStorage implements IStorage {
 
   async getUsers(): Promise<User[]> {
     return db.select().from(users).orderBy(users.fullName);
+  }
+
+  async getCustomers(): Promise<Customer[]> {
+    return db.select().from(customers).where(eq(customers.active, true)).orderBy(customers.name);
+  }
+
+  async getCustomer(id: string): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
+    return customer;
+  }
+
+  async createCustomer(customer: InsertCustomer): Promise<Customer> {
+    const [created] = await db.insert(customers).values(customer).returning();
+    await this.createAuditLog({ entityType: "customer", entityId: created.id, action: "create", changes: JSON.stringify(customer) });
+    return created;
+  }
+
+  async updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    const [updated] = await db.update(customers).set(customer).where(eq(customers.id, id)).returning();
+    if (updated) {
+      await this.createAuditLog({ entityType: "customer", entityId: id, action: "update", changes: JSON.stringify(customer) });
+    }
+    return updated;
   }
 
   async getProducts(): Promise<Product[]> {
@@ -264,6 +294,10 @@ export class DatabaseStorage implements IStorage {
   async createOrderItem(item: InsertOrderItem): Promise<OrderItem> {
     const [created] = await db.insert(orderItems).values(item).returning();
     return created;
+  }
+
+  async deleteOrderItem(id: string): Promise<void> {
+    await db.delete(orderItems).where(eq(orderItems.id, id));
   }
 
   async getQualityChecks(batchId: string): Promise<QualityCheck[]> {

@@ -5,7 +5,7 @@ import {
   insertProductSchema, insertMaterialSchema, insertLotSchema,
   insertRecipeSchema, insertRecipeItemSchema, insertBatchSchema,
   insertBatchMaterialSchema, insertOrderSchema, insertOrderItemSchema,
-  insertQualityCheckSchema, insertStockMovementSchema,
+  insertQualityCheckSchema, insertStockMovementSchema, insertCustomerSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -198,6 +198,35 @@ export async function registerRoutes(
     const data = insertOrderItemSchema.parse({ ...req.body, orderId: req.params.id });
     const item = await storage.createOrderItem(data);
     res.status(201).json(item);
+  }));
+
+  app.delete("/api/order-items/:id", asyncHandler(async (req, res) => {
+    await storage.deleteOrderItem(req.params.id);
+    res.status(204).send();
+  }));
+
+  app.get("/api/customers", asyncHandler(async (req, res) => {
+    const customers = await storage.getCustomers();
+    res.json(customers);
+  }));
+
+  app.get("/api/customers/:id", asyncHandler(async (req, res) => {
+    const customer = await storage.getCustomer(req.params.id);
+    if (!customer) return res.status(404).json({ error: "Customer not found" });
+    res.json(customer);
+  }));
+
+  app.post("/api/customers", asyncHandler(async (req, res) => {
+    const data = insertCustomerSchema.parse(req.body);
+    const customer = await storage.createCustomer(data);
+    res.status(201).json(customer);
+  }));
+
+  app.patch("/api/customers/:id", asyncHandler(async (req, res) => {
+    const data = insertCustomerSchema.partial().parse(req.body);
+    const customer = await storage.updateCustomer(req.params.id, data);
+    if (!customer) return res.status(404).json({ error: "Customer not found" });
+    res.json(customer);
   }));
 
   app.get("/api/batches/:id/quality-checks", asyncHandler(async (req, res) => {

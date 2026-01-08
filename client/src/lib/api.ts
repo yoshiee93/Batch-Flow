@@ -89,9 +89,23 @@ export interface Batch {
   createdAt: string;
 }
 
+export interface Customer {
+  id: string;
+  code: string;
+  name: string;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface Order {
   id: string;
   orderNumber: string;
+  customerId: string | null;
   customerName: string;
   status: "pending" | "in_production" | "ready" | "shipped" | "cancelled";
   priority: "low" | "normal" | "high" | "urgent";
@@ -264,5 +278,52 @@ export function useTraceabilityBackward(batchId: string) {
     queryKey: ["traceability", "backward", batchId],
     queryFn: () => fetchApi(`/traceability/backward/${batchId}`),
     enabled: !!batchId,
+  });
+}
+
+export function useCustomers() {
+  return useQuery<Customer[]>({
+    queryKey: ["customers"],
+    queryFn: () => fetchApi("/customers"),
+  });
+}
+
+export function useCreateCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<Customer>) => fetchApi<Customer>("/customers", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] }),
+  });
+}
+
+export function useUpdateCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Partial<Customer>) =>
+      fetchApi<Customer>(`/customers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] }),
+  });
+}
+
+export function useCreateOrderItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderId, ...data }: { orderId: string; productId: string; quantity: string }) =>
+      fetchApi<OrderItem>(`/orders/${orderId}/items`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orderItems"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+    },
+  });
+}
+
+export function useDeleteOrderItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => fetchApi(`/order-items/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orderItems"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+    },
   });
 }

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout/Layout";
 import Dashboard from "@/pages/Dashboard";
 import Orders from "@/pages/Orders";
+import Customers from "@/pages/Customers";
 import Production from "@/pages/Production";
 import Inventory from "@/pages/Inventory";
 import Products from "@/pages/Products";
@@ -26,6 +27,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/orders" component={Orders} />
+        <Route path="/customers" component={Customers} />
         <Route path="/production" component={Production} />
         <Route path="/inventory" component={Inventory} />
         <Route path="/products" component={Products} />
