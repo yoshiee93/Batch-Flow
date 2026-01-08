@@ -20,11 +20,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { 
-  useBatches, useProducts, useRecipes, useMaterials, useLots, useOutputItems,
+  useBatches, useProducts, useRecipes, useMaterials, useLots, useCategories,
   useUpdateBatch, useCreateBatch, useDeleteBatch,
   useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useUpdateBatchMaterial, useRecordBatchOutput,
   useBatchOutputs, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch,
-  type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput
+  type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput, type Category
 } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -742,13 +742,14 @@ function BatchCard({
   
   const { data: batchMaterials = [] } = useBatchMaterials(batch.id);
   const { data: batchOutputs = [] } = useBatchOutputs(batch.id);
-  const { data: outputProducts = [] } = useOutputItems();
+  const { data: categories = [] } = useCategories();
   
   const totalInputKg = batchMaterials.reduce((sum, bm) => sum + parseFloat(bm.quantity), 0);
   const totalOutputKg = batchOutputs.reduce((sum, bo) => sum + parseFloat(bo.quantity), 0);
   const nonPowderOutputKg = batchOutputs.reduce((sum, bo) => {
-    const product = outputProducts.find(p => p.id === bo.productId);
-    if (product?.isPowder) return sum;
+    const product = products.find(p => p.id === bo.productId);
+    const category = categories.find(c => c.id === product?.categoryId);
+    if (category?.excludeFromYield) return sum;
     return sum + parseFloat(bo.quantity);
   }, 0);
   const waste = batch.wasteQuantity ? parseFloat(batch.wasteQuantity) : 0;
@@ -890,7 +891,7 @@ function BatchCard({
                 ) : (
                   <div className="space-y-2">
                     {batchOutputs.map((bo) => {
-                      const outputProduct = outputProducts.find(p => p.id === bo.productId);
+                      const outputProduct = products.find(p => p.id === bo.productId);
                       return (
                         <div key={bo.id} className="flex items-center justify-between p-2 bg-background rounded border text-sm" data-testid={`batch-output-${bo.id}`}>
                           <div>
@@ -979,7 +980,7 @@ function BatchOutputsEditor({
   const [markCompleted, setMarkCompleted] = useState(false);
   
   const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
-  const { data: outputProducts = [] } = useOutputItems();
+  const { data: allProducts = [] } = useProducts();
   const addBatchOutput = useAddBatchOutput();
   const removeBatchOutput = useRemoveBatchOutput();
   const finalizeBatch = useFinalizeBatch();
@@ -1050,7 +1051,7 @@ function BatchOutputsEditor({
                   <SelectValue placeholder="Select product" />
                 </SelectTrigger>
                 <SelectContent>
-                  {outputProducts.map(product => (
+                  {allProducts.map(product => (
                     <SelectItem key={product.id} value={product.id}>
                       {product.sku} - {product.name}
                     </SelectItem>
@@ -1095,7 +1096,7 @@ function BatchOutputsEditor({
         ) : (
           <div className="space-y-2">
             {outputs.map((output) => {
-              const product = outputProducts.find(p => p.id === output.productId);
+              const product = allProducts.find(p => p.id === output.productId);
               return (
                 <div 
                   key={output.id} 

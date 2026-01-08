@@ -23,6 +23,7 @@ const navItems = [
   { label: 'Inventory', icon: Box, href: '/inventory' },
   { label: 'Traceability', icon: History, href: '/traceability' },
   { label: 'Quality Control', icon: ClipboardCheck, href: '/quality' },
+  { label: 'Settings', icon: Settings, href: '/settings' },
 ];
 
 export function Sidebar({ className }: { className?: string }) {
