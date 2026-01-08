@@ -12,9 +12,9 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 8, 2026**: Implemented dynamic category system. Replaced hardcoded boolean flags (isInput/isOutput/isPowder) with a configurable categories table. Categories have name, excludeFromYield, isDefault, and sortOrder fields. Default categories (Materials, Goods, Powders) are seeded and protected from deletion. Settings page allows creating/editing/deleting custom categories. Inventory page shows dynamic tabs based on categories with excludeFromYield=true. Production yield calculations use category metadata instead of boolean flags. API endpoints: GET/POST/PATCH/DELETE `/api/categories`.
 - **Jan 8, 2026**: Implemented multi-product batch output system. Batches can now produce multiple different products (e.g., freeze-dried strawberries producing both diced and crumble). New batchOutputs table tracks each product output. BatchOutputsEditor component provides add/remove outputs, waste/milling tracking, and finalize workflow. New API endpoints: GET/POST `/api/batches/:id/outputs`, DELETE `/api/batch-outputs/:id`, POST `/api/batches/:id/finalize`.
 - **Jan 8, 2026**: Simplified Record Input to remove lot requirement. Now just select material and quantity - inventory is deducted directly from material stock. Made lotId optional in batchMaterials table.
-- **Jan 8, 2026**: Added inventory categorization system. Products can now be flagged as "Input" (can be used in production) and/or "Output" (can be produced). This enables scenarios like "Strawberry Slice" being an output of one batch and an input to another. Category badges shown in Products table, checkboxes in create/edit forms. New API endpoints: `/api/items/inputs` and `/api/items/outputs`.
 - **Jan 8, 2026**: Implemented priority-based stock allocation system. Orders are allocated stock based on priority level (urgent > high > normal > low), then by due date (soonest first). Dashboard and Orders page show allocation status: Ready to Ship (green), Partially Allocated (amber), Awaiting Stock (grey). Auto-reallocation triggers on inventory changes and order modifications. Uses database transactions to prevent race conditions.
 - **Jan 8, 2026**: Added inline editing for batch material inputs. Pencil button allows editing quantity with automatic inventory adjustments (delta-based). Validation prevents negative/invalid quantities. Output editing works via Record Output button which pre-fills existing values.
 - **Jan 8, 2026**: Merged Products and Inventory pages into unified Inventory page with tabs for Raw Materials, Finished Goods, and Lots. Removed separate Products page and navigation link. /products route now redirects to /inventory.
@@ -64,7 +64,8 @@ The backend follows a modular structure:
 - **Migrations**: Drizzle Kit with migrations output to `./migrations`
 
 #### Database Tables:
-- **products** - Finished goods with SKU, stock levels
+- **categories** - Dynamic product categories with name, excludeFromYield flag, isDefault flag, sortOrder
+- **products** - Finished goods with SKU, stock levels, categoryId reference
 - **materials** - Raw materials with SKU, stock levels
 - **lots** - Lot tracking with expiry dates, supplier lots, traceability
 - **recipes** - Versioned product formulations
