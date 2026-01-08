@@ -25,6 +25,8 @@ export interface Product {
   unit: string;
   minStock: string;
   currentStock: string;
+  isInput: boolean;
+  isOutput: boolean;
   active: boolean;
   createdAt: string;
 }
@@ -150,6 +152,20 @@ export function useProducts() {
   });
 }
 
+export function useInputItems() {
+  return useQuery<Product[]>({
+    queryKey: ["inputItems"],
+    queryFn: () => fetchApi("/items/inputs"),
+  });
+}
+
+export function useOutputItems() {
+  return useQuery<Product[]>({
+    queryKey: ["outputItems"],
+    queryFn: () => fetchApi("/items/outputs"),
+  });
+}
+
 export function useMaterials() {
   return useQuery<Material[]>({
     queryKey: ["materials"],
@@ -231,7 +247,11 @@ export function useCreateProduct() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<Product>) => fetchApi<Product>("/products", { method: "POST", body: JSON.stringify(data) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["inputItems"] });
+      queryClient.invalidateQueries({ queryKey: ["outputItems"] });
+    },
   });
 }
 
@@ -240,7 +260,11 @@ export function useUpdateProduct() {
   return useMutation({
     mutationFn: ({ id, ...data }: { id: string } & Partial<Product>) =>
       fetchApi<Product>(`/products/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["inputItems"] });
+      queryClient.invalidateQueries({ queryKey: ["outputItems"] });
+    },
   });
 }
 
@@ -446,6 +470,8 @@ export function useDeleteProduct() {
     mutationFn: (id: string) => fetchApi(`/products/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["inputItems"] });
+      queryClient.invalidateQueries({ queryKey: ["outputItems"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
   });

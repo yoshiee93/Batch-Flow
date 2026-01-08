@@ -25,6 +25,16 @@ export async function registerRoutes(
     res.json(products);
   }));
 
+  app.get("/api/items/inputs", asyncHandler(async (req, res) => {
+    const items = await storage.getInputItems();
+    res.json(items);
+  }));
+
+  app.get("/api/items/outputs", asyncHandler(async (req, res) => {
+    const items = await storage.getOutputItems();
+    res.json(items);
+  }));
+
   app.get("/api/products/:id", asyncHandler(async (req, res) => {
     const product = await storage.getProduct(req.params.id);
     if (!product) return res.status(404).json({ error: "Product not found" });

@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Package, Box, FileText, Layers } from 'lucide-react';
+import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Package, Box, FileText, Layers, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { 
   useMaterials, useLots, useProducts, useRecipes, useRecipeItems,
@@ -36,7 +37,7 @@ export default function Inventory() {
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState({
-    sku: '', name: '', description: '', minStock: '0', currentStock: '0',
+    sku: '', name: '', description: '', minStock: '0', currentStock: '0', isInput: false, isOutput: true,
   });
   
   // Lot state
@@ -135,7 +136,7 @@ export default function Inventory() {
   };
 
   // Product handlers
-  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', minStock: '0', currentStock: '0' });
+  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', minStock: '0', currentStock: '0', isInput: false, isOutput: true });
 
   const handleCreateProduct = async () => {
     if (!productForm.sku || !productForm.name) {
@@ -145,7 +146,8 @@ export default function Inventory() {
     try {
       await createProduct.mutateAsync({
         sku: productForm.sku, name: productForm.name, description: productForm.description || null,
-        unit: 'KG', minStock: productForm.minStock, currentStock: productForm.currentStock, active: true,
+        unit: 'KG', minStock: productForm.minStock, currentStock: productForm.currentStock, 
+        isInput: productForm.isInput, isOutput: productForm.isOutput, active: true,
       });
       toast({ title: "Product created", description: `Product ${productForm.name} created successfully` });
       setIsCreateProductOpen(false);
@@ -160,6 +162,7 @@ export default function Inventory() {
     setProductForm({
       sku: product.sku, name: product.name, description: product.description || '',
       minStock: product.minStock, currentStock: product.currentStock,
+      isInput: product.isInput, isOutput: product.isOutput,
     });
     setIsEditProductOpen(true);
   };
@@ -170,6 +173,7 @@ export default function Inventory() {
       await updateProduct.mutateAsync({
         id: selectedProduct.id, name: productForm.name, description: productForm.description || null,
         minStock: productForm.minStock, currentStock: productForm.currentStock,
+        isInput: productForm.isInput, isOutput: productForm.isOutput,
       });
       toast({ title: "Product updated", description: `Product ${productForm.name} updated successfully` });
       setIsEditProductOpen(false);
@@ -470,6 +474,27 @@ export default function Inventory() {
                       <Input type="number" value={productForm.minStock} onChange={(e) => setProductForm({ ...productForm, minStock: e.target.value })} data-testid="input-product-min-stock" />
                     </div>
                   </div>
+                  <div className="space-y-3 pt-2 border-t">
+                    <Label className="text-sm font-medium">Category</Label>
+                    <div className="flex gap-6">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox 
+                          checked={productForm.isInput} 
+                          onCheckedChange={(checked) => setProductForm({ ...productForm, isInput: !!checked })}
+                          data-testid="checkbox-product-is-input"
+                        />
+                        <span className="text-sm flex items-center gap-1"><ArrowUpCircle className="h-4 w-4 text-blue-500" /> Can be used as Input</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox 
+                          checked={productForm.isOutput} 
+                          onCheckedChange={(checked) => setProductForm({ ...productForm, isOutput: !!checked })}
+                          data-testid="checkbox-product-is-output"
+                        />
+                        <span className="text-sm flex items-center gap-1"><ArrowDownCircle className="h-4 w-4 text-green-500" /> Can be produced as Output</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsCreateProductOpen(false)}>Cancel</Button>
@@ -488,6 +513,7 @@ export default function Inventory() {
                 <TableRow>
                   <TableHead className="w-[100px]">SKU</TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead className="text-center">Category</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead className="text-center">Recipe</TableHead>
                   <TableHead className="text-center">Status</TableHead>
@@ -502,6 +528,13 @@ export default function Inventory() {
                     <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
                       <TableCell className="font-mono font-medium">{product.sku}</TableCell>
                       <TableCell><div className="flex items-center gap-2"><Package className="h-4 w-4 text-muted-foreground" />{product.name}</div></TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex justify-center gap-1">
+                          {product.isInput && <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200"><ArrowUpCircle className="h-3 w-3 mr-1" />Input</Badge>}
+                          {product.isOutput && <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200"><ArrowDownCircle className="h-3 w-3 mr-1" />Output</Badge>}
+                          {!product.isInput && !product.isOutput && <span className="text-muted-foreground text-xs">—</span>}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right font-mono">{parseFloat(product.currentStock).toFixed(0)} KG</TableCell>
                       <TableCell className="text-center">
                         {recipe ? (
@@ -542,7 +575,7 @@ export default function Inventory() {
                 })}
                 {filteredProducts.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No products found. Click "New Product" to add one.
                     </TableCell>
                   </TableRow>
@@ -703,6 +736,27 @@ export default function Inventory() {
               <div className="space-y-2">
                 <Label>Min Stock (KG)</Label>
                 <Input type="number" value={productForm.minStock} onChange={(e) => setProductForm({ ...productForm, minStock: e.target.value })} data-testid="input-edit-product-min-stock" />
+              </div>
+            </div>
+            <div className="space-y-3 pt-2 border-t">
+              <Label className="text-sm font-medium">Category</Label>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox 
+                    checked={productForm.isInput} 
+                    onCheckedChange={(checked) => setProductForm({ ...productForm, isInput: !!checked })}
+                    data-testid="checkbox-edit-product-is-input"
+                  />
+                  <span className="text-sm flex items-center gap-1"><ArrowUpCircle className="h-4 w-4 text-blue-500" /> Can be used as Input</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox 
+                    checked={productForm.isOutput} 
+                    onCheckedChange={(checked) => setProductForm({ ...productForm, isOutput: !!checked })}
+                    data-testid="checkbox-edit-product-is-output"
+                  />
+                  <span className="text-sm flex items-center gap-1"><ArrowDownCircle className="h-4 w-4 text-green-500" /> Can be produced as Output</span>
+                </label>
               </div>
             </div>
           </div>

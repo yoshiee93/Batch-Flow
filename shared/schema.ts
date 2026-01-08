@@ -41,6 +41,8 @@ export const products = pgTable("products", {
   unit: varchar("unit", { length: 10 }).notNull().default("KG"),
   minStock: decimal("min_stock", { precision: 12, scale: 3 }).notNull().default("0"),
   currentStock: decimal("current_stock", { precision: 12, scale: 3 }).notNull().default("0"),
+  isInput: boolean("is_input").notNull().default(false),
+  isOutput: boolean("is_output").notNull().default(true),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
