@@ -70,7 +70,7 @@ export default function Orders() {
       return;
     }
     try {
-      await createOrder.mutateAsync({
+      const createdOrder = await createOrder.mutateAsync({
         orderNumber: newOrder.orderNumber,
         customerName: newOrder.customerName,
         customerId: newOrder.customerId || null,
@@ -78,9 +78,22 @@ export default function Orders() {
         dueDate: new Date(newOrder.dueDate).toISOString(),
         status: 'pending',
       });
-      toast({ title: "Order created", description: `Order ${newOrder.orderNumber} created successfully` });
+      toast({ title: "Order created", description: `Order ${newOrder.orderNumber} created. Add products below.` });
       setIsCreateDialogOpen(false);
       setNewOrder({ orderNumber: '', customerName: '', customerId: '', priority: 'normal', dueDate: '' });
+      
+      // Open edit dialog to add products
+      if (createdOrder) {
+        setSelectedOrder(createdOrder);
+        setEditOrder({
+          customerName: createdOrder.customerName,
+          customerId: createdOrder.customerId || '',
+          priority: createdOrder.priority,
+          dueDate: createdOrder.dueDate.split('T')[0],
+          notes: createdOrder.notes || '',
+        });
+        setIsEditDialogOpen(true);
+      }
     } catch (error) {
       toast({ title: "Error", description: "Failed to create order", variant: "destructive" });
     }
