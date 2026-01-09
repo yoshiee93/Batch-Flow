@@ -26,7 +26,7 @@ export default function Inventory() {
   const [isEditMaterialOpen, setIsEditMaterialOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [materialForm, setMaterialForm] = useState({
-    sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0',
+    sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: '' as string | null,
   });
   
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
@@ -61,7 +61,7 @@ export default function Inventory() {
     p.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const resetMaterialForm = () => setMaterialForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0' });
+  const resetMaterialForm = () => setMaterialForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null });
 
   const handleCreateMaterial = async () => {
     if (!materialForm.sku || !materialForm.name) {
@@ -71,7 +71,8 @@ export default function Inventory() {
     try {
       await createMaterial.mutateAsync({
         sku: materialForm.sku, name: materialForm.name, description: materialForm.description || null,
-        unit: materialForm.unit, minStock: materialForm.minStock, currentStock: materialForm.currentStock, active: true,
+        unit: materialForm.unit, minStock: materialForm.minStock, currentStock: materialForm.currentStock, 
+        categoryId: materialForm.categoryId || null, active: true,
       });
       toast({ title: "Material created", description: `Material ${materialForm.name} created successfully` });
       setIsCreateMaterialOpen(false);
@@ -86,6 +87,7 @@ export default function Inventory() {
     setMaterialForm({
       sku: material.sku, name: material.name, description: material.description || '',
       unit: material.unit, minStock: material.minStock, currentStock: material.currentStock,
+      categoryId: material.categoryId,
     });
     setIsEditMaterialOpen(true);
   };
@@ -96,6 +98,7 @@ export default function Inventory() {
       await updateMaterial.mutateAsync({
         id: selectedMaterial.id, name: materialForm.name, description: materialForm.description || null,
         minStock: materialForm.minStock, currentStock: materialForm.currentStock,
+        categoryId: materialForm.categoryId || null,
       });
       toast({ title: "Material updated", description: `Material ${materialForm.name} updated successfully` });
       setIsEditMaterialOpen(false);
@@ -395,6 +398,22 @@ export default function Inventory() {
                       <Input type="number" value={materialForm.minStock} onChange={(e) => setMaterialForm({ ...materialForm, minStock: e.target.value })} data-testid="input-material-min-stock" />
                     </div>
                   </div>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select
+                      value={materialForm.categoryId || ''}
+                      onValueChange={(v) => setMaterialForm({ ...materialForm, categoryId: v || null })}
+                    >
+                      <SelectTrigger data-testid="select-material-category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsCreateMaterialOpen(false)}>Cancel</Button>
@@ -500,13 +519,9 @@ export default function Inventory() {
 
         <TabsContent value="materials" className="space-y-4">
           <div className="flex justify-end">
-            <Dialog open={isCreateMaterialOpen} onOpenChange={setIsCreateMaterialOpen}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-new-material-tab">
-                  <Plus size={16} className="mr-2" /> New Material
-                </Button>
-              </DialogTrigger>
-            </Dialog>
+            <Button onClick={() => setIsCreateMaterialOpen(true)} data-testid="button-new-material-tab">
+              <Plus size={16} className="mr-2" /> New Material
+            </Button>
           </div>
 
           <Card>
@@ -538,13 +553,9 @@ export default function Inventory() {
 
         <TabsContent value="goods" className="space-y-4">
           <div className="flex justify-end">
-            <Dialog open={isCreateProductOpen} onOpenChange={setIsCreateProductOpen}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-new-product-tab">
-                  <Plus size={16} className="mr-2" /> New Good
-                </Button>
-              </DialogTrigger>
-            </Dialog>
+            <Button onClick={() => setIsCreateProductOpen(true)} data-testid="button-new-product-tab">
+              <Plus size={16} className="mr-2" /> New Good
+            </Button>
           </div>
 
           <Card>
@@ -636,6 +647,22 @@ export default function Inventory() {
                 <Label>Min Stock (KG)</Label>
                 <Input type="number" value={materialForm.minStock} onChange={(e) => setMaterialForm({ ...materialForm, minStock: e.target.value })} data-testid="input-edit-material-min-stock" />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select
+                value={materialForm.categoryId || ''}
+                onValueChange={(v) => setMaterialForm({ ...materialForm, categoryId: v || null })}
+              >
+                <SelectTrigger data-testid="select-edit-material-category">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

@@ -63,6 +63,7 @@ export const materials = pgTable("materials", {
   unit: varchar("unit", { length: 10 }).notNull().default("KG"),
   minStock: decimal("min_stock", { precision: 12, scale: 3 }).notNull().default("0"),
   currentStock: decimal("current_stock", { precision: 12, scale: 3 }).notNull().default("0"),
+  categoryId: varchar("category_id").references(() => categories.id),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

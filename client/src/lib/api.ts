@@ -47,6 +47,7 @@ export interface Material {
   unit: string;
   minStock: string;
   currentStock: string;
+  categoryId: string | null;
   active: boolean;
   createdAt: string;
 }
