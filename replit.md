@@ -12,6 +12,9 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 9, 2026**: Extended category support to materials. Added categoryId column to materials table with foreign key to categories. Updated Inventory page with category dropdown in both create and edit material forms. Material interface updated in API types.
+- **Jan 9, 2026**: Fixed Inventory page dialog structure. Moved create material and create product dialogs outside TabsContent components so they render correctly regardless of active tab. Added missing Lots tab trigger to TabsList.
+- **Jan 9, 2026**: Added lot display helpers and imports. Added useLots hook, getMaterialName, getProductName, and getLotItemName helper functions. Added format import from date-fns for date formatting in lots table.
 - **Jan 8, 2026**: Implemented dynamic category system. Replaced hardcoded boolean flags (isInput/isOutput/isPowder) with a configurable categories table. Categories have name, excludeFromYield, isDefault, and sortOrder fields. Default categories (Materials, Goods, Powders) are seeded and protected from deletion. Settings page allows creating/editing/deleting custom categories. Inventory page shows dynamic tabs based on categories with excludeFromYield=true. Production yield calculations use category metadata instead of boolean flags. API endpoints: GET/POST/PATCH/DELETE `/api/categories`.
 - **Jan 8, 2026**: Implemented multi-product batch output system. Batches can now produce multiple different products (e.g., freeze-dried strawberries producing both diced and crumble). New batchOutputs table tracks each product output. BatchOutputsEditor component provides add/remove outputs, waste/milling tracking, and finalize workflow. New API endpoints: GET/POST `/api/batches/:id/outputs`, DELETE `/api/batch-outputs/:id`, POST `/api/batches/:id/finalize`.
 - **Jan 8, 2026**: Simplified Record Input to remove lot requirement. Now just select material and quantity - inventory is deducted directly from material stock. Made lotId optional in batchMaterials table.
@@ -66,7 +69,7 @@ The backend follows a modular structure:
 #### Database Tables:
 - **categories** - Dynamic product categories with name, excludeFromYield flag, isDefault flag, sortOrder
 - **products** - Finished goods with SKU, stock levels, categoryId reference
-- **materials** - Raw materials with SKU, stock levels
+- **materials** - Raw materials with SKU, stock levels, categoryId reference
 - **lots** - Lot tracking with expiry dates, supplier lots, traceability
 - **recipes** - Versioned product formulations
 - **recipeItems** - Bill of materials for each recipe
