@@ -10,14 +10,12 @@ import { format } from 'date-fns';
 import { useProducts, useMaterials, useDashboardStats, useOrdersWithAllocation, useBatches, type OrderWithAllocation } from '@/lib/api';
 import { useSettings } from '@/hooks/use-settings';
 import { useDashboardLayout, type DashboardLayoutItem } from '@/hooks/use-dashboard-layout';
-import { useRef, useState, useEffect } from 'react';
-import { ResponsiveGridLayout } from 'react-grid-layout';
+import { useContainerWidth, ResponsiveGridLayout as RGL } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
 export default function Dashboard() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(1200);
+  const { width, containerRef, mounted } = useContainerWidth({ initialWidth: 1200 });
   const { data: ordersWithAllocation = [], isLoading: ordersLoading, isError: ordersError } = useOrdersWithAllocation();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
   const { settings } = useSettings();
@@ -32,17 +30,6 @@ export default function Dashboard() {
 
   const isLoading = ordersLoading || productsLoading || materialsLoading || batchesLoading;
   const hasError = ordersError || productsError || materialsError || batchesError;
-
-  useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
-      }
-    };
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
 
   if (isLoading) {
     return (
@@ -63,11 +50,14 @@ export default function Dashboard() {
     );
   }
 
+  const makeStatic = (items: DashboardLayoutItem[]) =>
+    items.map(item => ({ ...item, static: !editMode }));
+
   const layouts = {
-    lg: layout,
-    md: layout.map(item => ({ ...item, w: Math.min(item.w, 10) })),
-    sm: layout.map(item => ({ ...item, x: 0, w: 6 })),
-    xs: layout.map(item => ({ ...item, x: 0, w: 4 })),
+    lg: makeStatic(layout),
+    md: makeStatic(layout.map(item => ({ ...item, w: Math.min(item.w, 10) }))),
+    sm: makeStatic(layout.map(item => ({ ...item, x: 0, w: 6 }))),
+    xs: makeStatic(layout.map(item => ({ ...item, x: 0, w: 4 }))),
   };
 
   return (
@@ -115,19 +105,20 @@ export default function Dashboard() {
       )}
 
       <div ref={containerRef}>
-        <ResponsiveGridLayout
-          className="layout"
-          layouts={layouts}
-          breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
-          cols={{ lg: 12, md: 10, sm: 6, xs: 4 }}
-          rowHeight={60}
-          width={containerWidth}
-          onLayoutChange={(currentLayout) => onLayoutChange(currentLayout as DashboardLayoutItem[])}
-          isDraggable={editMode}
-          isResizable={editMode}
-          draggableHandle=".drag-handle"
-          margin={[16, 16]}
-        >
+        {mounted && (
+          <RGL
+            className="layout"
+            layouts={layouts}
+            breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
+            cols={{ lg: 12, md: 10, sm: 6, xs: 4 }}
+            rowHeight={60}
+            width={width}
+            onLayoutChange={(currentLayout) => onLayoutChange(currentLayout as DashboardLayoutItem[])}
+            isDraggable={editMode}
+            isResizable={editMode}
+            draggableHandle=".drag-handle"
+            margin={[16, 16]}
+          >
         <div key="stats-orders" className={cn(editMode && "ring-2 ring-blue-200 ring-offset-2 rounded-lg")}>
           <DashboardCard
             editMode={editMode}
@@ -306,7 +297,8 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
-        </ResponsiveGridLayout>
+          </RGL>
+        )}
       </div>
     </div>
   );

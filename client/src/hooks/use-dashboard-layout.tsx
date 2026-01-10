@@ -13,7 +13,6 @@ export interface DashboardLayoutItem {
 }
 
 const LAYOUT_STORAGE_KEY = 'batchmaster-dashboard-layout';
-const EDIT_MODE_STORAGE_KEY = 'batchmaster-dashboard-edit-mode';
 
 export const DEFAULT_LAYOUT: DashboardLayoutItem[] = [
   { i: 'stats-orders', x: 0, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
@@ -39,15 +38,7 @@ export function useDashboardLayout() {
     }
   });
 
-  const [editMode, setEditMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      const stored = localStorage.getItem(EDIT_MODE_STORAGE_KEY);
-      return stored === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [editMode, setEditMode] = useState<boolean>(false);
 
   useEffect(() => {
     try {
@@ -56,14 +47,6 @@ export function useDashboardLayout() {
       // Ignore storage errors
     }
   }, [layout]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(EDIT_MODE_STORAGE_KEY, String(editMode));
-    } catch {
-      // Ignore storage errors
-    }
-  }, [editMode]);
 
   const onLayoutChange = useCallback((newLayout: DashboardLayoutItem[]) => {
     setLayout(cloneLayout(newLayout));
