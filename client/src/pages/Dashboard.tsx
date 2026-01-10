@@ -2,7 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, CheckCircle2, Package, ShoppingCart, TrendingUp, AlertCircle, Loader2, Clock } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { AlertTriangle, CheckCircle2, Package, ShoppingCart, TrendingUp, AlertCircle, Loader2, Clock, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
 import { format } from 'date-fns';
@@ -181,61 +182,70 @@ function OrderCard({ order }: { order: OrderWithAllocation }) {
   };
 
   return (
-    <div className="p-3 sm:p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors" data-testid={`card-order-${order.id}`}>
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-0 mb-3">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-            <span className="font-mono font-bold text-sm sm:text-base">{order.orderNumber}</span>
-            <OrderStatusBadge status={order.status} />
-            <PriorityBadge priority={order.priority} />
-          </div>
-          <div className="text-sm font-medium">{order.customerName}</div>
-          <div className="text-xs text-muted-foreground">
-            Due: {format(new Date(order.dueDate), 'MMM d, yyyy')}
-          </div>
-        </div>
-        <div className="flex items-center">
-          {allocationBadge()}
-        </div>
-      </div>
-
-      {order.items.length > 0 && (
-        <div className="space-y-2 mt-3 pt-3 border-t">
-          {order.items.map((item) => {
-            const allocated = parseFloat(item.reservedQuantity);
-            const needed = parseFloat(item.quantity);
-            const percent = needed > 0 ? (allocated / needed) * 100 : 0;
-            const isFullyAllocated = allocated >= needed;
-            
-            return (
-              <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 text-sm">
-                <span className="text-muted-foreground truncate">{item.productName}</span>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <span className={cn(
-                    "font-mono text-xs px-2 py-0.5 rounded whitespace-nowrap",
-                    isFullyAllocated 
-                      ? "bg-green-50 text-green-700" 
-                      : allocated > 0
-                        ? "bg-amber-50 text-amber-700"
-                        : "bg-slate-50 text-slate-500"
-                  )}>
-                    {allocated.toFixed(0)}/{needed.toFixed(0)} KG
-                  </span>
-                  <Progress 
-                    value={Math.min(percent, 100)} 
-                    className={cn(
-                      "w-16 h-2 flex-shrink-0",
-                      !isFullyAllocated && allocated > 0 && "[&>div]:bg-amber-500",
-                      !isFullyAllocated && allocated === 0 && "[&>div]:bg-slate-300"
-                    )}
-                  />
-                </div>
+    <Collapsible defaultOpen={true} className="group">
+      <div className="border rounded-lg bg-card overflow-hidden" data-testid={`card-order-${order.id}`}>
+        <CollapsibleTrigger className="w-full p-3 sm:p-4 hover:bg-muted/50 transition-colors text-left">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-0">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+                <span className="font-mono font-bold text-sm sm:text-base">{order.orderNumber}</span>
+                <OrderStatusBadge status={order.status} />
+                <PriorityBadge priority={order.priority} />
               </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+              <div className="text-sm font-medium ml-6">{order.customerName}</div>
+              <div className="text-xs text-muted-foreground ml-6">
+                Due: {format(new Date(order.dueDate), 'MMM d, yyyy')}
+              </div>
+            </div>
+            <div className="flex items-center ml-6 sm:ml-0">
+              {allocationBadge()}
+            </div>
+          </div>
+        </CollapsibleTrigger>
+
+        {order.items.length > 0 && (
+          <CollapsibleContent>
+            <div className="space-y-2 px-3 sm:px-4 pb-3 sm:pb-4 pt-0 border-t">
+              <div className="pt-3">
+                {order.items.map((item) => {
+                  const allocated = parseFloat(item.reservedQuantity);
+                  const needed = parseFloat(item.quantity);
+                  const percent = needed > 0 ? (allocated / needed) * 100 : 0;
+                  const isFullyAllocated = allocated >= needed;
+                  
+                  return (
+                    <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 text-sm py-1">
+                      <span className="text-muted-foreground truncate">{item.productName}</span>
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <span className={cn(
+                          "font-mono text-xs px-2 py-0.5 rounded whitespace-nowrap",
+                          isFullyAllocated 
+                            ? "bg-green-50 text-green-700" 
+                            : allocated > 0
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-slate-50 text-slate-500"
+                        )}>
+                          {allocated.toFixed(0)}/{needed.toFixed(0)} KG
+                        </span>
+                        <Progress 
+                          value={Math.min(percent, 100)} 
+                          className={cn(
+                            "w-16 h-2 flex-shrink-0",
+                            !isFullyAllocated && allocated > 0 && "[&>div]:bg-amber-500",
+                            !isFullyAllocated && allocated === 0 && "[&>div]:bg-slate-300"
+                          )}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CollapsibleContent>
+        )}
+      </div>
+    </Collapsible>
   );
 }
 

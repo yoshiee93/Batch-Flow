@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
@@ -373,7 +374,7 @@ export default function Orders() {
       </Dialog>
 
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="w-full sm:max-w-xl">
+        <DialogContent className="w-full sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
@@ -403,7 +404,7 @@ export default function Orders() {
               </div>
 
               <div>
-                <h4 className="font-semibold mb-3">Products Requested</h4>
+                <h4 className="font-semibold mb-3">Products Requested ({viewingOrder.items.length})</h4>
                 {viewingOrder.items.length === 0 ? (
                   <p className="text-muted-foreground text-sm italic">No items in this order</p>
                 ) : (
@@ -417,37 +418,44 @@ export default function Orders() {
                       const stockStatus = reserved >= needed ? 'ready' : reserved > 0 ? 'partial' : 'waiting';
                       
                       return (
-                        <div key={item.id} className="border rounded-lg p-3">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <p className="font-medium">{item.productName}</p>
-                              {product?.sku && <p className="text-xs text-muted-foreground">{product.sku}</p>}
-                            </div>
-                            {stockStatus === 'ready' && (
-                              <Badge className="bg-green-100 text-green-700"><CheckCircle2 size={12} className="mr-1" /> Ready</Badge>
-                            )}
-                            {stockStatus === 'partial' && (
-                              <Badge className="bg-amber-100 text-amber-700"><Clock size={12} className="mr-1" /> Partial</Badge>
-                            )}
-                            {stockStatus === 'waiting' && (
-                              <Badge className="bg-slate-100 text-slate-600"><AlertCircle size={12} className="mr-1" /> Waiting</Badge>
-                            )}
+                        <Collapsible key={item.id} defaultOpen={true} className="group">
+                          <div className="border rounded-lg overflow-hidden">
+                            <CollapsibleTrigger className="w-full p-3 flex justify-between items-center hover:bg-muted/50 transition-colors">
+                              <div className="flex items-center gap-2 text-left">
+                                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+                                <div>
+                                  <p className="font-medium">{item.productName}</p>
+                                  {product?.sku && <p className="text-xs text-muted-foreground">{product.sku}</p>}
+                                </div>
+                              </div>
+                              {stockStatus === 'ready' && (
+                                <Badge className="bg-green-100 text-green-700"><CheckCircle2 size={12} className="mr-1" /> Ready</Badge>
+                              )}
+                              {stockStatus === 'partial' && (
+                                <Badge className="bg-amber-100 text-amber-700"><Clock size={12} className="mr-1" /> Partial</Badge>
+                              )}
+                              {stockStatus === 'waiting' && (
+                                <Badge className="bg-slate-100 text-slate-600"><AlertCircle size={12} className="mr-1" /> Waiting</Badge>
+                              )}
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="grid grid-cols-3 gap-2 text-sm p-3 pt-0 border-t">
+                                <div>
+                                  <p className="text-muted-foreground">Ordered</p>
+                                  <p className="font-mono">{needed.toFixed(2)} {unit}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Reserved</p>
+                                  <p className="font-mono">{reserved.toFixed(2)} {unit}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">In Stock</p>
+                                  <p className={cn("font-mono", currentStock < needed && "text-destructive")}>{currentStock.toFixed(2)} {unit}</p>
+                                </div>
+                              </div>
+                            </CollapsibleContent>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Ordered</p>
-                              <p className="font-mono">{needed.toFixed(2)} {unit}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Reserved</p>
-                              <p className="font-mono">{reserved.toFixed(2)} {unit}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">In Stock</p>
-                              <p className={cn("font-mono", currentStock < needed && "text-destructive")}>{currentStock.toFixed(2)} {unit}</p>
-                            </div>
-                          </div>
-                        </div>
+                        </Collapsible>
                       );
                     })}
                   </div>
