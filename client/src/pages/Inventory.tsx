@@ -346,13 +346,13 @@ export default function Inventory() {
         </Card>
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Materials Stock</div>
-          <div className="text-2xl font-bold font-mono">{totalMaterialStock.toFixed(0)} KG</div>
-          <div className="text-xs text-muted-foreground">{materials.length} items</div>
+          <div className="text-2xl font-bold font-mono">{totalMaterialStock.toFixed(0)}</div>
+          <div className="text-xs text-muted-foreground">{materials.length} items (mixed units)</div>
         </Card>
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Goods Stock</div>
-          <div className="text-2xl font-bold font-mono">{totalProductStock.toFixed(0)} KG</div>
-          <div className="text-xs text-muted-foreground">{products.length} items</div>
+          <div className="text-2xl font-bold font-mono">{totalProductStock.toFixed(0)}</div>
+          <div className="text-xs text-muted-foreground">{products.length} items (mixed units)</div>
         </Card>
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Low Stock Alerts</div>
