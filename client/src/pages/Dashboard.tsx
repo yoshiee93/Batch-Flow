@@ -41,21 +41,21 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-mono" data-testid="text-dashboard-title">Factory Overview</h1>
-          <p className="text-muted-foreground mt-1">Real-time orders and stock status.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono" data-testid="text-dashboard-title">Factory Overview</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">Real-time orders and stock status.</p>
         </div>
         <div className="flex gap-2">
            <Link href="/orders">
-             <Button className="font-mono" data-testid="button-new-order">
+             <Button className="font-mono w-full sm:w-auto" data-testid="button-new-order">
                <ShoppingCart size={16} className="mr-2" /> New Order
              </Button>
            </Link>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card data-testid="card-active-orders">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Orders</CardTitle>
@@ -100,8 +100,8 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+      <div className="grid gap-4 lg:grid-cols-7">
+        <Card className="lg:col-span-4">
           <CardHeader>
             <CardTitle>Current Orders</CardTitle>
             <CardDescription>Active orders and stock availability.</CardDescription>
@@ -121,7 +121,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="col-span-3">
+        <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Material Alerts</CardTitle>
             <CardDescription>Items requiring immediate attention.</CardDescription>
@@ -181,11 +181,11 @@ function OrderCard({ order }: { order: OrderWithAllocation }) {
   };
 
   return (
-    <div className="p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors" data-testid={`card-order-${order.id}`}>
-      <div className="flex items-start justify-between mb-3">
+    <div className="p-3 sm:p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors" data-testid={`card-order-${order.id}`}>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-0 mb-3">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="font-mono font-bold">{order.orderNumber}</span>
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+            <span className="font-mono font-bold text-sm sm:text-base">{order.orderNumber}</span>
             <OrderStatusBadge status={order.status} />
             <PriorityBadge priority={order.priority} />
           </div>
@@ -194,7 +194,7 @@ function OrderCard({ order }: { order: OrderWithAllocation }) {
             Due: {format(new Date(order.dueDate), 'MMM d, yyyy')}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center">
           {allocationBadge()}
         </div>
       </div>
@@ -208,23 +208,23 @@ function OrderCard({ order }: { order: OrderWithAllocation }) {
             const isFullyAllocated = allocated >= needed;
             
             return (
-              <div key={item.id} className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{item.productName}</span>
-                <div className="flex items-center gap-3">
+              <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 text-sm">
+                <span className="text-muted-foreground truncate">{item.productName}</span>
+                <div className="flex items-center gap-2 sm:gap-3">
                   <span className={cn(
-                    "font-mono text-xs px-2 py-0.5 rounded",
+                    "font-mono text-xs px-2 py-0.5 rounded whitespace-nowrap",
                     isFullyAllocated 
                       ? "bg-green-50 text-green-700" 
                       : allocated > 0
                         ? "bg-amber-50 text-amber-700"
                         : "bg-slate-50 text-slate-500"
                   )}>
-                    {allocated.toFixed(0)} / {needed.toFixed(0)} KG allocated
+                    {allocated.toFixed(0)}/{needed.toFixed(0)} KG
                   </span>
                   <Progress 
                     value={Math.min(percent, 100)} 
                     className={cn(
-                      "w-16 h-2",
+                      "w-16 h-2 flex-shrink-0",
                       !isFullyAllocated && allocated > 0 && "[&>div]:bg-amber-500",
                       !isFullyAllocated && allocated === 0 && "[&>div]:bg-slate-300"
                     )}
