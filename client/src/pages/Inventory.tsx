@@ -34,7 +34,7 @@ export default function Inventory() {
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState({
-    sku: '', name: '', description: '', minStock: '0', currentStock: '0', categoryId: '' as string | null,
+    sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: '' as string | null,
   });
 
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
@@ -125,7 +125,7 @@ export default function Inventory() {
     try {
       await updateMaterial.mutateAsync({
         id: selectedMaterial.id, name: materialForm.name, description: materialForm.description || null,
-        minStock: materialForm.minStock, currentStock: materialForm.currentStock,
+        unit: materialForm.unit, minStock: materialForm.minStock, currentStock: materialForm.currentStock,
         categoryId: materialForm.categoryId || null,
       });
       toast({ title: "Material updated", description: `Material ${materialForm.name} updated successfully` });
@@ -146,7 +146,7 @@ export default function Inventory() {
     }
   };
 
-  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', minStock: '0', currentStock: '0', categoryId: null });
+  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null });
 
   const handleCreateProduct = async () => {
     if (!productForm.name) {
@@ -156,7 +156,7 @@ export default function Inventory() {
     try {
       await createProduct.mutateAsync({
         sku: productForm.sku, name: productForm.name, description: productForm.description || null,
-        unit: 'KG', minStock: productForm.minStock, currentStock: productForm.currentStock, 
+        unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock, 
         categoryId: productForm.categoryId || null, active: true,
       });
       toast({ title: "Product created", description: `Product ${productForm.name} created successfully` });
@@ -171,7 +171,7 @@ export default function Inventory() {
     setSelectedProduct(product);
     setProductForm({
       sku: product.sku, name: product.name, description: product.description || '',
-      minStock: product.minStock, currentStock: product.currentStock,
+      unit: product.unit || 'KG', minStock: product.minStock, currentStock: product.currentStock,
       categoryId: product.categoryId,
     });
     setIsEditProductOpen(true);
@@ -182,7 +182,7 @@ export default function Inventory() {
     try {
       await updateProduct.mutateAsync({
         id: selectedProduct.id, name: productForm.name, description: productForm.description || null,
-        minStock: productForm.minStock, currentStock: productForm.currentStock,
+        unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock,
         categoryId: productForm.categoryId || null,
       });
       toast({ title: "Product updated", description: `Product ${productForm.name} updated successfully` });
@@ -246,7 +246,7 @@ export default function Inventory() {
         <TableCell className="text-center">
           <Badge variant="secondary">Material</Badge>
         </TableCell>
-        <TableCell className="text-right font-mono">{parseFloat(material.currentStock).toFixed(2)} KG</TableCell>
+        <TableCell className="text-right font-mono">{parseFloat(material.currentStock).toFixed(2)} {material.unit || 'KG'}</TableCell>
         <TableCell className="text-center">
           {isLow ? <Badge variant="destructive">Low</Badge> : <Badge variant="outline" className="text-green-600 border-green-200">OK</Badge>}
         </TableCell>
@@ -297,7 +297,7 @@ export default function Inventory() {
             <span className="text-muted-foreground text-xs">-</span>
           )}
         </TableCell>
-        <TableCell className="text-right font-mono">{parseFloat(product.currentStock).toFixed(2)} KG</TableCell>
+        <TableCell className="text-right font-mono">{parseFloat(product.currentStock).toFixed(2)} {product.unit || 'KG'}</TableCell>
         <TableCell className="text-center">
           {isLow ? <Badge variant="destructive">Low</Badge> : <Badge variant="outline" className="text-green-600 border-green-200">OK</Badge>}
         </TableCell>
@@ -498,13 +498,26 @@ export default function Inventory() {
               <Label>Description</Label>
               <Input placeholder="Optional" value={materialForm.description} onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })} data-testid="input-material-description" />
             </div>
+            <div className="space-y-2">
+              <Label>Unit of Measure</Label>
+              <Select value={materialForm.unit} onValueChange={(v) => setMaterialForm({ ...materialForm, unit: v })}>
+                <SelectTrigger data-testid="select-material-unit">
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="KG">KG (Kilograms)</SelectItem>
+                  <SelectItem value="QTY">QTY (Quantity/Pieces)</SelectItem>
+                  <SelectItem value="L">L (Liters)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Current Stock (KG)</Label>
+                <Label>Current Stock ({materialForm.unit})</Label>
                 <Input type="number" value={materialForm.currentStock} onChange={(e) => setMaterialForm({ ...materialForm, currentStock: e.target.value })} data-testid="input-material-current-stock" />
               </div>
               <div className="space-y-2">
-                <Label>Min Stock (KG)</Label>
+                <Label>Min Stock ({materialForm.unit})</Label>
                 <Input type="number" value={materialForm.minStock} onChange={(e) => setMaterialForm({ ...materialForm, minStock: e.target.value })} data-testid="input-material-min-stock" />
               </div>
             </div>
@@ -554,13 +567,26 @@ export default function Inventory() {
               <Label>Description</Label>
               <Input placeholder="Optional" value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} data-testid="input-product-description" />
             </div>
+            <div className="space-y-2">
+              <Label>Unit of Measure</Label>
+              <Select value={productForm.unit} onValueChange={(v) => setProductForm({ ...productForm, unit: v })}>
+                <SelectTrigger data-testid="select-product-unit">
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="KG">KG (Kilograms)</SelectItem>
+                  <SelectItem value="QTY">QTY (Quantity/Pieces)</SelectItem>
+                  <SelectItem value="L">L (Liters)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Current Stock (KG)</Label>
+                <Label>Current Stock ({productForm.unit})</Label>
                 <Input type="number" value={productForm.currentStock} onChange={(e) => setProductForm({ ...productForm, currentStock: e.target.value })} data-testid="input-product-current-stock" />
               </div>
               <div className="space-y-2">
-                <Label>Min Stock (KG)</Label>
+                <Label>Min Stock ({productForm.unit})</Label>
                 <Input type="number" value={productForm.minStock} onChange={(e) => setProductForm({ ...productForm, minStock: e.target.value })} data-testid="input-product-min-stock" />
               </div>
             </div>
@@ -610,13 +636,26 @@ export default function Inventory() {
               <Label>Description</Label>
               <Input value={materialForm.description} onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })} data-testid="input-edit-material-description" />
             </div>
+            <div className="space-y-2">
+              <Label>Unit of Measure</Label>
+              <Select value={materialForm.unit} onValueChange={(v) => setMaterialForm({ ...materialForm, unit: v })}>
+                <SelectTrigger data-testid="select-edit-material-unit">
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="KG">KG (Kilograms)</SelectItem>
+                  <SelectItem value="QTY">QTY (Quantity/Pieces)</SelectItem>
+                  <SelectItem value="L">L (Liters)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Current Stock (KG)</Label>
+                <Label>Current Stock ({materialForm.unit})</Label>
                 <Input type="number" value={materialForm.currentStock} onChange={(e) => setMaterialForm({ ...materialForm, currentStock: e.target.value })} data-testid="input-edit-material-current-stock" />
               </div>
               <div className="space-y-2">
-                <Label>Min Stock (KG)</Label>
+                <Label>Min Stock ({materialForm.unit})</Label>
                 <Input type="number" value={materialForm.minStock} onChange={(e) => setMaterialForm({ ...materialForm, minStock: e.target.value })} data-testid="input-edit-material-min-stock" />
               </div>
             </div>
@@ -666,13 +705,26 @@ export default function Inventory() {
               <Label>Description</Label>
               <Input value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} data-testid="input-edit-product-description" />
             </div>
+            <div className="space-y-2">
+              <Label>Unit of Measure</Label>
+              <Select value={productForm.unit} onValueChange={(v) => setProductForm({ ...productForm, unit: v })}>
+                <SelectTrigger data-testid="select-edit-product-unit">
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="KG">KG (Kilograms)</SelectItem>
+                  <SelectItem value="QTY">QTY (Quantity/Pieces)</SelectItem>
+                  <SelectItem value="L">L (Liters)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Current Stock (KG)</Label>
+                <Label>Current Stock ({productForm.unit})</Label>
                 <Input type="number" value={productForm.currentStock} onChange={(e) => setProductForm({ ...productForm, currentStock: e.target.value })} data-testid="input-edit-product-current-stock" />
               </div>
               <div className="space-y-2">
-                <Label>Min Stock (KG)</Label>
+                <Label>Min Stock ({productForm.unit})</Label>
                 <Input type="number" value={productForm.minStock} onChange={(e) => setProductForm({ ...productForm, minStock: e.target.value })} data-testid="input-edit-product-min-stock" />
               </div>
             </div>
