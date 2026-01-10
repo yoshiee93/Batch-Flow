@@ -333,8 +333,8 @@ export default function Inventory() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-mono" data-testid="text-inventory-title">Inventory</h1>
-          <p className="text-muted-foreground mt-1">Manage raw materials and finished goods.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono" data-testid="text-inventory-title">Inventory</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage raw materials and finished goods.</p>
         </div>
       </div>
 
@@ -401,34 +401,36 @@ export default function Inventory() {
                   <Package size={16} className="mr-2" /> New Product
                 </Button>
               </div>
-              <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[100px]">SKU</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="w-[80px] text-center">Type</TableHead>
-                      <TableHead className="text-right">Stock</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {categoryItems.length === 0 ? (
+              <Card className="overflow-hidden">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          No items in {category.name}. Add materials or products to get started.
-                        </TableCell>
+                        <TableHead className="min-w-[100px]">SKU</TableHead>
+                        <TableHead className="min-w-[150px]">Name</TableHead>
+                        <TableHead className="min-w-[80px] text-center">Type</TableHead>
+                        <TableHead className="min-w-[100px] text-right">Stock</TableHead>
+                        <TableHead className="min-w-[80px] text-center">Status</TableHead>
+                        <TableHead className="min-w-[100px] text-right">Actions</TableHead>
                       </TableRow>
-                    ) : (
-                      categoryItems.map((item) => 
-                        item.itemType === 'material' 
-                          ? renderMaterialRow(item as Material)
-                          : renderProductRow(item as Product)
-                      )
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {categoryItems.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            No items in {category.name}. Add materials or products to get started.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        categoryItems.map((item) => 
+                          item.itemType === 'material' 
+                            ? renderMaterialRow(item as Material)
+                            : renderProductRow(item as Product)
+                        )
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </Card>
             </TabsContent>
           );
@@ -443,34 +445,36 @@ export default function Inventory() {
               <Package size={16} className="mr-2" /> New Product
             </Button>
           </div>
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">SKU</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Category</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allItems.length === 0 ? (
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No items found. Add materials or products to get started.
-                    </TableCell>
+                    <TableHead className="min-w-[100px]">SKU</TableHead>
+                    <TableHead className="min-w-[150px]">Name</TableHead>
+                    <TableHead className="min-w-[100px] text-center">Category</TableHead>
+                    <TableHead className="min-w-[100px] text-right">Stock</TableHead>
+                    <TableHead className="min-w-[80px] text-center">Status</TableHead>
+                    <TableHead className="min-w-[100px] text-right">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  allItems.map((item) => 
-                    item.itemType === 'material' 
-                      ? renderMaterialRow(item as Material)
-                      : renderProductRow(item as Product)
-                  )
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {allItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No items found. Add materials or products to get started.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    allItems.map((item) => 
+                      item.itemType === 'material' 
+                        ? renderMaterialRow(item as Material)
+                        : renderProductRow(item as Product)
+                    )
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </Card>
         </TabsContent>
       </Tabs>

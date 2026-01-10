@@ -115,13 +115,13 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="text-page-title">
-            <Settings2 className="h-8 w-8" />
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2" data-testid="text-page-title">
+            <Settings2 className="h-6 w-6 sm:h-8 sm:w-8" />
             Settings
           </h1>
-          <p className="text-muted-foreground">Configure system settings and categories</p>
+          <p className="text-muted-foreground text-sm sm:text-base">Configure system settings and categories</p>
         </div>
       </div>
 
@@ -149,17 +149,18 @@ export default function Settings() {
               <p className="text-sm">Add categories to organize your products</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Sort Order</TableHead>
-                  <TableHead className="text-center">Show in Tabs</TableHead>
-                  <TableHead className="text-center">Exclude from Yield</TableHead>
-                  <TableHead className="text-center">Default</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[120px]">Name</TableHead>
+                    <TableHead className="text-center min-w-[80px]">Sort Order</TableHead>
+                    <TableHead className="text-center min-w-[100px]">Show in Tabs</TableHead>
+                    <TableHead className="text-center min-w-[120px]">Exclude from Yield</TableHead>
+                    <TableHead className="text-center min-w-[70px]">Default</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {categories.map((category) => (
                   <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
@@ -224,7 +225,8 @@ export default function Settings() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -252,8 +252,8 @@ export default function Production() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-mono" data-testid="text-production-title">Production Control</h1>
-          <p className="text-muted-foreground mt-1">Manage batches, record inputs and outputs.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono" data-testid="text-production-title">Production Control</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage batches, record inputs and outputs.</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -364,7 +364,7 @@ export default function Production() {
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-full sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Batch {selectedBatch?.batchNumber}</DialogTitle>
             <DialogDescription>Update batch details and manage material inputs</DialogDescription>
@@ -372,7 +372,7 @@ export default function Production() {
           <div className="space-y-6 py-4">
             <div className="space-y-3">
               <Label className="text-sm font-medium">Output Breakdown (KG)</Label>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-actualQuantity" className="text-xs text-muted-foreground">Product Output</Label>
                   <Input
@@ -446,7 +446,7 @@ export default function Production() {
       </Dialog>
 
       <Dialog open={isRecordInputOpen} onOpenChange={setIsRecordInputOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="w-full sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Record Input for {selectedBatch?.batchNumber}</DialogTitle>
             <DialogDescription>Add materials used in production. This will deduct from inventory.</DialogDescription>
@@ -500,7 +500,7 @@ export default function Production() {
       </Dialog>
 
       <Dialog open={isRecordOutputOpen} onOpenChange={setIsRecordOutputOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-full sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Manage Outputs for {selectedBatch?.batchNumber}</DialogTitle>
             <DialogDescription>Add multiple product outputs from this batch. Each output will be added to product inventory.</DialogDescription>
@@ -518,7 +518,7 @@ export default function Production() {
       </Dialog>
 
       <Dialog open={isAddOutputOpen} onOpenChange={setIsAddOutputOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-full sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add Output for {selectedBatch?.batchNumber}</DialogTitle>
             <DialogDescription>Record finished products from this batch. Each output will be added to inventory.</DialogDescription>
@@ -936,21 +936,21 @@ function BatchCard({
               </div>
             )}
             
-            <div className="mt-4 pt-3 border-t flex items-center justify-between">
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="mt-4 pt-3 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-muted-foreground">
                 {batch.startDate && <span>Batch Date: {format(new Date(batch.startDate), 'MMM d, yyyy')}</span>}
                 {batch.endDate && <span>Completed: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
               </div>
               {!isCompleted && (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => onRecordInputClick(batch)}>
-                    <Package size={14} className="mr-2" /> Add Input
+                    <Package size={14} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Add </span>Input
                   </Button>
                   <Button size="sm" variant="outline" className="text-green-600 border-green-200" onClick={() => onAddOutputClick(batch)}>
-                    <ArrowDownCircle size={14} className="mr-2" /> Add Output
+                    <ArrowDownCircle size={14} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Add </span>Output
                   </Button>
                   <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => onMarkComplete(batch)}>
-                    <CheckCircle size={14} className="mr-2" /> Complete
+                    <CheckCircle size={14} className="mr-1 sm:mr-2" /> Complete
                   </Button>
                 </div>
               )}
@@ -1041,7 +1041,7 @@ function BatchOutputsEditor({
       {!isCompleted && (
         <div className="space-y-4 pb-4 border-b">
           <h4 className="font-medium text-sm">Add Product Output</h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="output-product">Product</Label>
               <Select 
@@ -1139,7 +1139,7 @@ function BatchOutputsEditor({
         <>
           <div className="space-y-4 pt-4 border-t">
             <h4 className="font-medium text-sm">Waste & Milling</h4>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="waste">Waste (KG)</Label>
                 <Input

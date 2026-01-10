@@ -252,19 +252,20 @@ export default function Customers() {
           </div>
         </div>
 
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="font-mono">CODE</TableHead>
-                <TableHead>COMPANY</TableHead>
-                <TableHead>CONTACT</TableHead>
-                <TableHead>EMAIL</TableHead>
-                <TableHead>PHONE</TableHead>
-                <TableHead>STATUS</TableHead>
-                <TableHead className="w-[80px]">ACTIONS</TableHead>
-              </TableRow>
-            </TableHeader>
+        <div className="rounded-md border overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="font-mono min-w-[80px]">CODE</TableHead>
+                  <TableHead className="min-w-[140px]">COMPANY</TableHead>
+                  <TableHead className="min-w-[120px]">CONTACT</TableHead>
+                  <TableHead className="min-w-[160px]">EMAIL</TableHead>
+                  <TableHead className="min-w-[100px]">PHONE</TableHead>
+                  <TableHead className="min-w-[80px]">STATUS</TableHead>
+                  <TableHead className="w-[80px]">ACTIONS</TableHead>
+                </TableRow>
+              </TableHeader>
             <TableBody>
               {filteredCustomers.length === 0 ? (
                 <TableRow>
@@ -349,7 +350,8 @@ export default function Customers() {
                 ))
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </div>
       </Card>
 

@@ -193,8 +193,8 @@ export default function Orders() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-mono" data-testid="text-orders-title">Orders</h1>
-          <p className="text-muted-foreground mt-1">Manage customer orders and fulfillment.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono" data-testid="text-orders-title">Orders</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">Manage customer orders and fulfillment.</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -287,8 +287,8 @@ export default function Orders() {
         </Dialog>
       </div>
 
-      <div className="flex items-center space-x-2 bg-card p-2 rounded-md border max-w-md">
-        <Search className="w-4 h-4 text-muted-foreground ml-2" />
+      <div className="flex items-center space-x-2 bg-card p-2 rounded-md border w-full sm:max-w-md">
+        <Search className="w-4 h-4 text-muted-foreground ml-2 flex-shrink-0" />
         <Input 
           placeholder="Search orders..." 
           className="border-none shadow-none focus-visible:ring-0"
@@ -296,49 +296,51 @@ export default function Orders() {
           onChange={(e) => setSearchTerm(e.target.value)}
           data-testid="input-search-orders"
         />
-        <Button variant="ghost" size="icon" data-testid="button-filter-orders">
+        <Button variant="ghost" size="icon" className="flex-shrink-0" data-testid="button-filter-orders">
           <Filter size={16} />
         </Button>
       </div>
 
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[140px]">Order #</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Items</TableHead>
-              <TableHead className="text-center">Stock</TableHead>
-              <TableHead className="text-center">Priority</TableHead>
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-right">Due Date</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredOrders.map((order) => (
-              <OrderRow 
-                key={order.id} 
-                order={order} 
-                onStatusChange={handleStatusChange}
-                onEditClick={handleEditClick}
-                onDelete={handleDeleteOrder}
-                onComplete={handleCompleteOrder}
-              />
-            ))}
-            {filteredOrders.length === 0 && (
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  No orders found. Click "Create Order" to add your first order.
-                </TableCell>
+                <TableHead className="w-[100px] sm:w-[140px]">Order #</TableHead>
+                <TableHead className="min-w-[120px]">Customer</TableHead>
+                <TableHead className="min-w-[200px]">Items</TableHead>
+                <TableHead className="text-center min-w-[100px]">Stock</TableHead>
+                <TableHead className="text-center min-w-[80px]">Priority</TableHead>
+                <TableHead className="text-center min-w-[80px]">Status</TableHead>
+                <TableHead className="text-right min-w-[100px]">Due Date</TableHead>
+                <TableHead className="text-right min-w-[80px]">Actions</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredOrders.map((order) => (
+                <OrderRow 
+                  key={order.id} 
+                  order={order} 
+                  onStatusChange={handleStatusChange}
+                  onEditClick={handleEditClick}
+                  onDelete={handleDeleteOrder}
+                  onComplete={handleCompleteOrder}
+                />
+              ))}
+              {filteredOrders.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    No orders found. Click "Create Order" to add your first order.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-full sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Order {selectedOrder?.orderNumber}</DialogTitle>
             <DialogDescription>Update order details and manage order items</DialogDescription>
