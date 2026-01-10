@@ -63,12 +63,12 @@ export default function Inventory() {
 
   const filteredMaterials = materials.filter(m => 
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    m.sku.toLowerCase().includes(searchTerm.toLowerCase())
+    (m.sku && m.sku.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getMaterialName = (materialId: string | null) => {
@@ -92,8 +92,8 @@ export default function Inventory() {
   const resetMaterialForm = () => setMaterialForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null });
 
   const handleCreateMaterial = async () => {
-    if (!materialForm.sku || !materialForm.name) {
-      toast({ title: "Missing fields", description: "Please fill in SKU and Name", variant: "destructive" });
+    if (!materialForm.name) {
+      toast({ title: "Missing fields", description: "Please fill in Name", variant: "destructive" });
       return;
     }
     try {
@@ -149,8 +149,8 @@ export default function Inventory() {
   const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', minStock: '0', currentStock: '0', categoryId: null });
 
   const handleCreateProduct = async () => {
-    if (!productForm.sku || !productForm.name) {
-      toast({ title: "Missing fields", description: "Please fill in SKU and Name", variant: "destructive" });
+    if (!productForm.name) {
+      toast({ title: "Missing fields", description: "Please fill in Name", variant: "destructive" });
       return;
     }
     try {
@@ -483,7 +483,7 @@ export default function Inventory() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>SKU *</Label>
+              <Label>SKU</Label>
               <Input placeholder="e.g. RM-001" value={materialForm.sku} onChange={(e) => setMaterialForm({ ...materialForm, sku: e.target.value })} data-testid="input-material-sku" />
             </div>
             <div className="space-y-2">
@@ -539,7 +539,7 @@ export default function Inventory() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>SKU *</Label>
+              <Label>SKU</Label>
               <Input placeholder="e.g. FG-001" value={productForm.sku} onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })} data-testid="input-product-sku" />
             </div>
             <div className="space-y-2">
