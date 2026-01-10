@@ -850,6 +850,8 @@ export class DatabaseStorage implements IStorage {
       changes: JSON.stringify({ status: "shipped", itemsShipped: items.length }),
     });
     
+    await this.runStockAllocation();
+    
     return { order: updatedOrder, movements: createdMovements };
   }
 
