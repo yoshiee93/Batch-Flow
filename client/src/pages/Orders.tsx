@@ -7,7 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
@@ -391,6 +393,7 @@ function EditOrderContent({
   const { toast } = useToast();
   
   const [newItem, setNewItem] = useState({ productId: '', quantity: '' });
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
 
   const handleAddItem = async () => {
     if (!newItem.productId || !newItem.quantity) {
@@ -549,18 +552,50 @@ function EditOrderContent({
             <div className="flex gap-2 items-end">
               <div className="flex-1 space-y-2">
                 <Label>Add Product</Label>
-                <Select value={newItem.productId} onValueChange={(v) => setNewItem({ ...newItem, productId: v })}>
-                  <SelectTrigger data-testid="select-add-product">
-                    <SelectValue placeholder="Select product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map(product => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.sku} - {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={productSearchOpen}
+                      className="w-full justify-between font-normal"
+                      data-testid="select-add-product"
+                    >
+                      {newItem.productId
+                        ? products.find(p => p.id === newItem.productId)?.name || "Select product..."
+                        : "Search products..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Type to search products..." />
+                      <CommandList>
+                        <CommandEmpty>No product found.</CommandEmpty>
+                        <CommandGroup>
+                          {products.map(product => (
+                            <CommandItem
+                              key={product.id}
+                              value={`${product.sku} ${product.name}`}
+                              onSelect={() => {
+                                setNewItem({ ...newItem, productId: product.id });
+                                setProductSearchOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  newItem.productId === product.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {product.sku ? `${product.sku} - ` : ''}{product.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="w-32 space-y-2">
                 <Label>Quantity (KG)</Label>
