@@ -12,6 +12,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 10, 2026**: Added unit of measure support. Products and materials can now have different units (KG, QTY, L). Unit dropdown added to create/edit forms. Tables display each item's actual unit. Summary cards no longer assume KG for mixed-unit inventories.
 - **Jan 10, 2026**: Implemented mobile and tablet responsiveness. Added screen size detection hooks (useIsMobile, useIsTablet, useScreenSize). Layout has collapsible sidebar with hamburger menu on mobile (<1024px). All tables wrapped with horizontal scroll for small screens. Dashboard grid stacks 2 columns on mobile. Dialogs use full-width on mobile (w-full sm:max-w-*). Responsive typography throughout (text-2xl sm:text-3xl for titles). Breakpoints: mobile <640px, tablet 640-1024px, desktop 1024px+.
 - **Jan 10, 2026**: Added order completion feature. POST /api/orders/:id/complete endpoint marks orders as shipped, deducts stock from product inventory, logs stock movements with "shipment" type. Includes confirmation dialog explaining the action. Stock allocation re-runs after completion.
 - **Jan 9, 2026**: Extended category support to materials. Added categoryId column to materials table with foreign key to categories. Updated Inventory page with category dropdown in both create and edit material forms. Material interface updated in API types.
