@@ -24,6 +24,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem, useDeleteOrderItem, useDeleteOrder, useCustomers, useOrdersWithAllocation, useCompleteOrder, type Order, type OrderItem, type Product, type Customer, type OrderWithAllocation } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { useSettings } from '@/hooks/use-settings';
 
 export default function Orders() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,6 +56,7 @@ export default function Orders() {
   const deleteOrder = useDeleteOrder();
   const completeOrder = useCompleteOrder();
   const { toast } = useToast();
+  const { settings } = useSettings();
 
   const handleCompleteOrder = async (orderId: string) => {
     try {
@@ -418,7 +420,7 @@ export default function Orders() {
                       const stockStatus = reserved >= needed ? 'ready' : reserved > 0 ? 'partial' : 'waiting';
                       
                       return (
-                        <Collapsible key={item.id} defaultOpen={true} className="group">
+                        <Collapsible key={item.id} defaultOpen={settings.cardsExpandedByDefault} className="group">
                           <div className="border rounded-lg overflow-hidden">
                             <CollapsibleTrigger className="w-full p-3 flex justify-between items-center hover:bg-muted/50 transition-colors">
                               <div className="flex items-center gap-2 text-left">

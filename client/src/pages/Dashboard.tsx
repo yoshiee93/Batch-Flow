@@ -8,10 +8,12 @@ import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
 import { format } from 'date-fns';
 import { useProducts, useMaterials, useDashboardStats, useOrdersWithAllocation, type OrderWithAllocation } from '@/lib/api';
+import { useSettings } from '@/hooks/use-settings';
 
 export default function Dashboard() {
   const { data: ordersWithAllocation = [], isLoading: ordersLoading, isError: ordersError } = useOrdersWithAllocation();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
+  const { settings } = useSettings();
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: stats } = useDashboardStats();
 
@@ -110,7 +112,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {activeOrders.map(order => (
-                <OrderCard key={order.id} order={order} />
+                <OrderCard key={order.id} order={order} defaultExpanded={settings.cardsExpandedByDefault} />
               ))}
               {activeOrders.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
@@ -157,7 +159,7 @@ export default function Dashboard() {
   );
 }
 
-function OrderCard({ order }: { order: OrderWithAllocation }) {
+function OrderCard({ order, defaultExpanded = false }: { order: OrderWithAllocation; defaultExpanded?: boolean }) {
   const allocationBadge = () => {
     switch (order.allocationStatus) {
       case 'ready_to_ship':
@@ -182,7 +184,7 @@ function OrderCard({ order }: { order: OrderWithAllocation }) {
   };
 
   return (
-    <Collapsible defaultOpen={true} className="group">
+    <Collapsible defaultOpen={defaultExpanded} className="group">
       <div className="border rounded-lg bg-card overflow-hidden" data-testid={`card-order-${order.id}`}>
         <CollapsibleTrigger className="w-full p-3 sm:p-4 hover:bg-muted/50 transition-colors text-left">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-0">

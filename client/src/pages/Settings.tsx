@@ -7,9 +7,10 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList } from 'lucide-react';
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, type Category } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { useSettings } from '@/hooks/use-settings';
 
 export default function Settings() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -27,6 +28,7 @@ export default function Settings() {
   const updateCategory = useUpdateCategory();
   const deleteCategory = useDeleteCategory();
   const { toast } = useToast();
+  const { settings, updateSetting } = useSettings();
 
   const resetForm = () => {
     setFormData({ name: '', excludeFromYield: false, showInTabs: true, sortOrder: 0 });
@@ -124,6 +126,34 @@ export default function Settings() {
           <p className="text-muted-foreground text-sm sm:text-base">Configure system settings and categories</p>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <LayoutList className="h-5 w-5" />
+            Display Preferences
+          </CardTitle>
+          <CardDescription>
+            Customize how information is displayed throughout the application.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="cards-expanded">Expand cards by default</Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, order cards on the dashboard and order details will be expanded by default
+              </p>
+            </div>
+            <Switch
+              id="cards-expanded"
+              checked={settings.cardsExpandedByDefault}
+              onCheckedChange={(checked) => updateSetting('cardsExpandedByDefault', checked)}
+              data-testid="switch-cards-expanded"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
