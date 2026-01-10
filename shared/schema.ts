@@ -45,7 +45,7 @@ export const categories = pgTable("categories", {
 
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  sku: varchar("sku", { length: 50 }).notNull().unique(),
+  sku: varchar("sku", { length: 50 }).notNull().default(""),
   name: text("name").notNull(),
   description: text("description"),
   unit: varchar("unit", { length: 10 }).notNull().default("KG"),
@@ -58,7 +58,7 @@ export const products = pgTable("products", {
 
 export const materials = pgTable("materials", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  sku: varchar("sku", { length: 50 }).notNull().unique(),
+  sku: varchar("sku", { length: 50 }).notNull().default(""),
   name: text("name").notNull(),
   description: text("description"),
   unit: varchar("unit", { length: 10 }).notNull().default("KG"),
