@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 export default function Inventory() {
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
   const [isCreateMaterialOpen, setIsCreateMaterialOpen] = useState(false);
@@ -52,6 +52,14 @@ export default function Inventory() {
 
   const isLoading = materialsLoading || productsLoading || lotsLoading;
   const hasError = materialsError || productsError;
+  
+  const visibleCategories = categories.filter(c => c.showInTabs);
+  
+  useEffect(() => {
+    if (visibleCategories.length > 0 && !activeTab) {
+      setActiveTab(`cat-${visibleCategories[0].id}`);
+    }
+  }, [visibleCategories, activeTab]);
 
   const filteredMaterials = materials.filter(m => 
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -366,177 +374,28 @@ export default function Inventory() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="all" className="flex items-center gap-2" data-testid="tab-all">
-            <Layers size={16} /> All
-          </TabsTrigger>
-          <TabsTrigger value="materials" className="flex items-center gap-2" data-testid="tab-materials">
-            <Box size={16} /> Materials
-          </TabsTrigger>
-          <TabsTrigger value="goods" className="flex items-center gap-2" data-testid="tab-goods">
-            <Package size={16} /> Goods
-          </TabsTrigger>
           {categories.filter(c => c.showInTabs).map((category) => (
             <TabsTrigger key={category.id} value={`cat-${category.id}`} className="flex items-center gap-2" data-testid={`tab-category-${category.id}`}>
-              <span className="text-amber-500">◉</span> {category.name}
+              {category.name}
             </TabsTrigger>
           ))}
-          <TabsTrigger value="lots" className="flex items-center gap-2" data-testid="tab-lots">
-            <Layers size={16} /> Lots
-          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="space-y-4">
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsCreateMaterialOpen(true)} data-testid="button-new-material">
-              <Box size={16} className="mr-2" /> New Material
-            </Button>
-            <Button onClick={() => setIsCreateProductOpen(true)} data-testid="button-new-product">
-              <Package size={16} className="mr-2" /> New Good
-            </Button>
-          </div>
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">SKU</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Category</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allItems.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No items found. Add materials or goods to get started.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  allItems.map((item) => 
-                    item.itemType === 'material' 
-                      ? renderMaterialRow(item as Material)
-                      : renderProductRow(item as Product)
-                  )
-                )}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="materials" className="space-y-4">
-          <div className="flex justify-end">
-            <Button onClick={() => setIsCreateMaterialOpen(true)} data-testid="button-new-material-tab">
-              <Plus size={16} className="mr-2" /> New Material
-            </Button>
-          </div>
-
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">SKU</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Category</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMaterials.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No materials found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredMaterials.map(renderMaterialRow)
-                )}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="goods" className="space-y-4">
-          <div className="flex justify-end">
-            <Button onClick={() => setIsCreateProductOpen(true)} data-testid="button-new-product-tab">
-              <Plus size={16} className="mr-2" /> New Good
-            </Button>
-          </div>
-
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">SKU</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Category</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No goods found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredProducts.map(renderProductRow)
-                )}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="lots" className="space-y-4">
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Lot Number</TableHead>
-                  <TableHead>Material/Product</TableHead>
-                  <TableHead>Supplier Lot</TableHead>
-                  <TableHead className="text-right">Qty (KG)</TableHead>
-                  <TableHead className="text-right">Remaining (KG)</TableHead>
-                  <TableHead>Expiry</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lots.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No lots found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  lots.map((lot) => (
-                    <TableRow key={lot.id}>
-                      <TableCell className="font-mono">{lot.lotNumber}</TableCell>
-                      <TableCell>{getLotItemName(lot)}</TableCell>
-                      <TableCell>{lot.supplierLot || '-'}</TableCell>
-                      <TableCell className="text-right">{parseFloat(lot.quantity).toFixed(2)} KG</TableCell>
-                      <TableCell className="text-right">{parseFloat(lot.remainingQuantity).toFixed(2)} KG</TableCell>
-                      <TableCell>{lot.expiryDate ? format(new Date(lot.expiryDate), 'MMM d, yyyy') : '-'}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-
         {categories.filter(c => c.showInTabs).map((category) => {
-          const categoryProducts = products.filter(p => p.categoryId === category.id);
+          const categoryMaterials = filteredMaterials.filter(m => m.categoryId === category.id);
+          const categoryProducts = filteredProducts.filter(p => p.categoryId === category.id);
+          const categoryItems = [
+            ...categoryMaterials.map(m => ({ ...m, itemType: 'material' as const })),
+            ...categoryProducts.map(p => ({ ...p, itemType: 'product' as const }))
+          ];
           return (
             <TabsContent key={category.id} value={`cat-${category.id}`} className="space-y-4">
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsCreateMaterialOpen(true)} data-testid={`button-new-material-cat-${category.id}`}>
+                  <Box size={16} className="mr-2" /> New Material
+                </Button>
                 <Button onClick={() => setIsCreateProductOpen(true)} data-testid={`button-new-product-cat-${category.id}`}>
-                  <Plus size={16} className="mr-2" /> New {category.name.slice(0, -1)}
+                  <Package size={16} className="mr-2" /> New Product
                 </Button>
               </div>
               <Card>
@@ -545,21 +404,25 @@ export default function Inventory() {
                     <TableRow>
                       <TableHead className="w-[100px]">SKU</TableHead>
                       <TableHead>Name</TableHead>
-                      <TableHead className="text-center">Category</TableHead>
+                      <TableHead className="w-[80px] text-center">Type</TableHead>
                       <TableHead className="text-right">Stock</TableHead>
                       <TableHead className="text-center">Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {categoryProducts.length === 0 ? (
+                    {categoryItems.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          No {category.name} products found.
+                          No items in {category.name}. Add materials or products to get started.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      categoryProducts.map(renderProductRow)
+                      categoryItems.map((item) => 
+                        item.itemType === 'material' 
+                          ? renderMaterialRow(item as Material)
+                          : renderProductRow(item as Product)
+                      )
                     )}
                   </TableBody>
                 </Table>
