@@ -7,7 +7,7 @@ import { AlertTriangle, CheckCircle2, Package, ShoppingCart, TrendingUp, AlertCi
 import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
 import { format } from 'date-fns';
-import { useProducts, useMaterials, useDashboardStats, useOrdersWithAllocation, type OrderWithAllocation } from '@/lib/api';
+import { useProducts, useMaterials, useDashboardStats, useOrdersWithAllocation, useBatches, type OrderWithAllocation, type Batch } from '@/lib/api';
 import { useSettings } from '@/hooks/use-settings';
 
 export default function Dashboard() {
@@ -15,13 +15,15 @@ export default function Dashboard() {
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
   const { settings } = useSettings();
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
+  const { data: batches = [], isLoading: batchesLoading, isError: batchesError } = useBatches();
   const { data: stats } = useDashboardStats();
 
   const activeOrders = ordersWithAllocation.filter(o => ['pending', 'in_production'].includes(o.status));
   const lowStockMaterials = materials.filter(m => parseFloat(m.currentStock) <= parseFloat(m.minStock));
+  const activeBatches = batches.filter(b => b.status === 'in_progress');
 
-  const isLoading = ordersLoading || productsLoading || materialsLoading;
-  const hasError = ordersError || productsError || materialsError;
+  const isLoading = ordersLoading || productsLoading || materialsLoading || batchesLoading;
+  const hasError = ordersError || productsError || materialsError || batchesError;
 
   if (isLoading) {
     return (
@@ -149,6 +151,64 @@ export default function Dashboard() {
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                   <CheckCircle2 className="h-8 w-8 mb-2 opacity-50" />
                   <p className="text-sm">No stock alerts</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Current Production</CardTitle>
+            <CardDescription>Batches currently in progress.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {activeBatches.map(batch => {
+                const product = products.find(p => p.id === batch.productId);
+                const plannedQty = parseFloat(batch.plannedQuantity);
+                const actualQty = batch.actualQuantity ? parseFloat(batch.actualQuantity) : 0;
+                const progress = plannedQty > 0 ? (actualQty / plannedQty) * 100 : 0;
+                
+                return (
+                  <Collapsible key={batch.id} defaultOpen={settings.cardsExpandedByDefault} className="group">
+                    <div className="border rounded-lg overflow-hidden" data-testid={`card-batch-${batch.id}`}>
+                      <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 transition-colors text-left">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+                              <span className="font-mono font-bold text-sm">{batch.batchNumber}</span>
+                              <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                                <Clock size={12} className="mr-1" /> In Progress
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground ml-6">{product?.name || 'Unknown Product'}</p>
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-3 pb-3 pt-0 border-t space-y-2">
+                          <div className="pt-3 flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Progress</span>
+                            <span className="font-mono">{actualQty.toFixed(0)} / {plannedQty.toFixed(0)} {product?.unit || 'KG'}</span>
+                          </div>
+                          <Progress value={Math.min(progress, 100)} className="h-2" />
+                          {batch.startDate && (
+                            <p className="text-xs text-muted-foreground">
+                              Started: {format(new Date(batch.startDate), 'MMM d, yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
+                );
+              })}
+              {activeBatches.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <Package className="h-8 w-8 mb-2 opacity-50" />
+                  <p className="text-sm">No active production</p>
                 </div>
               )}
             </div>
