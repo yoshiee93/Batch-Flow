@@ -124,7 +124,7 @@ export default function Inventory() {
     if (!selectedMaterial || !materialForm.name) return;
     try {
       await updateMaterial.mutateAsync({
-        id: selectedMaterial.id, name: materialForm.name, description: materialForm.description || null,
+        id: selectedMaterial.id, sku: materialForm.sku, name: materialForm.name, description: materialForm.description || null,
         unit: materialForm.unit, minStock: materialForm.minStock, currentStock: materialForm.currentStock,
         categoryId: materialForm.categoryId || null,
       });
@@ -181,7 +181,7 @@ export default function Inventory() {
     if (!selectedProduct || !productForm.name) return;
     try {
       await updateProduct.mutateAsync({
-        id: selectedProduct.id, name: productForm.name, description: productForm.description || null,
+        id: selectedProduct.id, sku: productForm.sku, name: productForm.name, description: productForm.description || null,
         unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock,
         categoryId: productForm.categoryId || null,
       });
@@ -626,7 +626,7 @@ export default function Inventory() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>SKU</Label>
-              <Input value={materialForm.sku} disabled className="bg-muted" />
+              <Input value={materialForm.sku} onChange={(e) => setMaterialForm({ ...materialForm, sku: e.target.value })} placeholder="Optional" data-testid="input-edit-material-sku" />
             </div>
             <div className="space-y-2">
               <Label>Name *</Label>
@@ -695,7 +695,7 @@ export default function Inventory() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>SKU</Label>
-              <Input value={productForm.sku} disabled className="bg-muted" />
+              <Input value={productForm.sku} onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })} placeholder="Optional" data-testid="input-edit-product-sku" />
             </div>
             <div className="space-y-2">
               <Label>Name *</Label>
