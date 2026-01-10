@@ -25,14 +25,17 @@ export const DEFAULT_LAYOUT: DashboardLayoutItem[] = [
   { i: 'current-production', x: 8, y: 5, w: 4, h: 3, minW: 3, minH: 2 },
 ];
 
+const cloneLayout = (items: DashboardLayoutItem[]): DashboardLayoutItem[] => 
+  items.map(item => ({ ...item }));
+
 export function useDashboardLayout() {
   const [layout, setLayout] = useState<DashboardLayoutItem[]>(() => {
-    if (typeof window === 'undefined') return DEFAULT_LAYOUT;
+    if (typeof window === 'undefined') return cloneLayout(DEFAULT_LAYOUT);
     try {
       const stored = localStorage.getItem(LAYOUT_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : DEFAULT_LAYOUT;
+      return stored ? JSON.parse(stored) : cloneLayout(DEFAULT_LAYOUT);
     } catch {
-      return DEFAULT_LAYOUT;
+      return cloneLayout(DEFAULT_LAYOUT);
     }
   });
 
@@ -63,11 +66,11 @@ export function useDashboardLayout() {
   }, [editMode]);
 
   const onLayoutChange = useCallback((newLayout: DashboardLayoutItem[]) => {
-    setLayout(newLayout);
+    setLayout(cloneLayout(newLayout));
   }, []);
 
   const resetLayout = useCallback(() => {
-    setLayout(DEFAULT_LAYOUT);
+    setLayout(cloneLayout(DEFAULT_LAYOUT));
   }, []);
 
   const toggleEditMode = useCallback(() => {
