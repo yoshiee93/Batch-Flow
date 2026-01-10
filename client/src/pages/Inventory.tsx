@@ -374,14 +374,17 @@ export default function Inventory() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          {categories.filter(c => c.showInTabs).map((category) => (
+          {visibleCategories.map((category) => (
             <TabsTrigger key={category.id} value={`cat-${category.id}`} className="flex items-center gap-2" data-testid={`tab-category-${category.id}`}>
               {category.name}
             </TabsTrigger>
           ))}
+          <TabsTrigger value="all" className="flex items-center gap-2" data-testid="tab-all">
+            <Layers size={16} /> All
+          </TabsTrigger>
         </TabsList>
 
-        {categories.filter(c => c.showInTabs).map((category) => {
+        {visibleCategories.map((category) => {
           const categoryMaterials = filteredMaterials.filter(m => m.categoryId === category.id);
           const categoryProducts = filteredProducts.filter(p => p.categoryId === category.id);
           const categoryItems = [
@@ -430,6 +433,46 @@ export default function Inventory() {
             </TabsContent>
           );
         })}
+
+        <TabsContent value="all" className="space-y-4">
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsCreateMaterialOpen(true)} data-testid="button-new-material">
+              <Box size={16} className="mr-2" /> New Material
+            </Button>
+            <Button onClick={() => setIsCreateProductOpen(true)} data-testid="button-new-product">
+              <Package size={16} className="mr-2" /> New Product
+            </Button>
+          </div>
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">SKU</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="text-center">Category</TableHead>
+                  <TableHead className="text-right">Stock</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {allItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No items found. Add materials or products to get started.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  allItems.map((item) => 
+                    item.itemType === 'material' 
+                      ? renderMaterialRow(item as Material)
+                      : renderProductRow(item as Product)
+                  )
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <Dialog open={isCreateMaterialOpen} onOpenChange={setIsCreateMaterialOpen}>
