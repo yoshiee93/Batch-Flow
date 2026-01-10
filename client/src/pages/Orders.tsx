@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem, useDeleteOrderItem, useDeleteOrder, useCustomers, useOrdersWithAllocation, type Order, type OrderItem, type Product, type Customer, type OrderWithAllocation } from '@/lib/api';
+import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem, useDeleteOrderItem, useDeleteOrder, useCustomers, useOrdersWithAllocation, useCompleteOrder, type Order, type OrderItem, type Product, type Customer, type OrderWithAllocation } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Orders() {
@@ -48,7 +48,24 @@ export default function Orders() {
   const updateOrder = useUpdateOrder();
   const createOrder = useCreateOrder();
   const deleteOrder = useDeleteOrder();
+  const completeOrder = useCompleteOrder();
   const { toast } = useToast();
+
+  const handleCompleteOrder = async (orderId: string) => {
+    try {
+      const result = await completeOrder.mutateAsync(orderId);
+      toast({ 
+        title: "Order completed", 
+        description: `Order shipped successfully. ${result.movements.length} stock movement(s) logged.` 
+      });
+    } catch (error: any) {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to complete order", 
+        variant: "destructive" 
+      });
+    }
+  };
 
   const filteredOrders = ordersWithAllocation.filter(o => 
     o.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -306,6 +323,7 @@ export default function Orders() {
                 onStatusChange={handleStatusChange}
                 onEditClick={handleEditClick}
                 onDelete={handleDeleteOrder}
+                onComplete={handleCompleteOrder}
               />
             ))}
             {filteredOrders.length === 0 && (
@@ -576,13 +594,15 @@ function EditOrderContent({
   );
 }
 
-function OrderRow({ order, onStatusChange, onEditClick, onDelete }: { 
+function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete }: { 
   order: OrderWithAllocation; 
   onStatusChange: (id: string, status: string) => void;
   onEditClick: (order: Order) => void;
   onDelete: (order: Order) => void;
+  onComplete: (id: string) => void;
 }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
 
   const allocationBadge = () => {
     if (order.items.length === 0) {
@@ -659,9 +679,15 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete }: {
             <DropdownMenuItem onClick={() => onStatusChange(order.id, 'ready')}>
               <CheckCircle2 size={14} className="mr-2" /> Mark Ready
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onStatusChange(order.id, 'shipped')}>
-              <Truck size={14} className="mr-2" /> Mark Shipped
-            </DropdownMenuItem>
+            {order.status !== 'shipped' && order.status !== 'cancelled' && (
+              <DropdownMenuItem 
+                onClick={() => setIsCompleteDialogOpen(true)}
+                className="text-green-600"
+                data-testid={`button-complete-order-${order.id}`}
+              >
+                <Truck size={14} className="mr-2" /> Complete Order
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => onStatusChange(order.id, 'cancelled')}>
               Cancel Order
@@ -687,6 +713,33 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete }: {
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={() => onDelete(order)} data-testid="button-confirm-delete-order">
                 Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Complete Order</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div>
+                  Complete order {order.orderNumber} for {order.customerName}? This will:
+                  <ul className="list-disc ml-4 mt-2 space-y-1">
+                    <li>Mark the order as shipped</li>
+                    <li>Deduct stock from inventory for all items</li>
+                    <li>Log stock movements for traceability</li>
+                  </ul>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => { onComplete(order.id); setIsCompleteDialogOpen(false); }} 
+                className="bg-green-600 hover:bg-green-700"
+                data-testid="button-confirm-complete-order"
+              >
+                Complete Order
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

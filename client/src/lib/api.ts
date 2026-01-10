@@ -534,6 +534,21 @@ export function useUpdateOrder() {
   });
 }
 
+export function useCompleteOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (orderId: string) =>
+      fetchApi<{ order: Order; movements: any[] }>(`/orders/${orderId}/complete`, { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithAllocation"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    },
+  });
+}
+
 export function useTraceabilityForward(lotId: string) {
   return useQuery({
     queryKey: ["traceability", "forward", lotId],

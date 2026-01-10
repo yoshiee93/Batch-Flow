@@ -354,6 +354,17 @@ export async function registerRoutes(
     res.status(204).send();
   }));
 
+  app.post("/api/orders/:id/complete", asyncHandler(async (req, res) => {
+    const orderId = req.params.id;
+    const order = await storage.getOrder(orderId);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+    if (order.status === "shipped") return res.status(400).json({ error: "Order already completed" });
+    if (order.status === "cancelled") return res.status(400).json({ error: "Cannot complete cancelled order" });
+    
+    const result = await storage.completeOrder(orderId);
+    res.json(result);
+  }));
+
   app.get("/api/customers", asyncHandler(async (req, res) => {
     const customers = await storage.getCustomers();
     res.json(customers);

@@ -92,6 +92,7 @@ export interface IStorage {
   getOrderItems(orderId: string): Promise<OrderItem[]>;
   createOrderItem(item: InsertOrderItem): Promise<OrderItem>;
   deleteOrderItem(id: string): Promise<void>;
+  completeOrder(orderId: string): Promise<{ order: Order; movements: StockMovement[] }>;
 
   getQualityChecks(batchId: string): Promise<QualityCheck[]>;
   createQualityCheck(check: InsertQualityCheck): Promise<QualityCheck>;
@@ -807,6 +808,49 @@ export class DatabaseStorage implements IStorage {
   async deleteOrderItem(id: string): Promise<void> {
     await db.delete(orderItems).where(eq(orderItems.id, id));
     await this.runStockAllocation();
+  }
+
+  async completeOrder(orderId: string): Promise<{ order: Order; movements: StockMovement[] }> {
+    const order = await this.getOrder(orderId);
+    if (!order) throw new Error("Order not found");
+    
+    const items = await this.getOrderItems(orderId);
+    const createdMovements: StockMovement[] = [];
+    
+    for (const item of items) {
+      const product = await this.getProduct(item.productId);
+      if (!product) continue;
+      
+      const quantity = parseFloat(item.quantity);
+      const newStock = parseFloat(product.currentStock) - quantity;
+      
+      await db.update(products)
+        .set({ currentStock: newStock.toFixed(3) })
+        .where(eq(products.id, item.productId));
+      
+      const movement = await this.createStockMovement({
+        movementType: "shipment",
+        productId: item.productId,
+        orderId: orderId,
+        quantity: `-${quantity.toFixed(3)}`,
+        reference: `Order ${order.orderNumber} completed - shipped to ${order.customerName}`,
+      });
+      createdMovements.push(movement);
+    }
+    
+    const [updatedOrder] = await db.update(orders)
+      .set({ status: "shipped" })
+      .where(eq(orders.id, orderId))
+      .returning();
+    
+    await this.createAuditLog({
+      entityType: "order",
+      entityId: orderId,
+      action: "complete",
+      changes: JSON.stringify({ status: "shipped", itemsShipped: items.length }),
+    });
+    
+    return { order: updatedOrder, movements: createdMovements };
   }
 
   async getQualityChecks(batchId: string): Promise<QualityCheck[]> {
