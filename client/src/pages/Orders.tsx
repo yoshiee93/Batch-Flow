@@ -573,7 +573,9 @@ function EditOrderContent({
                       <CommandList>
                         <CommandEmpty>No product found.</CommandEmpty>
                         <CommandGroup>
-                          {products.map(product => (
+                          {products
+                            .filter(product => !orderItems.some(item => item.productId === product.id))
+                            .map(product => (
                             <CommandItem
                               key={product.id}
                               value={`${product.sku} ${product.name}`}
