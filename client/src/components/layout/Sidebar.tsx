@@ -3,8 +3,6 @@ import { Link, useLocation } from 'wouter';
 import { 
   LayoutDashboard, 
   Factory, 
-  ClipboardCheck, 
-  History, 
   Settings, 
   Box,
   Menu,
@@ -21,9 +19,6 @@ const navItems = [
   { label: 'Customers', icon: Users, href: '/customers' },
   { label: 'Production', icon: Factory, href: '/production' },
   { label: 'Inventory', icon: Box, href: '/inventory' },
-  { label: 'Traceability', icon: History, href: '/traceability' },
-  { label: 'Quality Control', icon: ClipboardCheck, href: '/quality' },
-  { label: 'Settings', icon: Settings, href: '/settings' },
 ];
 
 export function Sidebar({ className }: { className?: string }) {
@@ -69,9 +64,11 @@ export function Sidebar({ className }: { className?: string }) {
             <span className="text-sm font-medium">John Doe</span>
             <span className="text-xs text-sidebar-foreground/60">Prod. Manager</span>
           </div>
-          <Button variant="ghost" size="icon" className="ml-auto text-sidebar-foreground/60 hover:text-sidebar-foreground">
-            <Settings size={16} />
-          </Button>
+          <Link href="/settings">
+            <Button variant="ghost" size="icon" className="ml-auto text-sidebar-foreground/60 hover:text-sidebar-foreground" data-testid="button-settings">
+              <Settings size={16} />
+            </Button>
+          </Link>
         </div>
       </div>
     </div>
