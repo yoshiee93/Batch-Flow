@@ -21,6 +21,7 @@ export interface Category {
   id: string;
   name: string;
   excludeFromYield: boolean;
+  showInTabs: boolean;
   isDefault: boolean;
   sortOrder: number;
   createdAt: string;

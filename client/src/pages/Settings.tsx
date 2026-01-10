@@ -18,6 +18,7 @@ export default function Settings() {
   const [formData, setFormData] = useState({
     name: '',
     excludeFromYield: false,
+    showInTabs: true,
     sortOrder: 0,
   });
 
@@ -28,7 +29,7 @@ export default function Settings() {
   const { toast } = useToast();
 
   const resetForm = () => {
-    setFormData({ name: '', excludeFromYield: false, sortOrder: 0 });
+    setFormData({ name: '', excludeFromYield: false, showInTabs: true, sortOrder: 0 });
   };
 
   const handleCreate = async () => {
@@ -40,6 +41,7 @@ export default function Settings() {
       await createCategory.mutateAsync({
         name: formData.name,
         excludeFromYield: formData.excludeFromYield,
+        showInTabs: formData.showInTabs,
         isDefault: false,
         sortOrder: formData.sortOrder,
       });
@@ -56,6 +58,7 @@ export default function Settings() {
     setFormData({
       name: category.name,
       excludeFromYield: category.excludeFromYield,
+      showInTabs: category.showInTabs,
       sortOrder: category.sortOrder,
     });
     setIsEditDialogOpen(true);
@@ -71,6 +74,7 @@ export default function Settings() {
         id: selectedCategory.id,
         name: formData.name,
         excludeFromYield: formData.excludeFromYield,
+        showInTabs: formData.showInTabs,
         sortOrder: formData.sortOrder,
       });
       toast({ title: "Category updated", description: `Category "${formData.name}" updated successfully` });
@@ -150,6 +154,7 @@ export default function Settings() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead className="text-center">Sort Order</TableHead>
+                  <TableHead className="text-center">Show in Tabs</TableHead>
                   <TableHead className="text-center">Exclude from Yield</TableHead>
                   <TableHead className="text-center">Default</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -162,6 +167,13 @@ export default function Settings() {
                       {category.name}
                     </TableCell>
                     <TableCell className="text-center">{category.sortOrder}</TableCell>
+                    <TableCell className="text-center">
+                      {category.showInTabs ? (
+                        <span className="text-green-600">Yes</span>
+                      ) : (
+                        <span className="text-muted-foreground">No</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-center">
                       {category.excludeFromYield ? (
                         <span className="text-amber-600">Yes</span>
@@ -250,6 +262,18 @@ export default function Settings() {
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
+                <Label htmlFor="create-showInTabs">Show in Inventory Tabs</Label>
+                <p className="text-xs text-muted-foreground">Display this category as a tab on the Inventory page</p>
+              </div>
+              <Switch
+                id="create-showInTabs"
+                checked={formData.showInTabs}
+                onCheckedChange={(checked) => setFormData({ ...formData, showInTabs: checked })}
+                data-testid="switch-show-in-tabs"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
                 <Label htmlFor="create-excludeFromYield">Exclude from Yield</Label>
                 <p className="text-xs text-muted-foreground">Products in this category won't count toward yield percentage</p>
               </div>
@@ -303,6 +327,18 @@ export default function Settings() {
                 data-testid="input-edit-sort-order"
               />
               <p className="text-xs text-muted-foreground">Lower numbers appear first in lists</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="edit-showInTabs">Show in Inventory Tabs</Label>
+                <p className="text-xs text-muted-foreground">Display this category as a tab on the Inventory page</p>
+              </div>
+              <Switch
+                id="edit-showInTabs"
+                checked={formData.showInTabs}
+                onCheckedChange={(checked) => setFormData({ ...formData, showInTabs: checked })}
+                data-testid="switch-edit-show-in-tabs"
+              />
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">

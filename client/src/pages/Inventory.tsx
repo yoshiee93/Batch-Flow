@@ -375,7 +375,7 @@ export default function Inventory() {
           <TabsTrigger value="goods" className="flex items-center gap-2" data-testid="tab-goods">
             <Package size={16} /> Goods
           </TabsTrigger>
-          {categories.filter(c => c.excludeFromYield).map((category) => (
+          {categories.filter(c => c.showInTabs).map((category) => (
             <TabsTrigger key={category.id} value={`cat-${category.id}`} className="flex items-center gap-2" data-testid={`tab-category-${category.id}`}>
               <span className="text-amber-500">◉</span> {category.name}
             </TabsTrigger>
@@ -530,7 +530,7 @@ export default function Inventory() {
           </Card>
         </TabsContent>
 
-        {categories.filter(c => c.excludeFromYield).map((category) => {
+        {categories.filter(c => c.showInTabs).map((category) => {
           const categoryProducts = products.filter(p => p.categoryId === category.id);
           return (
             <TabsContent key={category.id} value={`cat-${category.id}`} className="space-y-4">
