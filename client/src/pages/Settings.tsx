@@ -109,45 +109,6 @@ export default function Settings() {
     );
   }
 
-  const CategoryFormFields = () => (
-    <div className="grid gap-4 py-4">
-      <div className="grid gap-2">
-        <Label htmlFor="name">Name</Label>
-        <Input
-          id="name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          placeholder="e.g., Powders"
-          data-testid="input-category-name"
-        />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="sortOrder">Sort Order</Label>
-        <Input
-          id="sortOrder"
-          type="number"
-          value={formData.sortOrder}
-          onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
-          placeholder="0"
-          data-testid="input-sort-order"
-        />
-        <p className="text-xs text-muted-foreground">Lower numbers appear first in lists</p>
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="space-y-0.5">
-          <Label htmlFor="excludeFromYield">Exclude from Yield</Label>
-          <p className="text-xs text-muted-foreground">Products in this category won't count toward yield percentage</p>
-        </div>
-        <Switch
-          id="excludeFromYield"
-          checked={formData.excludeFromYield}
-          onCheckedChange={(checked) => setFormData({ ...formData, excludeFromYield: checked })}
-          data-testid="switch-exclude-yield"
-        />
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -264,7 +225,42 @@ export default function Settings() {
               Create a new category to organize products
             </DialogDescription>
           </DialogHeader>
-          <CategoryFormFields />
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="create-name">Name</Label>
+              <Input
+                id="create-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Powders"
+                data-testid="input-category-name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="create-sortOrder">Sort Order</Label>
+              <Input
+                id="create-sortOrder"
+                type="number"
+                value={formData.sortOrder}
+                onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
+                placeholder="0"
+                data-testid="input-sort-order"
+              />
+              <p className="text-xs text-muted-foreground">Lower numbers appear first in lists</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="create-excludeFromYield">Exclude from Yield</Label>
+                <p className="text-xs text-muted-foreground">Products in this category won't count toward yield percentage</p>
+              </div>
+              <Switch
+                id="create-excludeFromYield"
+                checked={formData.excludeFromYield}
+                onCheckedChange={(checked) => setFormData({ ...formData, excludeFromYield: checked })}
+                data-testid="switch-exclude-yield"
+              />
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsCreateDialogOpen(false); resetForm(); }}>
               Cancel
@@ -285,7 +281,42 @@ export default function Settings() {
               Update category settings
             </DialogDescription>
           </DialogHeader>
-          <CategoryFormFields />
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Powders"
+                data-testid="input-edit-category-name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-sortOrder">Sort Order</Label>
+              <Input
+                id="edit-sortOrder"
+                type="number"
+                value={formData.sortOrder}
+                onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
+                placeholder="0"
+                data-testid="input-edit-sort-order"
+              />
+              <p className="text-xs text-muted-foreground">Lower numbers appear first in lists</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="edit-excludeFromYield">Exclude from Yield</Label>
+                <p className="text-xs text-muted-foreground">Products in this category won't count toward yield percentage</p>
+              </div>
+              <Switch
+                id="edit-excludeFromYield"
+                checked={formData.excludeFromYield}
+                onCheckedChange={(checked) => setFormData({ ...formData, excludeFromYield: checked })}
+                data-testid="switch-edit-exclude-yield"
+              />
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedCategory(null); resetForm(); }}>
               Cancel
