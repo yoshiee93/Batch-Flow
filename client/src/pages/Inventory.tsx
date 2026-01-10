@@ -13,7 +13,7 @@ import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Package, Box, Layer
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   useMaterials, useProducts, useCategories, useLots,
-  useCreateMaterial, useUpdateMaterial, useDeleteMaterial, 
+  useUpdateMaterial, useDeleteMaterial, 
   useCreateProduct, useUpdateProduct, useDeleteProduct,
   type Material, type Product, type Category, type Lot
 } from '@/lib/api';
@@ -23,7 +23,6 @@ export default function Inventory() {
   const [activeTab, setActiveTab] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
-  const [isCreateMaterialOpen, setIsCreateMaterialOpen] = useState(false);
   const [isEditMaterialOpen, setIsEditMaterialOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [materialForm, setMaterialForm] = useState({
@@ -42,7 +41,6 @@ export default function Inventory() {
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
   const { data: lots = [], isLoading: lotsLoading } = useLots();
   
-  const createMaterial = useCreateMaterial();
   const updateMaterial = useUpdateMaterial();
   const deleteMaterial = useDeleteMaterial();
   const createProduct = useCreateProduct();
@@ -90,25 +88,6 @@ export default function Inventory() {
   };
 
   const resetMaterialForm = () => setMaterialForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null });
-
-  const handleCreateMaterial = async () => {
-    if (!materialForm.name) {
-      toast({ title: "Missing fields", description: "Please fill in Name", variant: "destructive" });
-      return;
-    }
-    try {
-      await createMaterial.mutateAsync({
-        sku: materialForm.sku, name: materialForm.name, description: materialForm.description || null,
-        unit: materialForm.unit, minStock: materialForm.minStock, currentStock: materialForm.currentStock, 
-        categoryId: materialForm.categoryId || null, active: true,
-      });
-      toast({ title: "Material created", description: `Material ${materialForm.name} created successfully` });
-      setIsCreateMaterialOpen(false);
-      resetMaterialForm();
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to create material", variant: "destructive" });
-    }
-  };
 
   const handleEditMaterialClick = (material: Material) => {
     setSelectedMaterial(material);
@@ -234,6 +213,7 @@ export default function Inventory() {
 
   const renderMaterialRow = (material: Material) => {
     const isLow = parseFloat(material.currentStock) <= parseFloat(material.minStock);
+    const materialCategory = categories.find(c => c.id === material.categoryId);
     return (
       <TableRow key={material.id} data-testid={`row-material-${material.id}`}>
         <TableCell className="font-mono font-medium">{material.sku}</TableCell>
@@ -244,7 +224,11 @@ export default function Inventory() {
           </div>
         </TableCell>
         <TableCell className="text-center">
-          <Badge variant="secondary">Material</Badge>
+          {materialCategory ? (
+            <Badge variant="outline" className="text-primary border-primary/30">{materialCategory.name}</Badge>
+          ) : (
+            <span className="text-muted-foreground text-xs">-</span>
+          )}
         </TableCell>
         <TableCell className="text-right font-mono">{parseFloat(material.currentStock).toFixed(2)} {material.unit || 'KG'}</TableCell>
         <TableCell className="text-center">
@@ -394,11 +378,8 @@ export default function Inventory() {
           return (
             <TabsContent key={category.id} value={`cat-${category.id}`} className="space-y-4">
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsCreateMaterialOpen(true)} data-testid={`button-new-material-cat-${category.id}`}>
-                  <Box size={16} className="mr-2" /> New Material
-                </Button>
-                <Button onClick={() => setIsCreateProductOpen(true)} data-testid={`button-new-product-cat-${category.id}`}>
-                  <Package size={16} className="mr-2" /> New Product
+                <Button onClick={() => { setProductForm(prev => ({ ...prev, categoryId: category.id })); setIsCreateProductOpen(true); }} data-testid={`button-new-product-cat-${category.id}`}>
+                  <Plus size={16} className="mr-2" /> New Product
                 </Button>
               </div>
               <Card className="overflow-hidden">
@@ -438,11 +419,8 @@ export default function Inventory() {
 
         <TabsContent value="all" className="space-y-4">
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsCreateMaterialOpen(true)} data-testid="button-new-material">
-              <Box size={16} className="mr-2" /> New Material
-            </Button>
             <Button onClick={() => setIsCreateProductOpen(true)} data-testid="button-new-product">
-              <Package size={16} className="mr-2" /> New Product
+              <Plus size={16} className="mr-2" /> New Product
             </Button>
           </div>
           <Card className="overflow-hidden">
@@ -479,80 +457,11 @@ export default function Inventory() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={isCreateMaterialOpen} onOpenChange={setIsCreateMaterialOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Material</DialogTitle>
-            <DialogDescription>Create a new raw material</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>SKU</Label>
-              <Input placeholder="e.g. RM-001" value={materialForm.sku} onChange={(e) => setMaterialForm({ ...materialForm, sku: e.target.value })} data-testid="input-material-sku" />
-            </div>
-            <div className="space-y-2">
-              <Label>Name *</Label>
-              <Input placeholder="e.g. Strawberry Slice" value={materialForm.name} onChange={(e) => setMaterialForm({ ...materialForm, name: e.target.value })} data-testid="input-material-name" />
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Input placeholder="Optional" value={materialForm.description} onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })} data-testid="input-material-description" />
-            </div>
-            <div className="space-y-2">
-              <Label>Unit of Measure</Label>
-              <Select value={materialForm.unit} onValueChange={(v) => setMaterialForm({ ...materialForm, unit: v })}>
-                <SelectTrigger data-testid="select-material-unit">
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="KG">KG (Kilograms)</SelectItem>
-                  <SelectItem value="QTY">QTY (Quantity/Pieces)</SelectItem>
-                  <SelectItem value="L">L (Liters)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Current Stock ({materialForm.unit})</Label>
-                <Input type="number" value={materialForm.currentStock} onChange={(e) => setMaterialForm({ ...materialForm, currentStock: e.target.value })} data-testid="input-material-current-stock" />
-              </div>
-              <div className="space-y-2">
-                <Label>Min Stock ({materialForm.unit})</Label>
-                <Input type="number" value={materialForm.minStock} onChange={(e) => setMaterialForm({ ...materialForm, minStock: e.target.value })} data-testid="input-material-min-stock" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Select
-                value={materialForm.categoryId || ''}
-                onValueChange={(v) => setMaterialForm({ ...materialForm, categoryId: v || null })}
-              >
-                <SelectTrigger data-testid="select-material-category">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateMaterialOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateMaterial} disabled={createMaterial.isPending} data-testid="button-submit-material">
-              {createMaterial.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add Material
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={isCreateProductOpen} onOpenChange={setIsCreateProductOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New Good</DialogTitle>
-            <DialogDescription>Create a new finished good</DialogDescription>
+            <DialogTitle>Add New Product</DialogTitle>
+            <DialogDescription>Create a new product and assign it to a category</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -611,7 +520,7 @@ export default function Inventory() {
             <Button variant="outline" onClick={() => setIsCreateProductOpen(false)}>Cancel</Button>
             <Button onClick={handleCreateProduct} disabled={createProduct.isPending} data-testid="button-submit-product">
               {createProduct.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add Good
+              Add Product
             </Button>
           </DialogFooter>
         </DialogContent>
