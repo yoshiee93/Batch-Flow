@@ -28,7 +28,9 @@ export default function Orders() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [viewingOrder, setViewingOrder] = useState<OrderWithAllocation | null>(null);
   const [newOrder, setNewOrder] = useState({
     orderNumber: '',
     customerName: '',
@@ -128,6 +130,11 @@ export default function Orders() {
       notes: order.notes || '',
     });
     setIsEditDialogOpen(true);
+  };
+
+  const handleViewClick = (order: OrderWithAllocation) => {
+    setViewingOrder(order);
+    setIsViewDialogOpen(true);
   };
 
   const handleUpdateOrder = async () => {
@@ -327,6 +334,8 @@ export default function Orders() {
                   onEditClick={handleEditClick}
                   onDelete={handleDeleteOrder}
                   onComplete={handleCompleteOrder}
+                  onViewClick={handleViewClick}
+                  products={products}
                 />
               ))}
               {filteredOrders.length === 0 && (
@@ -360,6 +369,108 @@ export default function Orders() {
               onClose={() => setIsEditDialogOpen(false)}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="w-full sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Order {viewingOrder?.orderNumber}
+            </DialogTitle>
+            <DialogDescription>Order details and stock status</DialogDescription>
+          </DialogHeader>
+          {viewingOrder && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Customer</p>
+                  <p className="font-medium">{viewingOrder.customerName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Due Date</p>
+                  <p className="font-medium">{format(new Date(viewingOrder.dueDate), 'MMM d, yyyy')}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Priority</p>
+                  <PriorityBadge priority={viewingOrder.priority} />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <OrderStatusBadge status={viewingOrder.status} />
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-3">Products Requested</h4>
+                {viewingOrder.items.length === 0 ? (
+                  <p className="text-muted-foreground text-sm italic">No items in this order</p>
+                ) : (
+                  <div className="space-y-3">
+                    {viewingOrder.items.map((item) => {
+                      const product = products.find(p => p.id === item.productId);
+                      const currentStock = product ? parseFloat(product.currentStock) : 0;
+                      const needed = parseFloat(item.quantity);
+                      const reserved = parseFloat(item.reservedQuantity);
+                      const unit = product?.unit || 'KG';
+                      const stockStatus = reserved >= needed ? 'ready' : reserved > 0 ? 'partial' : 'waiting';
+                      
+                      return (
+                        <div key={item.id} className="border rounded-lg p-3">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-medium">{item.productName}</p>
+                              {product?.sku && <p className="text-xs text-muted-foreground">{product.sku}</p>}
+                            </div>
+                            {stockStatus === 'ready' && (
+                              <Badge className="bg-green-100 text-green-700"><CheckCircle2 size={12} className="mr-1" /> Ready</Badge>
+                            )}
+                            {stockStatus === 'partial' && (
+                              <Badge className="bg-amber-100 text-amber-700"><Clock size={12} className="mr-1" /> Partial</Badge>
+                            )}
+                            {stockStatus === 'waiting' && (
+                              <Badge className="bg-slate-100 text-slate-600"><AlertCircle size={12} className="mr-1" /> Waiting</Badge>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Ordered</p>
+                              <p className="font-mono">{needed.toFixed(2)} {unit}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Reserved</p>
+                              <p className="font-mono">{reserved.toFixed(2)} {unit}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">In Stock</p>
+                              <p className={cn("font-mono", currentStock < needed && "text-destructive")}>{currentStock.toFixed(2)} {unit}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {viewingOrder.notes && (
+                <div>
+                  <h4 className="font-semibold mb-2">Notes</h4>
+                  <p className="text-sm text-muted-foreground">{viewingOrder.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>Close</Button>
+            <Button onClick={() => {
+              setIsViewDialogOpen(false);
+              if (viewingOrder) handleEditClick(viewingOrder);
+            }}>
+              <Pencil className="mr-2 h-4 w-4" /> Edit Order
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -633,12 +744,14 @@ function EditOrderContent({
   );
 }
 
-function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete }: { 
+function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, onViewClick, products }: { 
   order: OrderWithAllocation; 
   onStatusChange: (id: string, status: string) => void;
   onEditClick: (order: Order) => void;
   onDelete: (order: Order) => void;
   onComplete: (id: string) => void;
+  onViewClick: (order: OrderWithAllocation) => void;
+  products: Product[];
 }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
@@ -670,17 +783,22 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete }: 
   };
 
   return (
-    <TableRow data-testid={`row-order-${order.id}`}>
+    <TableRow 
+      data-testid={`row-order-${order.id}`} 
+      className="cursor-pointer hover:bg-muted/50"
+      onClick={() => onViewClick(order)}
+    >
       <TableCell className="font-mono font-bold">{order.orderNumber}</TableCell>
       <TableCell>{order.customerName}</TableCell>
       <TableCell>
         <div className="space-y-1">
           {order.items.map((item) => {
+            const product = products.find(p => p.id === item.productId);
             const allocated = parseFloat(item.reservedQuantity);
             const needed = parseFloat(item.quantity);
             return (
               <div key={item.id} className="text-sm">
-                {item.productName} <span className="text-muted-foreground font-mono">({allocated.toFixed(0)}/{needed.toFixed(0)} KG)</span>
+                {item.productName} <span className="text-muted-foreground font-mono">({allocated.toFixed(0)}/{needed.toFixed(0)} {product?.unit || 'KG'})</span>
               </div>
             );
           })}
@@ -699,7 +817,7 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete }: 
       <TableCell className="text-right font-mono text-sm">
         {format(new Date(order.dueDate), 'MMM d, yyyy')}
       </TableCell>
-      <TableCell className="text-right">
+      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" data-testid={`button-order-actions-${order.id}`}>
