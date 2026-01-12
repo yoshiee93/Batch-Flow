@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown, Archive } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -77,6 +78,14 @@ export default function Orders() {
   const filteredOrders = ordersWithAllocation.filter(o => 
     o.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     o.customerName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const currentOrders = filteredOrders.filter(o => 
+    o.status !== 'shipped' && o.status !== 'cancelled'
+  );
+
+  const archivedOrders = filteredOrders.filter(o => 
+    o.status === 'shipped' || o.status === 'cancelled'
   );
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
@@ -313,45 +322,96 @@ export default function Orders() {
         </Button>
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px] sm:w-[140px]">Order #</TableHead>
-                <TableHead className="min-w-[120px]">Customer</TableHead>
-                <TableHead className="min-w-[200px]">Items</TableHead>
-                <TableHead className="text-center min-w-[100px]">Stock</TableHead>
-                <TableHead className="text-center min-w-[80px]">Priority</TableHead>
-                <TableHead className="text-center min-w-[80px]">Status</TableHead>
-                <TableHead className="text-right min-w-[100px]">Due Date</TableHead>
-                <TableHead className="text-right min-w-[80px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map((order) => (
-                <OrderRow 
-                  key={order.id} 
-                  order={order} 
-                  onStatusChange={handleStatusChange}
-                  onEditClick={handleEditClick}
-                  onDelete={handleDeleteOrder}
-                  onComplete={handleCompleteOrder}
-                  onViewClick={handleViewClick}
-                  products={products}
-                />
-              ))}
-              {filteredOrders.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    No orders found. Click "Create Order" to add your first order.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+      <Tabs defaultValue="current" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="current" data-testid="tab-current-orders">
+            Current ({currentOrders.length})
+          </TabsTrigger>
+          <TabsTrigger value="archive" data-testid="tab-archive-orders">
+            <Archive size={14} className="mr-1" /> Archive ({archivedOrders.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="current">
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px] sm:w-[140px]">Order #</TableHead>
+                    <TableHead className="min-w-[120px]">Customer</TableHead>
+                    <TableHead className="min-w-[200px]">Items</TableHead>
+                    <TableHead className="text-center min-w-[100px]">Stock</TableHead>
+                    <TableHead className="text-center min-w-[80px]">Priority</TableHead>
+                    <TableHead className="text-center min-w-[80px]">Status</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Due Date</TableHead>
+                    <TableHead className="text-right min-w-[80px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentOrders.map((order) => (
+                    <OrderRow 
+                      key={order.id} 
+                      order={order} 
+                      onStatusChange={handleStatusChange}
+                      onEditClick={handleEditClick}
+                      onDelete={handleDeleteOrder}
+                      onComplete={handleCompleteOrder}
+                      onViewClick={handleViewClick}
+                      products={products}
+                    />
+                  ))}
+                  {currentOrders.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        No active orders. Click "Create Order" to add a new order.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="archive">
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px] sm:w-[140px]">Order #</TableHead>
+                    <TableHead className="min-w-[120px]">Customer</TableHead>
+                    <TableHead className="min-w-[200px]">Items</TableHead>
+                    <TableHead className="text-center min-w-[100px]">Status</TableHead>
+                    <TableHead className="text-center min-w-[80px]">Priority</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Completed</TableHead>
+                    <TableHead className="text-right min-w-[80px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {archivedOrders.map((order) => (
+                    <ArchivedOrderRow 
+                      key={order.id} 
+                      order={order} 
+                      onViewClick={handleViewClick}
+                      onDelete={handleDeleteOrder}
+                      products={products}
+                    />
+                  ))}
+                  {archivedOrders.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        No archived orders yet. Completed orders will appear here.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="w-full sm:max-w-2xl">
@@ -907,6 +967,103 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
                 data-testid="button-confirm-complete-order"
               >
                 Complete Order
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function ArchivedOrderRow({ order, onViewClick, onDelete, products }: { 
+  order: OrderWithAllocation; 
+  onViewClick: (order: OrderWithAllocation) => void;
+  onDelete: (order: Order) => void;
+  products: Product[];
+}) {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const statusBadge = () => {
+    if (order.status === 'shipped') {
+      return (
+        <Badge className="bg-green-100 text-green-700 border-green-200">
+          <Truck size={12} className="mr-1" /> Shipped
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-red-100 text-red-700 border-red-200">
+        Cancelled
+      </Badge>
+    );
+  };
+
+  return (
+    <TableRow 
+      data-testid={`row-archived-order-${order.id}`} 
+      className="cursor-pointer hover:bg-muted/50"
+      onClick={() => onViewClick(order)}
+    >
+      <TableCell className="font-mono font-bold">{order.orderNumber}</TableCell>
+      <TableCell>{order.customerName}</TableCell>
+      <TableCell>
+        <div className="space-y-1">
+          {order.items.map((item) => {
+            const product = products.find(p => p.id === item.productId);
+            const quantity = parseFloat(item.quantity);
+            return (
+              <div key={item.id} className="text-sm">
+                {item.productName} <span className="text-muted-foreground font-mono">({quantity.toFixed(0)} {product?.unit || 'KG'})</span>
+              </div>
+            );
+          })}
+          {order.items.length === 0 && <span className="text-muted-foreground text-sm italic">No items</span>}
+        </div>
+      </TableCell>
+      <TableCell className="text-center">
+        {statusBadge()}
+      </TableCell>
+      <TableCell className="text-center">
+        <PriorityBadge priority={order.priority} />
+      </TableCell>
+      <TableCell className="text-right font-mono text-sm">
+        {format(new Date(order.createdAt), 'MMM d, yyyy')}
+      </TableCell>
+      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" data-testid={`button-archived-order-actions-${order.id}`}>
+              <MoreHorizontal size={18} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => onViewClick(order)}>
+              <Package size={14} className="mr-2" /> View Details
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              className="text-destructive" 
+              onClick={() => setIsDeleteDialogOpen(true)}
+              data-testid={`button-delete-archived-order-${order.id}`}
+            >
+              <Trash2 size={14} className="mr-2" /> Delete Order
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Archived Order</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete order {order.orderNumber}? This will remove the order record. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onDelete(order)} data-testid="button-confirm-delete-archived-order">
+                Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
