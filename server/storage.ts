@@ -81,7 +81,7 @@ export interface IStorage {
   getBatchOutputs(batchId: string): Promise<BatchOutput[]>;
   addBatchOutput(batchId: string, productId: string, quantity: string): Promise<BatchOutput>;
   removeBatchOutput(id: string): Promise<void>;
-  finalizeBatch(batchId: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch>;
+  finalizeBatch(batchId: string, wasteQuantity: string, millingQuantity: string, wetQuantity: string, markCompleted: boolean): Promise<Batch>;
   recordBatchOutput(batchId: string, actualQuantity: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch>;
 
   getOrders(): Promise<Order[]>;
@@ -651,7 +651,7 @@ export class DatabaseStorage implements IStorage {
     await this.runStockAllocation();
   }
 
-  async finalizeBatch(batchId: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch> {
+  async finalizeBatch(batchId: string, wasteQuantity: string, millingQuantity: string, wetQuantity: string, markCompleted: boolean): Promise<Batch> {
     const [batch] = await db.select().from(batches).where(eq(batches.id, batchId));
     if (!batch) throw new Error("Batch not found");
     
@@ -663,6 +663,7 @@ export class DatabaseStorage implements IStorage {
       actualQuantity: totalOutput.toFixed(2),
       wasteQuantity,
       millingQuantity,
+      wetQuantity,
     };
     
     if (markCompleted) {
@@ -676,7 +677,7 @@ export class DatabaseStorage implements IStorage {
       entityType: "batch",
       entityId: batchId,
       action: markCompleted ? "completed" : "updated",
-      changes: JSON.stringify({ totalOutput, wasteQuantity, millingQuantity, markCompleted }),
+      changes: JSON.stringify({ totalOutput, wasteQuantity, millingQuantity, wetQuantity, markCompleted }),
     });
     
     return updated;

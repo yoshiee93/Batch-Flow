@@ -115,6 +115,7 @@ export const batches = pgTable("batches", {
   actualQuantity: decimal("actual_quantity", { precision: 12, scale: 3 }),
   wasteQuantity: decimal("waste_quantity", { precision: 12, scale: 3 }),
   millingQuantity: decimal("milling_quantity", { precision: 12, scale: 3 }),
+  wetQuantity: decimal("wet_quantity", { precision: 12, scale: 3 }),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   assignedTo: varchar("assigned_to").references(() => users.id),

@@ -289,11 +289,12 @@ export async function registerRoutes(
   }));
 
   app.post("/api/batches/:id/finalize", asyncHandler(async (req, res) => {
-    const { wasteQuantity, millingQuantity, markCompleted } = req.body;
+    const { wasteQuantity, millingQuantity, wetQuantity, markCompleted } = req.body;
     const batch = await storage.finalizeBatch(
       req.params.id,
       wasteQuantity || "0",
       millingQuantity || "0",
+      wetQuantity || "0",
       markCompleted || false
     );
     res.json(batch);
