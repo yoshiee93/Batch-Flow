@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -511,6 +511,7 @@ export default function Production() {
               isCompleted={selectedBatch.status === 'completed'}
               wasteQuantity={selectedBatch.wasteQuantity || '0'}
               millingQuantity={selectedBatch.millingQuantity || '0'}
+              wetQuantity={selectedBatch.wetQuantity || '0'}
               onClose={() => setIsRecordOutputOpen(false)}
             />
           )}
@@ -529,6 +530,7 @@ export default function Production() {
               isCompleted={selectedBatch.status === 'completed'}
               wasteQuantity={selectedBatch.wasteQuantity || '0'}
               millingQuantity={selectedBatch.millingQuantity || '0'}
+              wetQuantity={selectedBatch.wetQuantity || '0'}
               onClose={() => setIsAddOutputOpen(false)}
             />
           )}
@@ -967,18 +969,28 @@ function BatchOutputsEditor({
   isCompleted,
   wasteQuantity: initialWaste,
   millingQuantity: initialMilling,
+  wetQuantity: initialWet,
   onClose,
 }: { 
   batchId: string;
   isCompleted: boolean;
   wasteQuantity: string;
   millingQuantity: string;
+  wetQuantity: string;
   onClose: () => void;
 }) {
   const [newOutputForm, setNewOutputForm] = useState({ productId: '', quantity: '' });
   const [wasteQuantity, setWasteQuantity] = useState(initialWaste);
   const [millingQuantity, setMillingQuantity] = useState(initialMilling);
+  const [wetQuantity, setWetQuantity] = useState(initialWet);
   const [markCompleted, setMarkCompleted] = useState(false);
+  
+  useEffect(() => {
+    setWasteQuantity(initialWaste);
+    setMillingQuantity(initialMilling);
+    setWetQuantity(initialWet);
+    setMarkCompleted(false);
+  }, [batchId, initialWaste, initialMilling, initialWet]);
   
   const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
   const { data: allProducts = [] } = useProducts();
@@ -1020,13 +1032,14 @@ function BatchOutputsEditor({
         batchId,
         wasteQuantity: wasteQuantity || "0",
         millingQuantity: millingQuantity || "0",
+        wetQuantity: wetQuantity || "0",
         markCompleted,
       });
       toast({ 
         title: markCompleted ? "Batch completed" : "Batch updated", 
         description: markCompleted 
           ? "Batch has been finalized and marked as complete" 
-          : "Batch waste/milling quantities updated"
+          : "Batch quantities updated"
       });
       onClose();
     } catch (error) {
@@ -1138,8 +1151,8 @@ function BatchOutputsEditor({
       {!isCompleted && (
         <>
           <div className="space-y-4 pt-4 border-t">
-            <h4 className="font-medium text-sm">Waste & Milling</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <h4 className="font-medium text-sm">Waste, Milling & Wet</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="waste">Waste (KG)</Label>
                 <Input
@@ -1162,6 +1175,18 @@ function BatchOutputsEditor({
                   onChange={(e) => setMillingQuantity(e.target.value)}
                   placeholder="0.00"
                   data-testid="input-finalize-milling"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="wet">Wet (KG)</Label>
+                <Input
+                  id="wet"
+                  type="number"
+                  step="0.01"
+                  value={wetQuantity}
+                  onChange={(e) => setWetQuantity(e.target.value)}
+                  placeholder="0.00"
+                  data-testid="input-finalize-wet"
                 />
               </div>
             </div>
