@@ -1022,9 +1022,13 @@ export class DatabaseStorage implements IStorage {
         productName: i.product.name,
       }));
 
-      // Calculate allocation status
+      // Calculate allocation status - shipped/cancelled orders get their own status
       let allocationStatus = 'awaiting_stock';
-      if (itemsWithProduct.length > 0) {
+      if (order.status === 'shipped') {
+        allocationStatus = 'shipped';
+      } else if (order.status === 'cancelled') {
+        allocationStatus = 'cancelled';
+      } else if (itemsWithProduct.length > 0) {
         const fullyAllocated = itemsWithProduct.every(
           i => parseFloat(i.reservedQuantity) >= parseFloat(i.quantity)
         );
