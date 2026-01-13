@@ -14,11 +14,12 @@ Preferred communication style: Simple, everyday language.
 
 - **Jan 13, 2026**: Added wet quantity tracking to production batches. New wetQuantity column in batches table tracks product that needs reprocessing through the dryer. Displayed alongside waste and milling in the batch output dialog.
 - **Jan 13, 2026**: Added Current/Archive tabs to Orders page. Shipped and cancelled orders now display in Archive tab with "Shipped" or "Cancelled" status badges. Current tab shows only active orders (pending, in_production, ready). New ArchivedOrderRow component for archive display.
-- **Jan 13, 2026**: Created Calculator page with four calculation tools:
+- **Jan 13, 2026**: Created Calculator page with five calculation tools:
   - **Yield Calculator**: Calculate finished product, waste, milling, and wet (redry) quantities from raw input weight with percentage breakdowns.
   - **Recipe Calculator**: Select product and recipe to calculate materials needed for target quantity. Uses getRecipeItemsWithMaterials API to show real material names and units.
   - **Unit Converter**: Convert between weight units (KG, g, lb, oz) and volume units (L, ml, gal).
   - **Batch Planner**: Calculate total raw materials needed for producing multiple products with expected yield percentage.
+  - **Delivery Net Weight**: Calculate actual product weight from deliveries by subtracting pallet and container weights (tare weight).
 - **Jan 10, 2026**: Implemented draggable and resizable dashboard tiles. Uses react-grid-layout v2 with useContainerWidth hook. Edit Layout toggle button enables/disables tile movement. Tiles are static (locked) by default and require clicking "Edit Layout" to enable drag-and-drop. Layout preferences saved to localStorage. Reset button restores default arrangement. Hook: useDashboardLayout in `client/src/hooks/use-dashboard-layout.tsx`.
 - **Jan 10, 2026**: Added unit of measure support. Products and materials can now have different units (KG, QTY, L). Unit dropdown added to create/edit forms. Tables display each item's actual unit. Summary cards no longer assume KG for mixed-unit inventories.
 - **Jan 10, 2026**: Implemented mobile and tablet responsiveness. Added screen size detection hooks (useIsMobile, useIsTablet, useScreenSize). Layout has collapsible sidebar with hamburger menu on mobile (<1024px). All tables wrapped with horizontal scroll for small screens. Dashboard grid stacks 2 columns on mobile. Dialogs use full-width on mobile (w-full sm:max-w-*). Responsive typography throughout (text-2xl sm:text-3xl for titles). Breakpoints: mobile <640px, tablet 640-1024px, desktop 1024px+.

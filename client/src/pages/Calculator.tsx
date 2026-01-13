@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calculator as CalcIcon, Scale, ArrowRightLeft, Package, Loader2 } from 'lucide-react';
+import { Calculator as CalcIcon, Scale, ArrowRightLeft, Package, Loader2, Truck } from 'lucide-react';
 import { useProducts, useRecipes, useRecipeItems, type Product, type Recipe, type RecipeItem } from '@/lib/api';
 
 export default function CalculatorPage() {
@@ -22,7 +22,7 @@ export default function CalculatorPage() {
       </div>
 
       <Tabs defaultValue="yield" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5">
           <TabsTrigger value="yield" data-testid="tab-yield-calc">
             <Scale size={14} className="mr-1" /> Yield
           </TabsTrigger>
@@ -34,6 +34,9 @@ export default function CalculatorPage() {
           </TabsTrigger>
           <TabsTrigger value="batch" data-testid="tab-batch-calc">
             <CalcIcon size={14} className="mr-1" /> Batch
+          </TabsTrigger>
+          <TabsTrigger value="netweight" data-testid="tab-netweight-calc">
+            <Truck size={14} className="mr-1" /> Delivery
           </TabsTrigger>
         </TabsList>
 
@@ -51,6 +54,10 @@ export default function CalculatorPage() {
 
         <TabsContent value="batch">
           <BatchCalculator />
+        </TabsContent>
+
+        <TabsContent value="netweight">
+          <NetWeightCalculator />
         </TabsContent>
       </Tabs>
     </div>
@@ -639,6 +646,208 @@ function BatchCalculator() {
                     </span>
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function NetWeightCalculator() {
+  const [grossWeight, setGrossWeight] = useState('');
+  const [palletWeight, setPalletWeight] = useState('25');
+  const [palletCount, setPalletCount] = useState('1');
+  const [containerWeight, setContainerWeight] = useState('2');
+  const [containerCount, setContainerCount] = useState('0');
+  const [results, setResults] = useState<{
+    gross: number;
+    totalPalletWeight: number;
+    totalContainerWeight: number;
+    totalTare: number;
+    netWeight: number;
+  } | null>(null);
+
+  const calculate = () => {
+    const gross = parseFloat(grossWeight) || 0;
+    const palletWt = parseFloat(palletWeight) || 0;
+    const pallets = parseInt(palletCount) || 0;
+    const containerWt = parseFloat(containerWeight) || 0;
+    const containers = parseInt(containerCount) || 0;
+
+    const totalPalletWeight = palletWt * pallets;
+    const totalContainerWeight = containerWt * containers;
+    const totalTare = totalPalletWeight + totalContainerWeight;
+    const netWeight = gross - totalTare;
+
+    setResults({
+      gross,
+      totalPalletWeight,
+      totalContainerWeight,
+      totalTare,
+      netWeight: Math.max(0, netWeight),
+    });
+  };
+
+  const reset = () => {
+    setGrossWeight('');
+    setPalletWeight('25');
+    setPalletCount('1');
+    setContainerWeight('2');
+    setContainerCount('0');
+    setResults(null);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Truck size={20} /> Delivery Net Weight
+        </CardTitle>
+        <CardDescription>
+          Calculate actual product weight by subtracting pallets and containers from delivery weight.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="grossWeight">Total Delivery Weight (KG)</Label>
+              <Input
+                id="grossWeight"
+                type="number"
+                placeholder="Enter the weight shown on scale"
+                value={grossWeight}
+                onChange={(e) => setGrossWeight(e.target.value)}
+                data-testid="input-gross-weight"
+              />
+              <p className="text-xs text-muted-foreground">
+                The full weight of the delivery as weighed
+              </p>
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-4">
+              <h4 className="font-medium text-sm">Pallets</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="palletWeight">Weight Each (KG)</Label>
+                  <Input
+                    id="palletWeight"
+                    type="number"
+                    value={palletWeight}
+                    onChange={(e) => setPalletWeight(e.target.value)}
+                    data-testid="input-pallet-weight"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="palletCount">Number of Pallets</Label>
+                  <Input
+                    id="palletCount"
+                    type="number"
+                    min="0"
+                    value={palletCount}
+                    onChange={(e) => setPalletCount(e.target.value)}
+                    data-testid="input-pallet-count"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-4">
+              <h4 className="font-medium text-sm">Containers / Bins / Boxes</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="containerWeight">Weight Each (KG)</Label>
+                  <Input
+                    id="containerWeight"
+                    type="number"
+                    value={containerWeight}
+                    onChange={(e) => setContainerWeight(e.target.value)}
+                    data-testid="input-container-weight"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="containerCount">Number of Containers</Label>
+                  <Input
+                    id="containerCount"
+                    type="number"
+                    min="0"
+                    value={containerCount}
+                    onChange={(e) => setContainerCount(e.target.value)}
+                    data-testid="input-container-count"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button onClick={calculate} className="flex-1" data-testid="button-calculate-netweight">
+                Calculate Net Weight
+              </Button>
+              <Button variant="outline" onClick={reset} data-testid="button-reset-netweight">
+                Reset
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {results && (
+              <div className="bg-muted/50 rounded-lg p-4 space-y-4">
+                <h3 className="font-semibold text-lg">Weight Breakdown</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-2 bg-background rounded">
+                    <span className="text-muted-foreground">Delivery Weight (Gross)</span>
+                    <span className="font-mono" data-testid="result-gross-weight">
+                      {results.gross.toFixed(2)} KG
+                    </span>
+                  </div>
+                  
+                  <div className="border-t pt-2 space-y-2">
+                    <div className="flex justify-between items-center p-2">
+                      <span className="text-muted-foreground">Pallets ({palletCount} × {palletWeight} KG)</span>
+                      <span className="font-mono text-red-600" data-testid="result-pallet-weight">
+                        − {results.totalPalletWeight.toFixed(2)} KG
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-2">
+                      <span className="text-muted-foreground">Containers ({containerCount} × {containerWeight} KG)</span>
+                      <span className="font-mono text-red-600" data-testid="result-container-weight">
+                        − {results.totalContainerWeight.toFixed(2)} KG
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-2">
+                    <div className="flex justify-between items-center p-2">
+                      <span className="text-muted-foreground">Total Tare Weight</span>
+                      <span className="font-mono text-red-600" data-testid="result-tare-weight">
+                        − {results.totalTare.toFixed(2)} KG
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="border-t-2 pt-3">
+                    <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
+                      <span className="font-semibold">Net Product Weight</span>
+                      <span className="font-mono font-bold text-xl text-green-600" data-testid="result-net-weight">
+                        {results.netWeight.toFixed(2)} KG
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      This is the actual weight of the product you received
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!results && (
+              <div className="bg-muted/30 rounded-lg p-6 text-center text-muted-foreground">
+                <Truck className="mx-auto h-12 w-12 mb-3 opacity-50" />
+                <p className="text-sm">
+                  Enter the delivery weight and pallet/container details to calculate the actual product weight.
+                </p>
               </div>
             )}
           </div>
