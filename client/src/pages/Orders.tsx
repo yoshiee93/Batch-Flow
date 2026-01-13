@@ -532,14 +532,44 @@ export default function Orders() {
               )}
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>Close</Button>
-            <Button onClick={() => {
+            <Button variant="outline" onClick={() => {
               setIsViewDialogOpen(false);
               if (viewingOrder) handleEditClick(viewingOrder);
             }}>
               <Pencil className="mr-2 h-4 w-4" /> Edit Order
             </Button>
+            {viewingOrder && viewingOrder.status !== 'shipped' && viewingOrder.status !== 'cancelled' && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button className="bg-green-600 hover:bg-green-700">
+                    <Truck size={14} className="mr-2" /> Complete Order
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Complete Order</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will mark the order as shipped and deduct the reserved stock from inventory.
+                      This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => {
+                        handleCompleteOrder(viewingOrder.id);
+                        setIsViewDialogOpen(false);
+                      }}
+                    >
+                      Complete Order
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
