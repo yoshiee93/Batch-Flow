@@ -87,6 +87,8 @@ export interface RecipeItem {
   materialId: string;
   quantity: string;
   notes: string | null;
+  materialName?: string;
+  materialUnit?: string;
 }
 
 export interface Batch {

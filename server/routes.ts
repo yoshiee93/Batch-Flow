@@ -176,7 +176,7 @@ export async function registerRoutes(
   }));
 
   app.get("/api/recipes/:id/items", asyncHandler(async (req, res) => {
-    const items = await storage.getRecipeItems(req.params.id);
+    const items = await storage.getRecipeItemsWithMaterials(req.params.id);
     res.json(items);
   }));
 

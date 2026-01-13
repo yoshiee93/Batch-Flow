@@ -66,6 +66,7 @@ export interface IStorage {
   getRecipesByProduct(productId: string): Promise<Recipe[]>;
   createRecipe(recipe: InsertRecipe): Promise<Recipe>;
   getRecipeItems(recipeId: string): Promise<RecipeItem[]>;
+  getRecipeItemsWithMaterials(recipeId: string): Promise<(RecipeItem & { materialName: string; materialUnit: string })[]>;
   createRecipeItem(item: InsertRecipeItem): Promise<RecipeItem>;
 
   getBatches(): Promise<Batch[]>;
@@ -320,6 +321,22 @@ export class DatabaseStorage implements IStorage {
 
   async getRecipeItems(recipeId: string): Promise<RecipeItem[]> {
     return db.select().from(recipeItems).where(eq(recipeItems.recipeId, recipeId));
+  }
+
+  async getRecipeItemsWithMaterials(recipeId: string): Promise<(RecipeItem & { materialName: string; materialUnit: string })[]> {
+    const items = await db.select({
+      recipeItem: recipeItems,
+      material: materials,
+    })
+    .from(recipeItems)
+    .leftJoin(materials, eq(recipeItems.materialId, materials.id))
+    .where(eq(recipeItems.recipeId, recipeId));
+
+    return items.map(row => ({
+      ...row.recipeItem,
+      materialName: row.material?.name || 'Unknown Material',
+      materialUnit: row.material?.unit || 'KG',
+    }));
   }
 
   async createRecipeItem(item: InsertRecipeItem): Promise<RecipeItem> {

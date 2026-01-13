@@ -12,6 +12,7 @@ import Production from "@/pages/Production";
 import Inventory from "@/pages/Inventory";
 import Traceability from "@/pages/Traceability";
 import Settings from "@/pages/Settings";
+import Calculator from "@/pages/Calculator";
 import NotFound from "@/pages/not-found";
 
 // Placeholder pages for routes that aren't built yet
@@ -36,6 +37,7 @@ function Router() {
         <Route path="/quality">
           <Placeholder title="Quality Control" />
         </Route>
+        <Route path="/calculator" component={Calculator} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>
