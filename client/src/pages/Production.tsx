@@ -757,6 +757,7 @@ function BatchCard({
   }, 0);
   const waste = batch.wasteQuantity ? parseFloat(batch.wasteQuantity) : 0;
   const milling = batch.millingQuantity ? parseFloat(batch.millingQuantity) : 0;
+  const wet = batch.wetQuantity ? parseFloat(batch.wetQuantity) : 0;
   
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -912,7 +913,7 @@ function BatchCard({
                   </div>
                 )}
                 
-                {(waste > 0 || milling > 0) && (
+                {(waste > 0 || milling > 0 || wet > 0) && (
                   <div className="mt-4 pt-3 border-t space-y-1">
                     {waste > 0 && (
                       <div className="flex justify-between text-sm">
@@ -924,6 +925,12 @@ function BatchCard({
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Milling</span>
                         <span className="font-mono text-amber-500">{milling.toFixed(2)} KG</span>
+                      </div>
+                    )}
+                    {wet > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Wet (Redry)</span>
+                        <span className="font-mono text-blue-500">{wet.toFixed(2)} KG</span>
                       </div>
                     )}
                   </div>
