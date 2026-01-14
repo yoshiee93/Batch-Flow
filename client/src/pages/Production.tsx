@@ -797,13 +797,23 @@ function BatchCard({
                     {totalInputKg > 0 ? (
                       (() => {
                         const yieldPct = (nonPowderOutputKg / totalInputKg) * 100;
+                        const yieldWithWetPct = ((nonPowderOutputKg + wet) / totalInputKg) * 100;
                         const colorClass = yieldPct >= 12 ? 'text-green-600' : yieldPct >= 8 ? 'text-amber-500' : 'text-red-500';
                         return (
                           <div>
-                            <span className={`font-mono font-bold ${colorClass}`}>
-                              {yieldPct.toFixed(1)}%
-                            </span>
-                            <div className="text-[10px] text-muted-foreground">Yield</div>
+                            <div className="flex items-center justify-end gap-1">
+                              <span className={`font-mono font-bold ${colorClass}`}>
+                                {yieldPct.toFixed(1)}%
+                              </span>
+                              {wet > 0 && (
+                                <span className="font-mono text-gray-400" title="Yield including wet (redry)">
+                                  ({yieldWithWetPct.toFixed(1)}%)
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {wet > 0 ? 'Yield (with wet)' : 'Yield'}
+                            </div>
                           </div>
                         );
                       })()
