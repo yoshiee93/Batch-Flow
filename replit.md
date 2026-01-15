@@ -12,6 +12,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 15, 2026**: Made all product/material select fields searchable in Production page. Create Batch, Record Input, and Add Output dialogs now use searchable comboboxes with type-ahead filtering using Popover + Command components.
 - **Jan 13, 2026**: Added wet quantity tracking to production batches. New wetQuantity column in batches table tracks product that needs reprocessing through the dryer. Displayed alongside waste and milling in the batch output dialog.
 - **Jan 13, 2026**: Added Current/Archive tabs to Orders page. Shipped and cancelled orders now display in Archive tab with "Shipped" or "Cancelled" status badges. Current tab shows only active orders (pending, in_production, ready). New ArchivedOrderRow component for archive display.
 - **Jan 13, 2026**: Created Calculator page with five calculation tools:

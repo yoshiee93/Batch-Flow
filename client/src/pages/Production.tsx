@@ -9,7 +9,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle, ChevronDown, ChevronRight, ChevronsUpDown, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import {
   DropdownMenu,
@@ -55,6 +58,8 @@ export default function Production() {
     materialId: '',
     quantity: '',
   });
+  const [materialSearchOpen, setMaterialSearchOpen] = useState(false);
+  const [createProductSearchOpen, setCreateProductSearchOpen] = useState(false);
   
   const [recordOutputForm, setRecordOutputForm] = useState({
     actualQuantity: '',
@@ -289,18 +294,45 @@ export default function Production() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="product">Product *</Label>
-                <Select value={newBatch.productId} onValueChange={(v) => setNewBatch({ ...newBatch, productId: v })}>
-                  <SelectTrigger data-testid="select-product">
-                    <SelectValue placeholder="Select a product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map(product => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.sku} - {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={createProductSearchOpen} onOpenChange={setCreateProductSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={createProductSearchOpen}
+                      className="w-full justify-between font-normal"
+                      data-testid="select-product"
+                    >
+                      {newBatch.productId
+                        ? products.find(p => p.id === newBatch.productId)?.name || "Select product..."
+                        : "Search products..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search products..." />
+                      <CommandList>
+                        <CommandEmpty>No product found.</CommandEmpty>
+                        <CommandGroup>
+                          {products.map(product => (
+                            <CommandItem
+                              key={product.id}
+                              value={`${product.sku} ${product.name}`}
+                              onSelect={() => {
+                                setNewBatch({ ...newBatch, productId: product.id });
+                                setCreateProductSearchOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", newBatch.productId === product.id ? "opacity-100" : "opacity-0")} />
+                              {product.sku ? `${product.sku} - ` : ''}{product.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="recipe">Recipe (Optional)</Label>
@@ -454,21 +486,45 @@ export default function Production() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="input-material">Material *</Label>
-              <Select 
-                value={recordInputForm.materialId} 
-                onValueChange={(v) => setRecordInputForm({ ...recordInputForm, materialId: v })}
-              >
-                <SelectTrigger data-testid="select-input-material">
-                  <SelectValue placeholder="Select a material" />
-                </SelectTrigger>
-                <SelectContent>
-                  {materials.map(material => (
-                    <SelectItem key={material.id} value={material.id}>
-                      {material.sku} - {material.name} ({material.currentStock} KG in stock)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={materialSearchOpen} onOpenChange={setMaterialSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={materialSearchOpen}
+                    className="w-full justify-between font-normal"
+                    data-testid="select-input-material"
+                  >
+                    {recordInputForm.materialId
+                      ? materials.find(m => m.id === recordInputForm.materialId)?.name || "Select material..."
+                      : "Search materials..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search materials..." />
+                    <CommandList>
+                      <CommandEmpty>No material found.</CommandEmpty>
+                      <CommandGroup>
+                        {materials.map(material => (
+                          <CommandItem
+                            key={material.id}
+                            value={`${material.sku} ${material.name}`}
+                            onSelect={() => {
+                              setRecordInputForm({ ...recordInputForm, materialId: material.id });
+                              setMaterialSearchOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", recordInputForm.materialId === material.id ? "opacity-100" : "opacity-0")} />
+                            {material.sku ? `${material.sku} - ` : ''}{material.name} ({material.currentStock} {material.unit})
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               {recordInputForm.materialId && (
                 <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
                   Available: <span className="font-mono font-medium">{materials.find(m => m.id === recordInputForm.materialId)?.currentStock || '0'} KG</span>
@@ -997,6 +1053,7 @@ function BatchOutputsEditor({
   onClose: () => void;
 }) {
   const [newOutputForm, setNewOutputForm] = useState({ productId: '', quantity: '' });
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [wasteQuantity, setWasteQuantity] = useState(initialWaste);
   const [millingQuantity, setMillingQuantity] = useState(initialMilling);
   const [wetQuantity, setWetQuantity] = useState(initialWet);
@@ -1074,21 +1131,45 @@ function BatchOutputsEditor({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="output-product">Product</Label>
-              <Select 
-                value={newOutputForm.productId} 
-                onValueChange={(v) => setNewOutputForm({ ...newOutputForm, productId: v })}
-              >
-                <SelectTrigger data-testid="select-output-product">
-                  <SelectValue placeholder="Select product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allProducts.map(product => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.sku} - {product.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={productSearchOpen}
+                    className="w-full justify-between font-normal"
+                    data-testid="select-output-product"
+                  >
+                    {newOutputForm.productId
+                      ? allProducts.find(p => p.id === newOutputForm.productId)?.name || "Select product..."
+                      : "Search products..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search products..." />
+                    <CommandList>
+                      <CommandEmpty>No product found.</CommandEmpty>
+                      <CommandGroup>
+                        {allProducts.map(product => (
+                          <CommandItem
+                            key={product.id}
+                            value={`${product.sku} ${product.name}`}
+                            onSelect={() => {
+                              setNewOutputForm({ ...newOutputForm, productId: product.id });
+                              setProductSearchOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", newOutputForm.productId === product.id ? "opacity-100" : "opacity-0")} />
+                            {product.sku ? `${product.sku} - ` : ''}{product.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label htmlFor="output-quantity">Quantity (KG)</Label>
