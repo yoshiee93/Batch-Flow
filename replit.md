@@ -12,6 +12,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 15, 2026**: Updated batch number generation format and grouped product dropdowns by category. New batch number format: ProductInitials + TypeCode (6=Frozen, 4=Freeze Dried from category) + Year (2 digits) + Julian Date (3 digits) + Weekday (1-7, Monday=1). Example: BW4260154 = Blueberry Whole, Freeze Dried, 2026, Day 15, Thursday. Product dropdowns now display products grouped under category headers for easier selection.
 - **Jan 15, 2026**: Made all product/material select fields searchable in Production page. Create Batch, Record Input, and Add Output dialogs now use searchable comboboxes with type-ahead filtering using Popover + Command components.
 - **Jan 13, 2026**: Added wet quantity tracking to production batches. New wetQuantity column in batches table tracks product that needs reprocessing through the dryer. Displayed alongside waste and milling in the batch output dialog.
 - **Jan 13, 2026**: Added Current/Archive tabs to Orders page. Shipped and cancelled orders now display in Archive tab with "Shipped" or "Cancelled" status badges. Current tab shows only active orders (pending, in_production, ready). New ArchivedOrderRow component for archive display.
