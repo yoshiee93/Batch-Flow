@@ -73,12 +73,61 @@ export default function Production() {
   const { data: recipes = [] } = useRecipes();
   const { data: materials = [] } = useMaterials();
   const { data: lots = [] } = useLots();
+  const { data: categories = [] } = useCategories();
   const updateBatch = useUpdateBatch();
   const createBatch = useCreateBatch();
   const deleteBatch = useDeleteBatch();
   const recordBatchInput = useRecordBatchInput();
   const recordBatchOutput = useRecordBatchOutput();
   const { toast } = useToast();
+
+  // Group products by category for dropdown display
+  const productsByCategory = categories.map(category => ({
+    category,
+    products: products.filter(p => p.categoryId === category.id)
+  })).filter(group => group.products.length > 0);
+  
+  // Add uncategorized products
+  const uncategorizedProducts = products.filter(p => !p.categoryId);
+  
+  // Helper to get product initials (first letter of each word, alphanumeric only)
+  const getProductInitials = (productName: string): string => {
+    return productName
+      .split(/\s+/)
+      .map(word => {
+        // Remove non-alphanumeric characters and get first letter
+        const cleaned = word.replace(/[^a-zA-Z0-9]/g, '');
+        return cleaned.charAt(0).toUpperCase();
+      })
+      .filter(char => char) // Remove empty strings
+      .join('');
+  };
+  
+  // Helper to get type code from category (6=Frozen, 4=Freeze Dried)
+  const getTypeCodeFromCategory = (categoryId: string | null): string => {
+    if (!categoryId) return '0';
+    const category = categories.find(c => c.id === categoryId);
+    if (!category) return '0';
+    const name = category.name.toLowerCase();
+    if (name.includes('frozen')) return '6';
+    if (name.includes('freeze') && name.includes('dried')) return '4';
+    if (name.includes('freeze-dried')) return '4';
+    return '0';
+  };
+  
+  // Helper to get Julian date (day of year 1-366)
+  const getJulianDate = (date: Date): number => {
+    const start = new Date(date.getFullYear(), 0, 0);
+    const diff = date.getTime() - start.getTime();
+    const oneDay = 1000 * 60 * 60 * 24;
+    return Math.floor(diff / oneDay);
+  };
+  
+  // Helper to get weekday (1-7, Monday=1, Sunday=7)
+  const getWeekday = (date: Date): number => {
+    const day = date.getDay();
+    return day === 0 ? 7 : day; // Sunday is 0 in JS, we want it as 7
+  };
 
   const handleCreateBatch = async () => {
     if (!newBatch.batchNumber || !newBatch.productId) {
@@ -226,12 +275,36 @@ export default function Production() {
   };
 
   const generateBatchNumber = () => {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `BATCH-${year}${month}${day}-${random}`;
+    // Requires product to be selected first
+    if (!newBatch.productId) {
+      toast({ title: "Select product first", description: "Please select a product before generating the batch number", variant: "destructive" });
+      return newBatch.batchNumber;
+    }
+    
+    const product = products.find(p => p.id === newBatch.productId);
+    if (!product) return newBatch.batchNumber;
+    
+    // Parse the date from the form (or use today)
+    const batchDate = newBatch.startDate ? new Date(newBatch.startDate + 'T12:00:00') : new Date();
+    
+    // Get product initials (first letter of each word)
+    const initials = getProductInitials(product.name);
+    
+    // Get type code from category (6=Frozen, 4=Freeze Dried)
+    const typeCode = getTypeCodeFromCategory(product.categoryId || null);
+    
+    // Last 2 digits of year
+    const year = String(batchDate.getFullYear()).slice(-2);
+    
+    // Julian date (day of year, padded to 3 digits)
+    const julianDate = String(getJulianDate(batchDate)).padStart(3, '0');
+    
+    // Weekday (1-7, Monday=1)
+    const weekday = getWeekday(batchDate);
+    
+    // Format: InitialsTypeCodeYearJulianDateWeekday
+    // Example: BW4260152 = Blueberry Whole, Freeze Dried (4), 2026, Day 15, Tuesday (2)
+    return `${initials}${typeCode}${year}${julianDate}${weekday}`;
   };
 
   if (isLoading) {
@@ -314,21 +387,40 @@ export default function Production() {
                       <CommandInput placeholder="Search products..." />
                       <CommandList>
                         <CommandEmpty>No product found.</CommandEmpty>
-                        <CommandGroup>
-                          {products.map(product => (
-                            <CommandItem
-                              key={product.id}
-                              value={`${product.sku} ${product.name}`}
-                              onSelect={() => {
-                                setNewBatch({ ...newBatch, productId: product.id });
-                                setCreateProductSearchOpen(false);
-                              }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", newBatch.productId === product.id ? "opacity-100" : "opacity-0")} />
-                              {product.sku ? `${product.sku} - ` : ''}{product.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
+                        {productsByCategory.map(({ category, products: categoryProducts }) => (
+                          <CommandGroup key={category.id} heading={category.name}>
+                            {categoryProducts.map(product => (
+                              <CommandItem
+                                key={product.id}
+                                value={`${category.name} ${product.sku} ${product.name}`}
+                                onSelect={() => {
+                                  setNewBatch({ ...newBatch, productId: product.id });
+                                  setCreateProductSearchOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", newBatch.productId === product.id ? "opacity-100" : "opacity-0")} />
+                                {product.sku ? `${product.sku} - ` : ''}{product.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        ))}
+                        {uncategorizedProducts.length > 0 && (
+                          <CommandGroup heading="Uncategorized">
+                            {uncategorizedProducts.map(product => (
+                              <CommandItem
+                                key={product.id}
+                                value={`Uncategorized ${product.sku} ${product.name}`}
+                                onSelect={() => {
+                                  setNewBatch({ ...newBatch, productId: product.id });
+                                  setCreateProductSearchOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", newBatch.productId === product.id ? "opacity-100" : "opacity-0")} />
+                                {product.sku ? `${product.sku} - ` : ''}{product.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
                       </CommandList>
                     </Command>
                   </PopoverContent>
@@ -1068,10 +1160,20 @@ function BatchOutputsEditor({
   
   const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
   const { data: allProducts = [] } = useProducts();
+  const { data: allCategories = [] } = useCategories();
   const addBatchOutput = useAddBatchOutput();
   const removeBatchOutput = useRemoveBatchOutput();
   const finalizeBatch = useFinalizeBatch();
   const { toast } = useToast();
+
+  // Group products by category for dropdown display
+  const productsByCategory = allCategories.map(category => ({
+    category,
+    products: allProducts.filter(p => p.categoryId === category.id)
+  })).filter(group => group.products.length > 0);
+  
+  // Add uncategorized products
+  const uncategorizedProducts = allProducts.filter(p => !p.categoryId);
   
   const handleAddOutput = async () => {
     if (!newOutputForm.productId || !newOutputForm.quantity) {
@@ -1151,21 +1253,40 @@ function BatchOutputsEditor({
                     <CommandInput placeholder="Search products..." />
                     <CommandList>
                       <CommandEmpty>No product found.</CommandEmpty>
-                      <CommandGroup>
-                        {allProducts.map(product => (
-                          <CommandItem
-                            key={product.id}
-                            value={`${product.sku} ${product.name}`}
-                            onSelect={() => {
-                              setNewOutputForm({ ...newOutputForm, productId: product.id });
-                              setProductSearchOpen(false);
-                            }}
-                          >
-                            <Check className={cn("mr-2 h-4 w-4", newOutputForm.productId === product.id ? "opacity-100" : "opacity-0")} />
-                            {product.sku ? `${product.sku} - ` : ''}{product.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                      {productsByCategory.map(({ category, products: categoryProducts }) => (
+                        <CommandGroup key={category.id} heading={category.name}>
+                          {categoryProducts.map(product => (
+                            <CommandItem
+                              key={product.id}
+                              value={`${category.name} ${product.sku} ${product.name}`}
+                              onSelect={() => {
+                                setNewOutputForm({ ...newOutputForm, productId: product.id });
+                                setProductSearchOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", newOutputForm.productId === product.id ? "opacity-100" : "opacity-0")} />
+                              {product.sku ? `${product.sku} - ` : ''}{product.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      ))}
+                      {uncategorizedProducts.length > 0 && (
+                        <CommandGroup heading="Uncategorized">
+                          {uncategorizedProducts.map(product => (
+                            <CommandItem
+                              key={product.id}
+                              value={`Uncategorized ${product.sku} ${product.name}`}
+                              onSelect={() => {
+                                setNewOutputForm({ ...newOutputForm, productId: product.id });
+                                setProductSearchOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", newOutputForm.productId === product.id ? "opacity-100" : "opacity-0")} />
+                              {product.sku ? `${product.sku} - ` : ''}{product.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
                     </CommandList>
                   </Command>
                 </PopoverContent>
