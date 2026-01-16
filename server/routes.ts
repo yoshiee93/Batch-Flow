@@ -245,11 +245,27 @@ export async function registerRoutes(
   }));
 
   app.post("/api/batches/:id/input", asyncHandler(async (req, res) => {
-    const { materialId, quantity } = req.body;
-    if (!materialId || !quantity) {
-      return res.status(400).json({ error: "materialId and quantity are required" });
+    const { materialId, productId, quantity, sourceLotId } = req.body;
+    
+    if (!quantity) {
+      return res.status(400).json({ error: "quantity is required" });
     }
-    const batchMaterial = await storage.recordBatchInput(req.params.id, materialId, quantity);
+    
+    // Must provide either materialId OR productId, but not both
+    if (!materialId && !productId) {
+      return res.status(400).json({ error: "Either materialId or productId is required" });
+    }
+    if (materialId && productId) {
+      return res.status(400).json({ error: "Provide either materialId or productId, not both" });
+    }
+    
+    let batchMaterial;
+    if (materialId) {
+      batchMaterial = await storage.recordBatchInput(req.params.id, materialId, quantity);
+    } else {
+      batchMaterial = await storage.recordBatchProductInput(req.params.id, productId, quantity, sourceLotId);
+    }
+    
     res.status(201).json(batchMaterial);
   }));
 

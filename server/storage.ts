@@ -79,6 +79,7 @@ export interface IStorage {
   removeBatchMaterial(id: string): Promise<void>;
   updateBatchMaterial(id: string, quantity: string): Promise<BatchMaterial>;
   recordBatchInput(batchId: string, materialId: string, quantity: string): Promise<BatchMaterial>;
+  recordBatchProductInput(batchId: string, productId: string, quantity: string, sourceLotId?: string): Promise<BatchMaterial>;
   getBatchOutputs(batchId: string): Promise<BatchOutput[]>;
   addBatchOutput(batchId: string, productId: string, quantity: string): Promise<BatchOutput>;
   removeBatchOutput(id: string): Promise<void>;
@@ -578,6 +579,61 @@ export class DatabaseStorage implements IStorage {
       entityId: batchId,
       action: "input_recorded",
       changes: JSON.stringify({ materialId, quantity }),
+    });
+    
+    return batchMaterial;
+  }
+
+  async recordBatchProductInput(batchId: string, productId: string, quantity: string, sourceLotId?: string): Promise<BatchMaterial> {
+    const quantityNum = parseFloat(quantity);
+    
+    // Deduct from product current stock
+    const [product] = await db.select().from(products).where(eq(products.id, productId));
+    if (!product) throw new Error("Product not found");
+    
+    const currentStock = parseFloat(product.currentStock || "0");
+    if (quantityNum > currentStock) {
+      throw new Error(`Insufficient stock. Available: ${currentStock} ${product.unit}`);
+    }
+    
+    const newStock = (currentStock - quantityNum).toFixed(2);
+    await db.update(products).set({ currentStock: newStock }).where(eq(products.id, productId));
+    
+    // If a specific lot is specified, also deduct from that lot
+    if (sourceLotId) {
+      const [lot] = await db.select().from(lots).where(eq(lots.id, sourceLotId));
+      if (lot) {
+        const remainingQty = parseFloat(lot.remainingQuantity || "0");
+        const newRemainingQty = Math.max(0, remainingQty - quantityNum).toFixed(2);
+        await db.update(lots).set({ remainingQuantity: newRemainingQty }).where(eq(lots.id, sourceLotId));
+      }
+    }
+    
+    // Create batch material record (with productId instead of materialId)
+    const [batchMaterial] = await db.insert(batchMaterials).values({
+      batchId,
+      materialId: null,
+      productId,
+      lotId: null,
+      sourceLotId: sourceLotId || null,
+      quantity,
+    }).returning();
+    
+    // Create stock movement
+    await this.createStockMovement({
+      movementType: "production_input",
+      productId,
+      lotId: sourceLotId || null,
+      batchId,
+      quantity: `-${quantity}`, // negative = consumed
+      reference: "Production input (product as ingredient)",
+    });
+    
+    await this.createAuditLog({
+      entityType: "batch",
+      entityId: batchId,
+      action: "product_input_recorded",
+      changes: JSON.stringify({ productId, quantity, sourceLotId }),
     });
     
     return batchMaterial;
