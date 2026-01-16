@@ -12,6 +12,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Jan 16, 2026**: Implemented product-as-ingredient input for full chain traceability. Finished products can now be used as inputs in production batches (e.g., freeze-dried strawberries going into trail mix). New productId and sourceLotId columns in batchMaterials table. Record Input dialog has toggle to switch between "Raw Material" and "Finished Product" input types. When a product is used as an ingredient, stock is deducted from product inventory and the batch tracks which product was consumed for complete traceability through multiple processing steps.
 - **Jan 15, 2026**: Updated batch number generation format and grouped product dropdowns by category. New batch number format: ProductInitials + TypeCode (6=Frozen, 4=Freeze Dried from category) + Year (2 digits) + Julian Date (3 digits) + Weekday (1-7, Monday=1). Example: BW4260154 = Blueberry Whole, Freeze Dried, 2026, Day 15, Thursday. Product dropdowns now display products grouped under category headers for easier selection.
 - **Jan 15, 2026**: Made all product/material select fields searchable in Production page. Create Batch, Record Input, and Add Output dialogs now use searchable comboboxes with type-ahead filtering using Popover + Command components.
 - **Jan 13, 2026**: Added wet quantity tracking to production batches. New wetQuantity column in batches table tracks product that needs reprocessing through the dryer. Displayed alongside waste and milling in the batch output dialog.
