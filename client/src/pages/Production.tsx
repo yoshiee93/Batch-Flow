@@ -55,10 +55,13 @@ export default function Production() {
   });
   
   const [recordInputForm, setRecordInputForm] = useState({
+    inputType: 'material' as 'material' | 'product',
     materialId: '',
+    productId: '',
     quantity: '',
   });
   const [materialSearchOpen, setMaterialSearchOpen] = useState(false);
+  const [inputProductSearchOpen, setInputProductSearchOpen] = useState(false);
   const [createProductSearchOpen, setCreateProductSearchOpen] = useState(false);
   
   const [recordOutputForm, setRecordOutputForm] = useState({
@@ -182,7 +185,7 @@ export default function Production() {
 
   const handleRecordInputClick = (batch: Batch) => {
     setSelectedBatch(batch);
-    setRecordInputForm({ materialId: '', quantity: '' });
+    setRecordInputForm({ inputType: 'material', materialId: '', productId: '', quantity: '' });
     setIsRecordInputOpen(true);
   };
 
@@ -193,18 +196,40 @@ export default function Production() {
 
   const handleRecordInput = async () => {
     if (!selectedBatch) return;
-    if (!recordInputForm.materialId || !recordInputForm.quantity) {
-      toast({ title: "Missing fields", description: "Please select material and enter quantity", variant: "destructive" });
+    
+    const { inputType, materialId, productId, quantity } = recordInputForm;
+    
+    if (!quantity) {
+      toast({ title: "Missing quantity", description: "Please enter quantity", variant: "destructive" });
       return;
     }
+    
+    if (inputType === 'material' && !materialId) {
+      toast({ title: "Missing material", description: "Please select a material", variant: "destructive" });
+      return;
+    }
+    
+    if (inputType === 'product' && !productId) {
+      toast({ title: "Missing product", description: "Please select a product", variant: "destructive" });
+      return;
+    }
+    
     try {
-      await recordBatchInput.mutateAsync({
+      const payload: { batchId: string; quantity: string; materialId?: string; productId?: string } = {
         batchId: selectedBatch.id,
-        materialId: recordInputForm.materialId,
-        quantity: recordInputForm.quantity,
-      });
-      toast({ title: "Input recorded", description: "Material has been added to batch and deducted from inventory" });
-      setRecordInputForm({ materialId: '', quantity: '' });
+        quantity,
+      };
+      
+      if (inputType === 'material') {
+        payload.materialId = materialId;
+      } else {
+        payload.productId = productId;
+      }
+      
+      await recordBatchInput.mutateAsync(payload);
+      const itemType = inputType === 'material' ? 'Material' : 'Product';
+      toast({ title: "Input recorded", description: `${itemType} has been added to batch and deducted from inventory` });
+      setRecordInputForm({ inputType: 'material', materialId: '', productId: '', quantity: '' });
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to record input", variant: "destructive" });
     }
@@ -573,59 +598,145 @@ export default function Production() {
         <DialogContent className="w-full sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Record Input for {selectedBatch?.batchNumber}</DialogTitle>
-            <DialogDescription>Add materials used in production. This will deduct from inventory.</DialogDescription>
+            <DialogDescription>Add raw materials or finished products used in production. This will deduct from inventory.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="input-material">Material *</Label>
-              <Popover open={materialSearchOpen} onOpenChange={setMaterialSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={materialSearchOpen}
-                    className="w-full justify-between font-normal"
-                    data-testid="select-input-material"
-                  >
-                    {recordInputForm.materialId
-                      ? materials.find(m => m.id === recordInputForm.materialId)?.name || "Select material..."
-                      : "Search materials..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search materials..." />
-                    <CommandList>
-                      <CommandEmpty>No material found.</CommandEmpty>
-                      <CommandGroup>
-                        {materials.map(material => (
-                          <CommandItem
-                            key={material.id}
-                            value={`${material.sku} ${material.name}`}
-                            onSelect={() => {
-                              setRecordInputForm({ ...recordInputForm, materialId: material.id });
-                              setMaterialSearchOpen(false);
-                            }}
-                          >
-                            <Check className={cn("mr-2 h-4 w-4", recordInputForm.materialId === material.id ? "opacity-100" : "opacity-0")} />
-                            {material.sku ? `${material.sku} - ` : ''}{material.name} ({material.currentStock} {material.unit})
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              {recordInputForm.materialId && (
-                <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
-                  Available: <span className="font-mono font-medium">{materials.find(m => m.id === recordInputForm.materialId)?.currentStock || '0'} KG</span>
-                </div>
-              )}
+              <Label>Input Type</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={recordInputForm.inputType === 'material' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setRecordInputForm({ ...recordInputForm, inputType: 'material', productId: '' })}
+                  data-testid="button-input-type-material"
+                >
+                  Raw Material
+                </Button>
+                <Button
+                  type="button"
+                  variant={recordInputForm.inputType === 'product' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setRecordInputForm({ ...recordInputForm, inputType: 'product', materialId: '' })}
+                  data-testid="button-input-type-product"
+                >
+                  Finished Product
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {recordInputForm.inputType === 'material' 
+                  ? 'Use raw materials from inventory as inputs'
+                  : 'Use finished products as ingredients (for multi-step processing)'}
+              </p>
             </div>
             
+            {recordInputForm.inputType === 'material' ? (
+              <div className="space-y-2">
+                <Label htmlFor="input-material">Material *</Label>
+                <Popover open={materialSearchOpen} onOpenChange={setMaterialSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={materialSearchOpen}
+                      className="w-full justify-between font-normal"
+                      data-testid="select-input-material"
+                    >
+                      {recordInputForm.materialId
+                        ? materials.find(m => m.id === recordInputForm.materialId)?.name || "Select material..."
+                        : "Search materials..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search materials..." />
+                      <CommandList>
+                        <CommandEmpty>No material found.</CommandEmpty>
+                        <CommandGroup>
+                          {materials.map(material => (
+                            <CommandItem
+                              key={material.id}
+                              value={`${material.sku} ${material.name}`}
+                              onSelect={() => {
+                                setRecordInputForm({ ...recordInputForm, materialId: material.id });
+                                setMaterialSearchOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", recordInputForm.materialId === material.id ? "opacity-100" : "opacity-0")} />
+                              {material.sku ? `${material.sku} - ` : ''}{material.name} ({material.currentStock} {material.unit})
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {recordInputForm.materialId && (
+                  <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
+                    Available: <span className="font-mono font-medium">{materials.find(m => m.id === recordInputForm.materialId)?.currentStock || '0'} {materials.find(m => m.id === recordInputForm.materialId)?.unit || 'KG'}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="input-product">Product *</Label>
+                <Popover open={inputProductSearchOpen} onOpenChange={setInputProductSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={inputProductSearchOpen}
+                      className="w-full justify-between font-normal"
+                      data-testid="select-input-product"
+                    >
+                      {recordInputForm.productId
+                        ? products.find(p => p.id === recordInputForm.productId)?.name || "Select product..."
+                        : "Search products..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search products..." />
+                      <CommandList>
+                        <CommandEmpty>No product found.</CommandEmpty>
+                        {categories.filter(c => !c.excludeFromYield).map(category => {
+                          const categoryProducts = products.filter(p => p.categoryId === category.id && parseFloat(p.currentStock || '0') > 0);
+                          if (categoryProducts.length === 0) return null;
+                          return (
+                            <CommandGroup key={category.id} heading={category.name}>
+                              {categoryProducts.map(product => (
+                                <CommandItem
+                                  key={product.id}
+                                  value={`${product.sku} ${product.name}`}
+                                  onSelect={() => {
+                                    setRecordInputForm({ ...recordInputForm, productId: product.id });
+                                    setInputProductSearchOpen(false);
+                                  }}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", recordInputForm.productId === product.id ? "opacity-100" : "opacity-0")} />
+                                  {product.sku ? `${product.sku} - ` : ''}{product.name} ({product.currentStock} {product.unit})
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          );
+                        })}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {recordInputForm.productId && (
+                  <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
+                    Available: <span className="font-mono font-medium">{products.find(p => p.id === recordInputForm.productId)?.currentStock || '0'} {products.find(p => p.id === recordInputForm.productId)?.unit || 'KG'}</span>
+                    <p className="text-xs mt-1">This product will be tracked for full chain traceability.</p>
+                  </div>
+                )}
+              </div>
+            )}
+            
             <div className="space-y-2">
-              <Label htmlFor="input-quantity">Quantity (KG) *</Label>
+              <Label htmlFor="input-quantity">Quantity *</Label>
               <Input
                 id="input-quantity"
                 type="number"
