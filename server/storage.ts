@@ -1,4 +1,4 @@
-import { eq, desc, and, sql, gte, lte, inArray } from "drizzle-orm";
+import { eq, desc, and, sql, gte, lte, inArray, isNotNull } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, products, materials, lots, recipes, recipeItems,
@@ -21,6 +21,18 @@ import {
   type StockMovement, type InsertStockMovement,
   type AuditLog, type InsertAuditLog,
 } from "@shared/schema";
+import { generateLotNumber, generateBarcodeValue } from "./lotUtils";
+
+export type ReceiveStockInput = {
+  materialId: string;
+  quantity: string;
+  supplierName?: string;
+  supplierLot?: string;
+  sourceType?: "supplier" | "farmer" | "internal_batch";
+  receivedDate?: Date;
+  expiryDate?: Date;
+  notes?: string;
+};
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -57,9 +69,17 @@ export interface IStorage {
   getLot(id: string): Promise<Lot | undefined>;
   getLotsByMaterial(materialId: string): Promise<Lot[]>;
   getLotsByProduct(productId: string): Promise<Lot[]>;
+  getLotByBarcode(barcodeValue: string): Promise<Lot | undefined>;
   createLot(lot: InsertLot): Promise<Lot>;
   updateLot(id: string, lot: Partial<InsertLot>): Promise<Lot | undefined>;
   deleteLot(id: string): Promise<void>;
+  receiveStock(data: ReceiveStockInput): Promise<{ lot: Lot; movement: StockMovement }>;
+  recordBatchLotInput(batchId: string, lotId: string, quantity: string): Promise<BatchMaterial>;
+  getBatchInputLots(batchId: string): Promise<any[]>;
+  getBatchOutputLots(batchId: string): Promise<any[]>;
+  getLotUsage(lotId: string): Promise<any[]>;
+  getLotLineage(lotId: string): Promise<any>;
+  updateLotBarcodePrinted(lotId: string): Promise<Lot | undefined>;
 
   getRecipes(): Promise<Recipe[]>;
   getRecipe(id: string): Promise<Recipe | undefined>;
@@ -299,6 +319,293 @@ export class DatabaseStorage implements IStorage {
   async deleteLot(id: string): Promise<void> {
     await db.delete(lots).where(eq(lots.id, id));
     await this.createAuditLog({ entityType: "lot", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
+  }
+
+  async getLotByBarcode(barcodeValue: string): Promise<Lot | undefined> {
+    const [lot] = await db.select().from(lots).where(eq(lots.barcodeValue, barcodeValue));
+    return lot;
+  }
+
+  async updateLotBarcodePrinted(lotId: string): Promise<Lot | undefined> {
+    const [updated] = await db.update(lots)
+      .set({ barcodePrintedAt: new Date() })
+      .where(eq(lots.id, lotId))
+      .returning();
+    if (updated) {
+      await this.createAuditLog({
+        entityType: "lot",
+        entityId: lotId,
+        action: "barcode_printed",
+        changes: JSON.stringify({ barcodePrintedAt: updated.barcodePrintedAt }),
+      });
+    }
+    return updated;
+  }
+
+  async receiveStock(data: ReceiveStockInput): Promise<{ lot: Lot; movement: StockMovement }> {
+    const { materialId, quantity, supplierName, supplierLot, sourceType, receivedDate, expiryDate, notes } = data;
+    const quantityNum = parseFloat(quantity);
+
+    const [material] = await db.select().from(materials).where(eq(materials.id, materialId));
+    if (!material) throw new Error("Material not found");
+
+    const lotNumber = generateLotNumber("RM");
+    const barcodeValue = generateBarcodeValue();
+
+    const [lot] = await db.insert(lots).values({
+      lotNumber,
+      lotType: "raw_material",
+      status: "active",
+      barcodeValue,
+      materialId,
+      supplierName: supplierName || null,
+      supplierLot: supplierLot || null,
+      sourceType: sourceType || null,
+      quantity,
+      remainingQuantity: quantity,
+      receivedDate: receivedDate || new Date(),
+      expiryDate: expiryDate || null,
+      notes: notes || null,
+    }).returning();
+
+    const newStock = (parseFloat(material.currentStock || "0") + quantityNum).toFixed(3);
+    await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, materialId));
+
+    const movement = await this.createStockMovement({
+      movementType: "receipt",
+      materialId,
+      lotId: lot.id,
+      quantity,
+      reference: `Goods received: ${lot.lotNumber}`,
+    });
+
+    await this.createAuditLog({
+      entityType: "lot",
+      entityId: lot.id,
+      action: "received",
+      changes: JSON.stringify({ lotNumber, barcodeValue, materialId, quantity, supplierName, supplierLot }),
+    });
+
+    return { lot, movement };
+  }
+
+  async recordBatchLotInput(batchId: string, lotId: string, quantity: string): Promise<BatchMaterial> {
+    const quantityNum = parseFloat(quantity);
+
+    const [lot] = await db.select().from(lots).where(eq(lots.id, lotId));
+    if (!lot) throw new Error("Lot not found");
+    if (lot.status === "consumed") throw new Error("Lot has been fully consumed");
+    if (lot.status === "quarantined") throw new Error("Lot is quarantined and cannot be used");
+    if (lot.status === "expired") throw new Error("Lot has expired");
+
+    const remaining = parseFloat(lot.remainingQuantity || "0");
+    if (quantityNum > remaining) {
+      throw new Error(`Insufficient lot quantity. Available: ${remaining}`);
+    }
+
+    const newRemaining = (remaining - quantityNum).toFixed(3);
+    const newStatus = parseFloat(newRemaining) === 0 ? "consumed" : lot.status;
+    await db.update(lots).set({ remainingQuantity: newRemaining, status: newStatus }).where(eq(lots.id, lotId));
+
+    if (lot.materialId) {
+      const [material] = await db.select().from(materials).where(eq(materials.id, lot.materialId));
+      if (material) {
+        const newStock = Math.max(0, parseFloat(material.currentStock || "0") - quantityNum).toFixed(3);
+        await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, lot.materialId));
+      }
+    } else if (lot.productId) {
+      const [product] = await db.select().from(products).where(eq(products.id, lot.productId));
+      if (product) {
+        const newStock = Math.max(0, parseFloat(product.currentStock || "0") - quantityNum).toFixed(3);
+        await db.update(products).set({ currentStock: newStock }).where(eq(products.id, lot.productId));
+      }
+    }
+
+    const [batchMaterial] = await db.insert(batchMaterials).values({
+      batchId,
+      materialId: lot.materialId || null,
+      productId: lot.productId || null,
+      lotId,
+      quantity,
+    }).returning();
+
+    await this.createStockMovement({
+      movementType: "production_input",
+      materialId: lot.materialId || null,
+      productId: lot.productId || null,
+      lotId,
+      batchId,
+      quantity: `-${quantity}`,
+      reference: `Lot consumed: ${lot.lotNumber}`,
+    });
+
+    await this.createAuditLog({
+      entityType: "batch",
+      entityId: batchId,
+      action: "lot_input_recorded",
+      changes: JSON.stringify({ lotId, lotNumber: lot.lotNumber, quantity }),
+    });
+
+    return batchMaterial;
+  }
+
+  async getBatchInputLots(batchId: string): Promise<any[]> {
+    const materialLotInputs = await db.select({
+      bm: batchMaterials,
+      lot: lots,
+      material: materials,
+    })
+    .from(batchMaterials)
+    .innerJoin(lots, eq(batchMaterials.lotId, lots.id))
+    .leftJoin(materials, eq(lots.materialId, materials.id))
+    .where(and(eq(batchMaterials.batchId, batchId), isNotNull(batchMaterials.lotId)));
+
+    const productLotInputs = await db.select({
+      bm: batchMaterials,
+      lot: lots,
+      product: products,
+    })
+    .from(batchMaterials)
+    .innerJoin(lots, eq(batchMaterials.sourceLotId, lots.id))
+    .leftJoin(products, eq(lots.productId, products.id))
+    .where(and(eq(batchMaterials.batchId, batchId), isNotNull(batchMaterials.sourceLotId)));
+
+    return [
+      ...materialLotInputs.map(row => ({
+        batchMaterialId: row.bm.id,
+        lotId: row.lot.id,
+        lotNumber: row.lot.lotNumber,
+        barcodeValue: row.lot.barcodeValue,
+        lotType: row.lot.lotType,
+        status: row.lot.status,
+        materialId: row.material?.id ?? null,
+        materialName: row.material?.name ?? null,
+        productId: null as string | null,
+        productName: null as string | null,
+        supplierName: row.lot.supplierName,
+        supplierLot: row.lot.supplierLot,
+        sourceType: row.lot.sourceType,
+        receivedDate: row.lot.receivedDate,
+        expiryDate: row.lot.expiryDate,
+        quantityConsumed: row.bm.quantity,
+        remainingQuantity: row.lot.remainingQuantity,
+        addedAt: row.bm.addedAt,
+      })),
+      ...productLotInputs.map(row => ({
+        batchMaterialId: row.bm.id,
+        lotId: row.lot.id,
+        lotNumber: row.lot.lotNumber,
+        barcodeValue: row.lot.barcodeValue,
+        lotType: row.lot.lotType,
+        status: row.lot.status,
+        materialId: null as string | null,
+        materialName: null as string | null,
+        productId: row.product?.id ?? null,
+        productName: row.product?.name ?? null,
+        supplierName: row.lot.supplierName,
+        supplierLot: row.lot.supplierLot,
+        sourceType: row.lot.sourceType,
+        receivedDate: row.lot.receivedDate,
+        expiryDate: row.lot.expiryDate,
+        quantityConsumed: row.bm.quantity,
+        remainingQuantity: row.lot.remainingQuantity,
+        addedAt: row.bm.addedAt,
+      })),
+    ];
+  }
+
+  async getBatchOutputLots(batchId: string): Promise<any[]> {
+    const outputLots = await db.select({
+      lot: lots,
+      product: products,
+    })
+    .from(lots)
+    .leftJoin(products, eq(lots.productId, products.id))
+    .where(and(eq(lots.sourceBatchId, batchId), eq(lots.lotType, "finished_good")));
+
+    return outputLots.map(row => ({
+      lotId: row.lot.id,
+      lotNumber: row.lot.lotNumber,
+      barcodeValue: row.lot.barcodeValue,
+      lotType: row.lot.lotType,
+      status: row.lot.status,
+      productId: row.product?.id ?? null,
+      productName: row.product?.name ?? null,
+      quantity: row.lot.quantity,
+      remainingQuantity: row.lot.remainingQuantity,
+      producedDate: row.lot.producedDate,
+      expiryDate: row.lot.expiryDate,
+      barcodePrintedAt: row.lot.barcodePrintedAt,
+    }));
+  }
+
+  async getLotUsage(lotId: string): Promise<any[]> {
+    const directUsage = await db.select({
+      bm: batchMaterials,
+      batch: batches,
+      product: products,
+    })
+    .from(batchMaterials)
+    .innerJoin(batches, eq(batchMaterials.batchId, batches.id))
+    .innerJoin(products, eq(batches.productId, products.id))
+    .where(eq(batchMaterials.lotId, lotId));
+
+    const sourceUsage = await db.select({
+      bm: batchMaterials,
+      batch: batches,
+      product: products,
+    })
+    .from(batchMaterials)
+    .innerJoin(batches, eq(batchMaterials.batchId, batches.id))
+    .innerJoin(products, eq(batches.productId, products.id))
+    .where(eq(batchMaterials.sourceLotId, lotId));
+
+    const seen = new Set<string>();
+    const allUsage = [...directUsage, ...sourceUsage].filter(row => {
+      if (seen.has(row.bm.id)) return false;
+      seen.add(row.bm.id);
+      return true;
+    });
+
+    return allUsage.map(row => ({
+      batchId: row.batch.id,
+      batchNumber: row.batch.batchNumber,
+      batchStatus: row.batch.status,
+      productId: row.product.id,
+      productName: row.product.name,
+      quantityConsumed: row.bm.quantity,
+      addedAt: row.bm.addedAt,
+    }));
+  }
+
+  async getLotLineage(lotId: string): Promise<any> {
+    const lot = await this.getLot(lotId);
+    if (!lot) return null;
+
+    let sourceBatch = null;
+    let sourceInputLots: any[] = [];
+    if (lot.sourceBatchId) {
+      sourceBatch = await this.getBatch(lot.sourceBatchId);
+      if (sourceBatch) {
+        sourceInputLots = await this.getBatchInputLots(lot.sourceBatchId);
+      }
+    }
+
+    const usedInBatches = await this.getLotUsage(lotId);
+
+    const outputLots: any[] = [];
+    for (const usage of usedInBatches) {
+      const batchOutputLotsResult = await this.getBatchOutputLots(usage.batchId);
+      outputLots.push(...batchOutputLotsResult);
+    }
+
+    return {
+      lot,
+      sourceBatch,
+      sourceInputLots,
+      usedInBatches,
+      outputLots,
+    };
   }
 
   async getRecipes(): Promise<Recipe[]> {
@@ -728,12 +1035,11 @@ export class DatabaseStorage implements IStorage {
     const [batch] = await db.select().from(batches).where(eq(batches.id, batchId));
     if (!batch) throw new Error("Batch not found");
     
-    // Calculate total output from batch outputs
     const outputs = await this.getBatchOutputs(batchId);
     const totalOutput = outputs.reduce((sum, o) => sum + parseFloat(o.quantity), 0);
     
     const updateData: Partial<InsertBatch> = {
-      actualQuantity: totalOutput.toFixed(2),
+      actualQuantity: totalOutput.toFixed(3),
       wasteQuantity,
       millingQuantity,
       wetQuantity,
@@ -745,6 +1051,44 @@ export class DatabaseStorage implements IStorage {
     }
     
     const [updated] = await db.update(batches).set(updateData).where(eq(batches.id, batchId)).returning();
+    
+    if (markCompleted) {
+      const now = new Date();
+      for (const output of outputs) {
+        const existingLots = await db.select().from(lots).where(
+          and(eq(lots.sourceBatchId, batchId), eq(lots.productId, output.productId))
+        );
+        if (existingLots.length === 0) {
+          const lotNumber = generateLotNumber("FG");
+          const barcodeValue = generateBarcodeValue();
+          const [finishedLot] = await db.insert(lots).values({
+            lotNumber,
+            lotType: "finished_good",
+            status: "active",
+            barcodeValue,
+            productId: output.productId,
+            quantity: output.quantity,
+            remainingQuantity: output.quantity,
+            producedDate: now,
+            sourceBatchId: batchId,
+          }).returning();
+          await this.createStockMovement({
+            movementType: "production_output",
+            productId: output.productId,
+            lotId: finishedLot.id,
+            batchId,
+            quantity: output.quantity,
+            reference: `Finished lot created: ${finishedLot.lotNumber}`,
+          });
+          await this.createAuditLog({
+            entityType: "lot",
+            entityId: finishedLot.id,
+            action: "finished_lot_created",
+            changes: JSON.stringify({ lotNumber, barcodeValue, productId: output.productId, quantity: output.quantity, sourceBatchId: batchId }),
+          });
+        }
+      }
+    }
     
     await this.createAuditLog({
       entityType: "batch",
@@ -792,23 +1136,25 @@ export class DatabaseStorage implements IStorage {
         const [existingLot] = await db.select().from(lots).where(eq(lots.sourceBatchId, batchId));
         
         if (existingLot) {
-          // Update existing lot quantity
-          const newLotQty = (parseFloat(existingLot.quantity) + delta).toFixed(2);
-          const newRemainingQty = (parseFloat(existingLot.remainingQuantity || "0") + delta).toFixed(2);
+          const newLotQty = (parseFloat(existingLot.quantity) + delta).toFixed(3);
+          const newRemainingQty = (parseFloat(existingLot.remainingQuantity || "0") + delta).toFixed(3);
           await db.update(lots).set({ 
             quantity: newLotQty,
             remainingQuantity: newRemainingQty
           }).where(eq(lots.id, existingLot.id));
         } else {
-          // Create new finished goods lot
-          const lotNumber = `LOT-${updated.batchNumber.replace("BATCH-", "")}`;
+          const lotNumber = generateLotNumber("FG");
+          const barcodeValue = generateBarcodeValue();
           await db.insert(lots).values({
             lotNumber,
+            lotType: "finished_good",
+            status: "active",
+            barcodeValue,
             productId: batch.productId,
             quantity: actualQuantity,
             remainingQuantity: actualQuantity,
+            producedDate: new Date(),
             sourceBatchId: batchId,
-            receivedDate: new Date(),
           });
         }
         

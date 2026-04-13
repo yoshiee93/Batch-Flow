@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import type { ReceiveStockInput } from "./storage";
 import {
   insertProductSchema, insertMaterialSchema, insertLotSchema,
   insertRecipeSchema, insertRecipeItemSchema, insertBatchSchema,
@@ -124,14 +125,42 @@ export async function registerRoutes(
     res.json(lots);
   }));
 
+  app.get("/api/lots/barcode/:value", asyncHandler(async (req, res) => {
+    const lot = await storage.getLotByBarcode(req.params.value);
+    if (!lot) return res.status(404).json({ error: "Lot not found for barcode" });
+    res.json(lot);
+  }));
+
   app.get("/api/lots/:id", asyncHandler(async (req, res) => {
     const lot = await storage.getLot(req.params.id);
     if (!lot) return res.status(404).json({ error: "Lot not found" });
     res.json(lot);
   }));
 
+  app.get("/api/lots/:id/usage", asyncHandler(async (req, res) => {
+    const usage = await storage.getLotUsage(req.params.id);
+    res.json(usage);
+  }));
+
+  app.get("/api/lots/:id/lineage", asyncHandler(async (req, res) => {
+    const lineage = await storage.getLotLineage(req.params.id);
+    if (!lineage) return res.status(404).json({ error: "Lot not found" });
+    res.json(lineage);
+  }));
+
+  app.patch("/api/lots/:id/barcode-printed", asyncHandler(async (req, res) => {
+    const lot = await storage.updateLotBarcodePrinted(req.params.id);
+    if (!lot) return res.status(404).json({ error: "Lot not found" });
+    res.json(lot);
+  }));
+
   app.get("/api/materials/:id/lots", asyncHandler(async (req, res) => {
     const lots = await storage.getLotsByMaterial(req.params.id);
+    res.json(lots);
+  }));
+
+  app.get("/api/products/:id/lots", asyncHandler(async (req, res) => {
+    const lots = await storage.getLotsByProduct(req.params.id);
     res.json(lots);
   }));
 
@@ -151,6 +180,27 @@ export async function registerRoutes(
   app.delete("/api/lots/:id", asyncHandler(async (req, res) => {
     await storage.deleteLot(req.params.id);
     res.status(204).send();
+  }));
+
+  const receiveStockSchema = z.object({
+    materialId: z.string().min(1),
+    quantity: z.string().min(1),
+    supplierName: z.string().optional(),
+    supplierLot: z.string().optional(),
+    sourceType: z.enum(["supplier", "farmer", "internal_batch"]).optional(),
+    receivedDate: z.union([z.string(), z.date()]).transform(v => typeof v === "string" ? new Date(v) : v).optional(),
+    expiryDate: z.union([z.string(), z.date()]).transform(v => typeof v === "string" ? new Date(v) : v).optional(),
+    notes: z.string().optional(),
+  });
+
+  app.post("/api/receive-stock", asyncHandler(async (req, res) => {
+    const data = receiveStockSchema.parse(req.body) as ReceiveStockInput;
+    const qty = parseFloat(data.quantity);
+    if (isNaN(qty) || qty <= 0) {
+      return res.status(400).json({ error: "quantity must be a positive number" });
+    }
+    const result = await storage.receiveStock(data);
+    res.status(201).json(result);
   }));
 
   app.get("/api/recipes", asyncHandler(async (req, res) => {
@@ -314,6 +364,34 @@ export async function registerRoutes(
       markCompleted || false
     );
     res.json(batch);
+  }));
+
+  app.get("/api/batches/:id/input-lots", asyncHandler(async (req, res) => {
+    const inputLots = await storage.getBatchInputLots(req.params.id);
+    res.json(inputLots);
+  }));
+
+  app.get("/api/batches/:id/output-lots", asyncHandler(async (req, res) => {
+    const outputLots = await storage.getBatchOutputLots(req.params.id);
+    res.json(outputLots);
+  }));
+
+  app.post("/api/batches/:id/lot-input", asyncHandler(async (req, res) => {
+    const { lotId, quantity } = req.body;
+    if (!lotId || !quantity) {
+      return res.status(400).json({ error: "lotId and quantity are required" });
+    }
+    const qty = parseFloat(quantity);
+    if (isNaN(qty) || qty <= 0) {
+      return res.status(400).json({ error: "quantity must be a positive number" });
+    }
+    try {
+      const batchMaterial = await storage.recordBatchLotInput(req.params.id, lotId, quantity);
+      res.status(201).json(batchMaterial);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to record lot input";
+      res.status(400).json({ error: message });
+    }
   }));
 
   app.get("/api/orders", asyncHandler(async (req, res) => {

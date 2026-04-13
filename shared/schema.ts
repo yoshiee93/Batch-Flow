@@ -9,6 +9,9 @@ export const orderStatusEnum = pgEnum("order_status", ["pending", "in_production
 export const orderPriorityEnum = pgEnum("order_priority", ["low", "normal", "high", "urgent"]);
 export const movementTypeEnum = pgEnum("movement_type", ["receipt", "production_input", "production_output", "adjustment", "shipment"]);
 export const qualityResultEnum = pgEnum("quality_result", ["pass", "fail", "pending"]);
+export const lotTypeEnum = pgEnum("lot_type", ["raw_material", "intermediate", "finished_good"]);
+export const lotStatusEnum = pgEnum("lot_status", ["active", "quarantined", "released", "consumed", "expired"]);
+export const sourceTypeEnum = pgEnum("source_type", ["supplier", "farmer", "internal_batch"]);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -72,15 +75,21 @@ export const materials = pgTable("materials", {
 export const lots = pgTable("lots", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   lotNumber: varchar("lot_number", { length: 50 }).notNull().unique(),
+  lotType: lotTypeEnum("lot_type").notNull().default("raw_material"),
+  status: lotStatusEnum("status").notNull().default("active"),
+  barcodeValue: varchar("barcode_value", { length: 100 }).unique(),
   materialId: varchar("material_id").references(() => materials.id),
   productId: varchar("product_id").references(() => products.id),
   supplierLot: varchar("supplier_lot", { length: 100 }),
   supplierName: text("supplier_name"),
+  sourceType: sourceTypeEnum("source_type"),
   quantity: decimal("quantity", { precision: 12, scale: 3 }).notNull(),
   remainingQuantity: decimal("remaining_quantity", { precision: 12, scale: 3 }).notNull(),
   expiryDate: timestamp("expiry_date"),
   receivedDate: timestamp("received_date").notNull().defaultNow(),
+  producedDate: timestamp("produced_date"),
   sourceBatchId: varchar("source_batch_id"),
+  barcodePrintedAt: timestamp("barcode_printed_at"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -338,6 +347,9 @@ export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertQualityCheck = z.infer<typeof insertQualityCheckSchema>;
 export type QualityCheck = typeof qualityChecks.$inferSelect;
 export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;
+export type LotType = "raw_material" | "intermediate" | "finished_good";
+export type LotStatus = "active" | "quarantined" | "released" | "consumed" | "expired";
+export type SourceType = "supplier" | "farmer" | "internal_batch";
 export type StockMovement = typeof stockMovements.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
