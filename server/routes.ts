@@ -309,9 +309,10 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Provide either materialId or productId, not both" });
     }
     
+    const { lotId } = req.body;
     let batchMaterial;
     if (materialId) {
-      batchMaterial = await storage.recordBatchInput(req.params.id, materialId, quantity);
+      batchMaterial = await storage.recordBatchInput(req.params.id, materialId, quantity, lotId || null);
     } else {
       batchMaterial = await storage.recordBatchProductInput(req.params.id, productId, quantity, sourceLotId);
     }
