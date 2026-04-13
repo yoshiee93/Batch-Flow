@@ -1101,8 +1101,17 @@ export class DatabaseStorage implements IStorage {
             producedDate: now,
             sourceBatchId: batchId,
           }).returning();
-          // Note: stock movement for product output was already created by addBatchOutput.
-          // We only link the lot to the existing stock movement context here via audit.
+          // Create a lot-linked production_output movement so that the finished lot
+          // is traceable in stock movement history. The earlier addBatchOutput movement
+          // was not lot-aware (lot did not exist at that point).
+          await this.createStockMovement({
+            movementType: "production_output",
+            productId: output.productId,
+            lotId: finishedLot.id,
+            batchId,
+            quantity: output.quantity,
+            reference: `Finished lot assigned: ${finishedLot.lotNumber}`,
+          });
           await this.createAuditLog({
             entityType: "lot",
             entityId: finishedLot.id,

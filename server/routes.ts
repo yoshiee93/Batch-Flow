@@ -186,6 +186,7 @@ export async function registerRoutes(
     materialId: z.string().min(1),
     quantity: z.string().min(1),
     supplierName: z.string().optional(),
+    sourceName: z.string().optional(),
     supplierLot: z.string().optional(),
     sourceType: z.enum(["supplier", "farmer", "internal_batch"]).optional(),
     receivedDate: z.union([z.string(), z.date()]).transform(v => typeof v === "string" ? new Date(v) : v).optional(),
@@ -310,9 +311,13 @@ export async function registerRoutes(
     }
     
     const { lotId } = req.body;
+    // Material inputs MUST reference a specific lot for full traceability compliance
+    if (materialId && !lotId) {
+      return res.status(400).json({ error: "lotId is required for material inputs (lot-based compliance)" });
+    }
     let batchMaterial;
     if (materialId) {
-      batchMaterial = await storage.recordBatchInput(req.params.id, materialId, quantity, lotId || null);
+      batchMaterial = await storage.recordBatchInput(req.params.id, materialId, quantity, lotId);
     } else {
       batchMaterial = await storage.recordBatchProductInput(req.params.id, productId, quantity, sourceLotId);
     }
