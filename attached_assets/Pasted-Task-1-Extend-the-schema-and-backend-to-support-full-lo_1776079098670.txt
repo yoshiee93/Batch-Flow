@@ -1,0 +1,79 @@
+Task 1: Extend the schema and backend to support full lot-based compliance traceability
+
+Goal:
+Build the backend and data model changes required for lot-based receiving, barcode tracking, production consumption, finished lot creation, and detailed batch traceability.
+
+What already exists:
+The platform already includes products, materials, lots, batches, batch materials, batch outputs, stock movements, audit logs, and traceability logic. Extend these rather than replacing them.
+
+Requirements:
+
+1. Extend the lots model
+Add or confirm support for fields like:
+- lotType: raw_material | intermediate | finished_good
+- barcodeValue
+- status: active | quarantined | released | consumed | expired
+- sourceType: supplier | farmer | internal_batch
+- sourceName
+- supplierLot
+- receivedDate
+- producedDate
+- expiryDate if applicable
+- remainingQuantity
+- originalQuantity
+- location or locationId
+- barcodePrintedAt
+- notes
+
+2. Support goods received creation
+Add backend support for receiving raw stock as a proper intake action.
+This should:
+- create a lot
+- generate a unique internal lot number
+- generate a barcode value
+- create a stock movement entry
+- increase inventory
+
+3. Enforce lot-based production inputs
+Ensure production consumption ties to a specific lot, not just a generic material/product.
+Consumption must:
+- validate that the lot exists
+- validate enough remaining quantity
+- reduce remaining quantity
+- create stock movement records
+- preserve batch-to-lot traceability
+
+4. Finished output lot generation
+When a batch is finalized, create finished output lot records automatically.
+Each finished lot must:
+- reference the source batch
+- get a unique lot number
+- get a barcode value
+- record quantity and produced date
+- create stock movement entries
+
+5. Traceability query expansion
+Add or expand backend methods so the system can:
+- open a batch and list all input lots and all output lots
+- open a lot and see where it came from
+- open a lot and see what it was used in
+- move forward and backward through lot lineage
+
+6. Auditability
+Ensure all receive, consume, finalize, and print-related actions can be audited where appropriate.
+
+Deliverables:
+- schema updates
+- drizzle migration(s)
+- storage/repository updates
+- route/controller updates
+- helper utilities for lot number and barcode generation
+- traceability query support for detailed views
+
+Acceptance criteria:
+- raw stock can be received as a lot
+- lots have barcode values
+- batch inputs are tied to exact lots
+- finished lots are created from completed batches
+- traceability data can be queried in both directions
+- inventory quantities remain accurate

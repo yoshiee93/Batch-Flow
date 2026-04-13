@@ -1,0 +1,53 @@
+You are working on an existing React + TypeScript + Express + Drizzle/Postgres application called BatchMaster.
+
+Before making changes:
+- Inspect the existing schema, routes, storage layer, API client, inventory pages, production pages, and traceability pages
+- Reuse the current architecture wherever possible
+- Extend existing models and flows instead of replacing them
+- Do not create duplicate systems if a lot/batch/stock movement/traceability structure already exists
+- Keep the current app functional while adding the new compliance workflows
+
+Business objective:
+Expand the platform into a full lot-based inventory and compliance traceability system.
+
+Core rule:
+Inventory must be tracked by lot, not just by item.
+Every received raw stock item must become a unique lot with its own source, quantity, barcode, status, and history.
+Production inputs must consume exact lots.
+Finished outputs must become new lots with their own barcode and full traceability back to all source lots.
+
+Required real-world workflow:
+1. User receives raw stock into inventory
+2. User records source details such as supplier/farmer, supplier lot, quantity, date, and notes
+3. System generates a unique internal lot number and barcode
+4. User can print a barcode label
+5. During production, staff scan the barcode and consume that exact lot
+6. When production is completed, the finished goods receive a new lot number and barcode
+7. Users can open a batch or lot and view complete backward and forward traceability
+
+Implementation constraints:
+- Extend the current schema and APIs rather than replacing them
+- Preserve existing batch, lot, and stock movement logic where possible
+- Keep the system production-ready, not mock/demo quality
+- Preserve auditability for compliance purposes
+- Prefer clear server-side business rules and validations
+- Keep UI consistent with the current design system
+
+Expected major outcomes:
+- goods received workflow
+- barcode generation and printable labels
+- lot-based production input scanning
+- finished lot generation on batch completion
+- batch tracking detail page
+- lot/barcode search and traceability lookup
+
+Barcode/scanning implementation notes:
+- Use a library suitable for browser barcode generation such as JsBarcode or bwip-js
+- Design scanning so handheld scanners can act as keyboard input into focused fields
+- Camera scanning can be added later if needed, but the first workflow should work well with USB/Bluetooth scanners
+
+When working on each task:
+- First inspect existing files that are relevant
+- Then make targeted changes
+- Keep file changes minimal and intentional
+- After changes, explain what was updated and any migrations or setup needed

@@ -1,0 +1,41 @@
+Project overview:
+
+Expand the existing BatchMaster platform into a full compliance-focused inventory and traceability system based on lot control and barcode workflows.
+
+The platform already has a strong foundation with products, materials, lots, batches, batch inputs, batch outputs, stock movements, audit logs, inventory pages, production pages, and traceability APIs. This work should extend the current architecture rather than replace it.
+
+Business goal:
+The client needs end-to-end compliance traceability for stock and production.
+
+Required real-world workflow:
+1. Raw stock is received into inventory and recorded with source details such as supplier/farmer, supplier lot, quantity, date, and notes.
+2. The system generates a unique internal lot number and barcode for that received stock.
+3. A barcode label can be printed and attached to the stock.
+4. When stock is used in production, staff scan the barcode and consume that exact lot as an input.
+5. The finished product generated from that production run must receive a new unique lot number and barcode.
+6. The system must preserve backward and forward traceability between raw lots, production batches, and finished lots.
+7. Users must be able to open a batch or search/scan a lot and see the full chain of custody and usage history.
+
+Core system rule:
+Inventory must be tracked by lot, not only by item.
+A single item/material may have multiple lots, each with its own source, quantity, barcode, status, and history.
+Production inputs must be tied to exact lots.
+Finished outputs must become new lots.
+
+Implementation expectations:
+- Extend the existing schema, storage layer, APIs, and pages
+- Reuse current lot, batch, stock movement, and traceability logic where possible
+- Do not break current production, inventory, dashboard, or traceability flows
+- Build production-ready workflows, not placeholder/demo screens
+- Preserve auditability for compliance reporting
+
+Main functional outcomes:
+- Goods received workflow for raw stock intake
+- Barcode generation and label printing for lots
+- Scan/input workflow for consuming exact lots in production
+- Automatic finished output lot generation on batch completion
+- Detailed batch tracking page
+- Search/traceability page for barcode or lot lookup
+
+Acceptance goal:
+A user should be able to receive stock, label it, scan it into production, create a finished lot, and later inspect either the batch or lot to see complete traceability in both directions.
