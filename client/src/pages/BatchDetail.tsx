@@ -15,9 +15,13 @@ import {
 import { format } from 'date-fns';
 
 const batchStatusColors: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-800',
+  planned: 'bg-gray-100 text-gray-700',
+  pending: 'bg-gray-100 text-gray-700',
   in_progress: 'bg-blue-100 text-blue-800',
+  quality_check: 'bg-yellow-100 text-yellow-800',
   completed: 'bg-green-100 text-green-800',
+  released: 'bg-emerald-100 text-emerald-800',
+  quarantined: 'bg-orange-100 text-orange-800',
   cancelled: 'bg-red-100 text-red-800',
 };
 
@@ -36,7 +40,7 @@ const movementLabels: Record<string, string> = {
   shipment: 'Shipped',
 };
 
-const outflowTypes = new Set(['production_input', 'adjustment', 'shipment']);
+const inflowTypes = new Set(['receipt', 'production_output']);
 
 function fmtQty(q: string | null | undefined, unit = 'KG') {
   if (!q) return '—';
@@ -335,8 +339,10 @@ export default function BatchDetail() {
           ) : (
             <div className="space-y-2">
               {movements.map((mv: StockMovement) => {
-                const isOut = outflowTypes.has(mv.movementType);
-                const absQty = Math.abs(parseFloat(mv.quantity)).toFixed(2);
+                const rawQty = parseFloat(mv.quantity);
+                const isInflow = inflowTypes.has(mv.movementType) || (mv.movementType === 'adjustment' && rawQty > 0);
+                const isOut = !isInflow;
+                const absQty = Math.abs(rawQty).toFixed(2);
                 return (
                   <div key={mv.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 text-sm" data-testid={`row-movement-${mv.id}`}>
                     <div className="space-y-0.5">

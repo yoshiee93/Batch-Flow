@@ -30,9 +30,13 @@ const lotTypeLabels: Record<string, string> = {
 };
 
 const batchStatusColors: Record<string, string> = {
+  planned: 'bg-gray-100 text-gray-700',
   pending: 'bg-gray-100 text-gray-700',
   in_progress: 'bg-blue-100 text-blue-700',
+  quality_check: 'bg-yellow-100 text-yellow-700',
   completed: 'bg-green-100 text-green-700',
+  released: 'bg-emerald-100 text-emerald-700',
+  quarantined: 'bg-orange-100 text-orange-700',
   cancelled: 'bg-red-100 text-red-700',
 };
 
