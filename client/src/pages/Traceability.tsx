@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Search, ArrowRight, ArrowLeft, Box, Factory, Loader2, AlertCircle, Barcode } from 'lucide-react';
-import { useLots, useBatches, useTraceabilityForward, useTraceabilityBackward, fetchLotByBarcode } from '@/lib/api';
+import { useLots, useBatches, useMaterials, useProducts, useTraceabilityForward, useTraceabilityBackward, fetchLotByBarcode } from '@/lib/api';
 
 export default function Traceability() {
   const search = useSearch();
@@ -20,6 +20,8 @@ export default function Traceability() {
 
   const { data: lots = [] } = useLots();
   const { data: batches = [] } = useBatches();
+  const { data: materials = [] } = useMaterials();
+  const { data: products = [] } = useProducts();
 
   const { data: forwardTrace, isLoading: forwardLoading, isError: forwardError } = useTraceabilityForward(
     searchId?.type === 'lot' ? searchId.id : ''
@@ -132,7 +134,7 @@ export default function Traceability() {
       )}
 
       {forwardTrace && searchId?.type === 'lot' && !hasError && (
-        <ForwardTraceView trace={forwardTrace} />
+        <ForwardTraceView trace={forwardTrace} materials={materials} products={products} />
       )}
 
       {backwardTrace && searchId?.type === 'batch' && !hasError && (
@@ -150,12 +152,26 @@ export default function Traceability() {
   );
 }
 
-function ForwardTraceView({ trace }: { trace: Record<string, unknown> }) {
+const lotTypeLabels: Record<string, string> = {
+  raw_material: 'Raw Material',
+  intermediate: 'Intermediate',
+  finished_good: 'Finished Good',
+};
+
+function ForwardTraceView({ trace, materials, products }: { trace: Record<string, unknown>; materials: Array<{ id: string; name: string }>; products: Array<{ id: string; name: string }> }) {
   const lot = trace.lot as Record<string, unknown> | undefined;
   if (!lot) return null;
 
+  const usedInBatches = (trace.usedInBatches as Array<Record<string, unknown>>) ?? [];
+  const outputLots = (trace.outputLots as Array<Record<string, unknown>>) ?? [];
+  const lotType = (lot.lotType as string) ?? '';
+  const sourceDesc = (lot.supplierName as string) || (lot.sourceName as string) || ((lot.sourceBatchId as string) ? 'Internally produced' : 'External receipt');
+  const material = (lot.materialId as string) ? materials.find(m => m.id === lot.materialId) : null;
+  const product = (lot.productId as string) ? products.find(p => p.id === lot.productId) : null;
+  const itemName = material?.name || product?.name || (lot.lotNumber as string);
+
   return (
-    <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
       <Card className="border-l-4 border-l-primary">
         <CardHeader>
           <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -165,10 +181,9 @@ function ForwardTraceView({ trace }: { trace: Record<string, unknown> }) {
                 Lot: {lot.lotNumber as string}
               </CardTitle>
               <CardDescription className="font-mono flex gap-3 flex-wrap mt-1">
-                <span>Qty: {parseFloat(lot.quantity as string).toFixed(2)} KG</span>
-                <span>Remaining: {parseFloat(lot.remainingQuantity as string).toFixed(2)} KG</span>
-                {(lot.supplierLot as string) && <span>Supplier Lot: {lot.supplierLot as string}</span>}
                 {(lot.barcodeValue as string) && <Badge variant="outline" className="font-mono text-xs">{lot.barcodeValue as string}</Badge>}
+                {lotType && <Badge variant="secondary" className="text-xs">{lotTypeLabels[lotType] ?? lotType}</Badge>}
+                <Badge variant={lot.status === 'active' ? 'default' : 'secondary'} className="text-xs">{lot.status as string}</Badge>
               </CardDescription>
             </div>
             <Link href={`/lots/${lot.id}`}>
@@ -176,6 +191,40 @@ function ForwardTraceView({ trace }: { trace: Record<string, unknown> }) {
             </Link>
           </div>
         </CardHeader>
+        <CardContent className="pt-0">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-sm py-2 border rounded-lg px-4 bg-muted/30">
+            <div>
+              <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Item</div>
+              <div>{itemName}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Quantity</div>
+              <div className="font-mono">{parseFloat(lot.quantity as string).toFixed(2)} KG</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Remaining</div>
+              <div className="font-mono">{parseFloat(lot.remainingQuantity as string).toFixed(2)} KG</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Source</div>
+              <div>{sourceDesc}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Used in</div>
+              <div>{usedInBatches.length} batch{usedInBatches.length !== 1 ? 'es' : ''}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Contributed to</div>
+              <div>{outputLots.length} output lot{outputLots.length !== 1 ? 's' : ''}</div>
+            </div>
+            {(lot.supplierLot as string) && (
+              <div>
+                <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Supplier Lot</div>
+                <div className="font-mono">{lot.supplierLot as string}</div>
+              </div>
+            )}
+          </div>
+        </CardContent>
         <CardContent>
           <div className="relative border-l-2 border-dashed border-border ml-6 pl-8 py-2 space-y-8">
 

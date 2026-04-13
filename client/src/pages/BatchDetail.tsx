@@ -9,7 +9,7 @@ import {
   TrendingDown, ArrowRightLeft, ExternalLink
 } from 'lucide-react';
 import {
-  useBatch, useProducts, useBatchInputLots, useBatchOutputLots, useStockMovements,
+  useBatch, useProducts, useBatchInputLots, useBatchOutputLots, useStockMovements, useRecipes,
   type InputLot, type OutputLot, type StockMovement
 } from '@/lib/api';
 import { format } from 'date-fns';
@@ -29,13 +29,14 @@ const lotStatusColors: Record<string, string> = {
 };
 
 const movementLabels: Record<string, string> = {
-  receive: 'Received',
-  consume: 'Consumed',
-  produce: 'Produced',
-  adjust: 'Adjusted',
-  ship: 'Shipped',
-  transfer: 'Transferred',
+  receipt: 'Received',
+  production_input: 'Consumed (Input)',
+  production_output: 'Produced (Output)',
+  adjustment: 'Adjusted',
+  shipment: 'Shipped',
 };
+
+const outflowTypes = new Set(['production_input', 'adjustment', 'shipment']);
 
 function fmtQty(q: string | null | undefined, unit = 'KG') {
   if (!q) return '—';
@@ -51,6 +52,7 @@ export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: batch, isLoading: batchLoading, isError } = useBatch(id!);
   const { data: products = [] } = useProducts();
+  const { data: recipes = [] } = useRecipes();
   const { data: inputLots = [], isLoading: inputsLoading } = useBatchInputLots(id!);
   const { data: outputLots = [], isLoading: outputsLoading } = useBatchOutputLots(id!);
   const { data: movements = [], isLoading: movementsLoading } = useStockMovements(id!);
@@ -77,6 +79,7 @@ export default function BatchDetail() {
   }
 
   const product = products.find(p => p.id === batch.productId);
+  const recipe = batch.recipeId ? recipes.find(r => r.id === batch.recipeId) : null;
   const statusClass = batchStatusColors[batch.status] || 'bg-gray-100 text-gray-800';
   const statusLabel = batch.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
 
@@ -126,6 +129,15 @@ export default function BatchDetail() {
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Assigned To</div>
                 <div>{batch.assignedTo || '—'}</div>
+              </div>
+              <div className="col-span-2 sm:col-span-3">
+                <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Recipe</div>
+                <div>
+                  {recipe
+                    ? <>{recipe.name} <span className="text-xs text-muted-foreground font-mono">(v{recipe.version})</span></>
+                    : <span className="text-muted-foreground">—</span>
+                  }
+                </div>
               </div>
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Planned Qty</div>
@@ -323,13 +335,14 @@ export default function BatchDetail() {
           ) : (
             <div className="space-y-2">
               {movements.map((mv: StockMovement) => {
-                const isOut = ['consume', 'ship', 'adjust'].includes(mv.movementType);
+                const isOut = outflowTypes.has(mv.movementType);
+                const absQty = Math.abs(parseFloat(mv.quantity)).toFixed(2);
                 return (
                   <div key={mv.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 text-sm" data-testid={`row-movement-${mv.id}`}>
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
                         <TrendingDown className={`h-3.5 w-3.5 ${isOut ? 'text-red-500' : 'text-green-500 rotate-180'}`} />
-                        <span className="font-medium">{movementLabels[mv.movementType] ?? mv.movementType}</span>
+                        <span className="font-medium">{movementLabels[mv.movementType] ?? mv.movementType.replace('_', ' ')}</span>
                       </div>
                       {mv.reference && (
                         <div className="text-xs text-muted-foreground">{mv.reference}</div>
@@ -337,7 +350,7 @@ export default function BatchDetail() {
                       <div className="text-xs text-muted-foreground">{fmtDate(mv.createdAt, 'dd MMM yyyy, h:mm a')}</div>
                     </div>
                     <div className={`font-mono font-medium ${isOut ? 'text-red-600' : 'text-green-600'}`}>
-                      {isOut ? '-' : '+'}{parseFloat(mv.quantity).toFixed(2)}
+                      {isOut ? '-' : '+'}{absQty}
                     </div>
                   </div>
                 );
