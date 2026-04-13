@@ -58,6 +58,9 @@ The backend structure includes `server/index.ts` for app setup, `server/routes.t
 - Dashboard statistics (`GET /api/dashboard/stats`).
 - Category management (`GET/POST/PATCH/DELETE /api/categories`).
 
+### Pages
+- **BatchDetail** (`/batches/:id`): Shows batch overview (dates, quantities, yield), all input lots consumed (lot number, supplier, expiry, barcode), all output products, and links to full lot traceability. Accessible via "View Detail" from Production page dropdown.
+
 ### UI/UX Decisions
 - Responsive design for mobile, tablet, and desktop.
 - Searchable dropdowns for product/material selection.

@@ -7,28 +7,67 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Package, Box, Layers } from 'lucide-react';
+import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Package, Box, Layers, Printer, QrCode, CheckCircle2, Download } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
   useMaterials, useProducts, useCategories, useLots,
-  useUpdateMaterial, useDeleteMaterial, 
+  useUpdateMaterial, useDeleteMaterial,
   useCreateProduct, useUpdateProduct, useDeleteProduct,
-  type Material, type Product, type Category, type Lot
+  useReceiveStock, useMarkBarcodePrinted,
+  type Material, type Product, type Category, type Lot, type LotWithDetails,
 } from '@/lib/api';
+import { printBarcodeLabel } from '@/lib/barcodePrint';
 import { useToast } from '@/hooks/use-toast';
+
+const EMPTY_RECEIVE_FORM = {
+  materialId: '',
+  quantity: '',
+  supplierName: '',
+  sourceName: '',
+  supplierLot: '',
+  sourceType: '' as '' | 'supplier' | 'farmer' | 'internal_batch',
+  receivedDate: format(new Date(), 'yyyy-MM-dd'),
+  expiryDate: '',
+  notes: '',
+};
+
+function getLotStatusBadge(status: string | null) {
+  switch (status) {
+    case 'active': return <Badge className="bg-green-100 text-green-800 border-green-300">Active</Badge>;
+    case 'consumed': return <Badge variant="secondary">Consumed</Badge>;
+    case 'quarantined': return <Badge variant="destructive">Quarantined</Badge>;
+    case 'released': return <Badge className="bg-blue-100 text-blue-800 border-blue-300">Released</Badge>;
+    case 'expired': return <Badge variant="outline" className="text-amber-600">Expired</Badge>;
+    default: return <Badge variant="outline">{status || 'Unknown'}</Badge>;
+  }
+}
+
+function getLotTypeBadge(lotType: string | null) {
+  switch (lotType) {
+    case 'raw_material': return <Badge variant="outline" className="text-xs">Raw Mat.</Badge>;
+    case 'finished_good': return <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">Fin. Good</Badge>;
+    case 'intermediate': return <Badge variant="outline" className="text-xs text-purple-600 border-purple-200">Inter.</Badge>;
+    default: return null;
+  }
+}
 
 export default function Inventory() {
   const [activeTab, setActiveTab] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [lotSearchTerm, setLotSearchTerm] = useState('');
+
   const [isEditMaterialOpen, setIsEditMaterialOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [materialForm, setMaterialForm] = useState({
     sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: '' as string | null,
   });
-  
+
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -36,58 +75,103 @@ export default function Inventory() {
     sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: '' as string | null,
   });
 
+  const [isReceiveStockOpen, setIsReceiveStockOpen] = useState(false);
+  const [receiveForm, setReceiveForm] = useState(EMPTY_RECEIVE_FORM);
+  const [receivedLot, setReceivedLot] = useState<LotWithDetails | null>(null);
+  const [materialSearchOpen, setMaterialSearchOpen] = useState(false);
+
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
   const { data: lots = [], isLoading: lotsLoading } = useLots();
-  
+
   const updateMaterial = useUpdateMaterial();
   const deleteMaterial = useDeleteMaterial();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
+  const receiveStock = useReceiveStock();
+  const markBarcodePrinted = useMarkBarcodePrinted();
   const { toast } = useToast();
 
   const isLoading = materialsLoading || productsLoading || lotsLoading;
   const hasError = materialsError || productsError;
-  
+
   const visibleCategories = categories.filter(c => c.showInTabs);
-  
+
   useEffect(() => {
     if (visibleCategories.length > 0 && !activeTab) {
       setActiveTab(`cat-${visibleCategories[0].id}`);
     }
   }, [visibleCategories, activeTab]);
 
-  const filteredMaterials = materials.filter(m => 
-    m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredMaterials = materials.filter(m =>
+    m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (m.sku && m.sku.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const getMaterialName = (materialId: string | null) => {
-    if (!materialId) return null;
-    const material = materials.find(m => m.id === materialId);
-    return material?.name || 'Unknown Material';
-  };
-
-  const getProductName = (productId: string | null) => {
-    if (!productId) return null;
-    const product = products.find(p => p.id === productId);
-    return product?.name || 'Unknown Product';
-  };
-
-  const getLotItemName = (lot: Lot) => {
+  const filteredLots = (lots as Lot[]).filter(lot => {
+    if (!lotSearchTerm) return true;
+    const term = lotSearchTerm.toLowerCase();
     const materialName = getMaterialName(lot.materialId);
     const productName = getProductName(lot.productId);
-    return materialName || productName || 'Unassigned';
-  };
+    return (
+      lot.lotNumber.toLowerCase().includes(term) ||
+      (lot.barcodeValue && lot.barcodeValue.toLowerCase().includes(term)) ||
+      (materialName && materialName.toLowerCase().includes(term)) ||
+      (productName && productName.toLowerCase().includes(term)) ||
+      (lot.supplierName && lot.supplierName.toLowerCase().includes(term)) ||
+      (lot.sourceName && lot.sourceName.toLowerCase().includes(term))
+    );
+  });
+
+  function getMaterialName(materialId: string | null) {
+    if (!materialId) return null;
+    return materials.find(m => m.id === materialId)?.name || 'Unknown';
+  }
+
+  function getProductName(productId: string | null) {
+    if (!productId) return null;
+    return products.find(p => p.id === productId)?.name || 'Unknown';
+  }
+
+  function getLotItemName(lot: Lot) {
+    return getMaterialName(lot.materialId) || getProductName(lot.productId) || 'Unassigned';
+  }
+
+  function getLotUnit(lot: Lot): string {
+    if (lot.materialId) return materials.find(m => m.id === lot.materialId)?.unit || 'KG';
+    if (lot.productId) return products.find(p => p.id === lot.productId)?.unit || 'KG';
+    return 'KG';
+  }
+
+  function handlePrintLabel(lot: Lot) {
+    const itemName = getLotItemName(lot);
+    const unit = getLotUnit(lot);
+    const sourceLabel = lot.supplierName || lot.sourceName || undefined;
+    printBarcodeLabel({
+      lotNumber: lot.lotNumber,
+      barcodeValue: lot.barcodeValue,
+      itemName,
+      quantity: lot.originalQuantity || lot.quantity,
+      unit,
+      sourceLabel,
+      receivedDate: lot.receivedDate,
+      expiryDate: lot.expiryDate,
+      supplierLot: lot.supplierLot,
+    });
+    if (!lot.barcodePrintedAt) {
+      markBarcodePrinted.mutate(lot.id);
+    }
+  }
 
   const resetMaterialForm = () => setMaterialForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null });
+  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null });
 
   const handleEditMaterialClick = (material: Material) => {
     setSelectedMaterial(material);
@@ -107,11 +191,11 @@ export default function Inventory() {
         unit: materialForm.unit, minStock: materialForm.minStock, currentStock: materialForm.currentStock,
         categoryId: materialForm.categoryId || null,
       });
-      toast({ title: "Material updated", description: `Material ${materialForm.name} updated successfully` });
+      toast({ title: "Material updated", description: `${materialForm.name} updated successfully` });
       setIsEditMaterialOpen(false);
       setSelectedMaterial(null);
       resetMaterialForm();
-    } catch (error) {
+    } catch {
       toast({ title: "Error", description: "Failed to update material", variant: "destructive" });
     }
   };
@@ -119,29 +203,24 @@ export default function Inventory() {
   const handleDeleteMaterial = async (material: Material) => {
     try {
       await deleteMaterial.mutateAsync(material.id);
-      toast({ title: "Material deleted", description: `Material ${material.name} has been removed` });
-    } catch (error) {
+      toast({ title: "Material deleted", description: `${material.name} has been removed` });
+    } catch {
       toast({ title: "Error", description: "Failed to delete material", variant: "destructive" });
     }
   };
 
-  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null });
-
   const handleCreateProduct = async () => {
-    if (!productForm.name) {
-      toast({ title: "Missing fields", description: "Please fill in Name", variant: "destructive" });
-      return;
-    }
+    if (!productForm.name) return;
     try {
       await createProduct.mutateAsync({
         sku: productForm.sku, name: productForm.name, description: productForm.description || null,
-        unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock, 
-        categoryId: productForm.categoryId || null, active: true,
+        unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock,
+        categoryId: productForm.categoryId || null,
       });
-      toast({ title: "Product created", description: `Product ${productForm.name} created successfully` });
+      toast({ title: "Product created", description: `${productForm.name} added to inventory` });
       setIsCreateProductOpen(false);
       resetProductForm();
-    } catch (error) {
+    } catch {
       toast({ title: "Error", description: "Failed to create product", variant: "destructive" });
     }
   };
@@ -164,11 +243,11 @@ export default function Inventory() {
         unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock,
         categoryId: productForm.categoryId || null,
       });
-      toast({ title: "Product updated", description: `Product ${productForm.name} updated successfully` });
+      toast({ title: "Product updated", description: `${productForm.name} updated successfully` });
       setIsEditProductOpen(false);
       setSelectedProduct(null);
       resetProductForm();
-    } catch (error) {
+    } catch {
       toast({ title: "Error", description: "Failed to update product", variant: "destructive" });
     }
   };
@@ -176,10 +255,53 @@ export default function Inventory() {
   const handleDeleteProduct = async (product: Product) => {
     try {
       await deleteProduct.mutateAsync(product.id);
-      toast({ title: "Product deleted", description: `Product ${product.name} has been removed` });
-    } catch (error) {
+      toast({ title: "Product deleted", description: `${product.name} has been removed` });
+    } catch {
       toast({ title: "Error", description: "Failed to delete product", variant: "destructive" });
     }
+  };
+
+  const handleReceiveStock = async () => {
+    if (!receiveForm.materialId || !receiveForm.quantity) {
+      toast({ title: "Missing fields", description: "Please select a material and enter quantity", variant: "destructive" });
+      return;
+    }
+    const qty = parseFloat(receiveForm.quantity);
+    if (isNaN(qty) || qty <= 0) {
+      toast({ title: "Invalid quantity", description: "Quantity must be a positive number", variant: "destructive" });
+      return;
+    }
+    try {
+      const result = await receiveStock.mutateAsync({
+        materialId: receiveForm.materialId,
+        quantity: receiveForm.quantity,
+        supplierName: receiveForm.supplierName || undefined,
+        sourceName: receiveForm.sourceName || undefined,
+        supplierLot: receiveForm.supplierLot || undefined,
+        sourceType: receiveForm.sourceType || undefined,
+        receivedDate: receiveForm.receivedDate || undefined,
+        expiryDate: receiveForm.expiryDate || undefined,
+        notes: receiveForm.notes || undefined,
+      });
+      const materialName = getMaterialName(receiveForm.materialId) || 'material';
+      const lotWithDetails: LotWithDetails = { ...result.lot, materialName };
+      setReceivedLot(lotWithDetails);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Failed to receive stock';
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    }
+  };
+
+  const handleOpenReceive = () => {
+    setReceiveForm(EMPTY_RECEIVE_FORM);
+    setReceivedLot(null);
+    setIsReceiveStockOpen(true);
+  };
+
+  const handleCloseReceive = () => {
+    setIsReceiveStockOpen(false);
+    setReceivedLot(null);
+    setReceiveForm(EMPTY_RECEIVE_FORM);
   };
 
   if (isLoading) {
@@ -205,6 +327,7 @@ export default function Inventory() {
   const totalProductStock = products.reduce((sum, p) => sum + parseFloat(p.currentStock || '0'), 0);
   const lowStockMaterials = materials.filter(m => parseFloat(m.currentStock) <= parseFloat(m.minStock)).length;
   const lowStockProducts = products.filter(p => parseFloat(p.currentStock) <= parseFloat(p.minStock)).length;
+  const activeLots = (lots as Lot[]).filter(l => l.status === 'active').length;
 
   const allItems = [
     ...filteredMaterials.map(m => ({ ...m, itemType: 'material' as const })),
@@ -313,6 +436,54 @@ export default function Inventory() {
     );
   };
 
+  const renderLotRow = (lot: Lot) => {
+    const itemName = getLotItemName(lot);
+    const unit = getLotUnit(lot);
+    return (
+      <TableRow key={lot.id} data-testid={`row-lot-${lot.id}`}>
+        <TableCell>
+          <div className="font-mono font-medium text-sm">{lot.lotNumber}</div>
+          {lot.barcodeValue && (
+            <div className="text-xs text-muted-foreground font-mono mt-0.5">{lot.barcodeValue}</div>
+          )}
+        </TableCell>
+        <TableCell>
+          <div className="font-medium">{itemName}</div>
+          {getLotTypeBadge(lot.lotType)}
+        </TableCell>
+        <TableCell className="text-center">{getLotStatusBadge(lot.status)}</TableCell>
+        <TableCell className="text-right font-mono">
+          <div>{parseFloat(lot.remainingQuantity || '0').toFixed(2)} {unit}</div>
+          <div className="text-xs text-muted-foreground">of {parseFloat(lot.originalQuantity || lot.quantity).toFixed(2)}</div>
+        </TableCell>
+        <TableCell>
+          <div className="text-sm">{lot.supplierName || lot.sourceName || <span className="text-muted-foreground">—</span>}</div>
+          {lot.supplierLot && <div className="text-xs text-muted-foreground">Sup. lot: {lot.supplierLot}</div>}
+        </TableCell>
+        <TableCell>
+          <div className="text-sm">{lot.receivedDate ? format(new Date(lot.receivedDate), 'dd MMM yy') : '—'}</div>
+          {lot.expiryDate && (
+            <div className="text-xs text-amber-600">Exp: {format(new Date(lot.expiryDate), 'dd MMM yy')}</div>
+          )}
+        </TableCell>
+        <TableCell className="text-right">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1 text-xs"
+            onClick={() => handlePrintLabel(lot)}
+            data-testid={`button-print-label-${lot.id}`}
+          >
+            <Printer className="h-3.5 w-3.5" />
+            {lot.barcodePrintedAt ? 'Reprint' : 'Print'}
+          </Button>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
+  const selectedReceiveMaterial = receiveForm.materialId ? materials.find(m => m.id === receiveForm.materialId) : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -320,9 +491,12 @@ export default function Inventory() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono" data-testid="text-inventory-title">Inventory</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage raw materials and finished goods.</p>
         </div>
+        <Button onClick={handleOpenReceive} className="gap-2" data-testid="button-receive-stock">
+          <Download className="h-4 w-4" /> Receive Stock
+        </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Total Items</div>
           <div className="text-2xl font-bold font-mono">{materials.length + products.length}</div>
@@ -343,12 +517,17 @@ export default function Inventory() {
           <div className="text-2xl font-bold font-mono text-amber-600">{lowStockMaterials + lowStockProducts}</div>
           <div className="text-xs text-muted-foreground">items below min</div>
         </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground">Active Lots</div>
+          <div className="text-2xl font-bold font-mono text-green-600">{activeLots}</div>
+          <div className="text-xs text-muted-foreground">of {(lots as Lot[]).length} total</div>
+        </Card>
       </div>
 
       <div className="flex items-center space-x-2 bg-card p-2 rounded-md border max-w-md">
         <Search className="w-4 h-4 text-muted-foreground ml-2" />
-        <Input 
-          placeholder="Search inventory..." 
+        <Input
+          placeholder="Search inventory..."
           className="border-none shadow-none focus-visible:ring-0"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -365,6 +544,9 @@ export default function Inventory() {
           ))}
           <TabsTrigger value="all" className="flex items-center gap-2" data-testid="tab-all">
             <Layers size={16} /> All
+          </TabsTrigger>
+          <TabsTrigger value="lots" className="flex items-center gap-2" data-testid="tab-lots">
+            <QrCode size={16} /> Lots
           </TabsTrigger>
         </TabsList>
 
@@ -403,8 +585,8 @@ export default function Inventory() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        categoryItems.map((item) => 
-                          item.itemType === 'material' 
+                        categoryItems.map((item) =>
+                          item.itemType === 'material'
                             ? renderMaterialRow(item as Material)
                             : renderProductRow(item as Product)
                         )
@@ -444,8 +626,8 @@ export default function Inventory() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    allItems.map((item) => 
-                      item.itemType === 'material' 
+                    allItems.map((item) =>
+                      item.itemType === 'material'
                         ? renderMaterialRow(item as Material)
                         : renderProductRow(item as Product)
                     )
@@ -455,8 +637,235 @@ export default function Inventory() {
             </div>
           </Card>
         </TabsContent>
+
+        <TabsContent value="lots" className="space-y-4">
+          <div className="flex items-center space-x-2 bg-card p-2 rounded-md border max-w-md">
+            <Search className="w-4 h-4 text-muted-foreground ml-2" />
+            <Input
+              placeholder="Search lots by number, barcode, or source..."
+              className="border-none shadow-none focus-visible:ring-0"
+              value={lotSearchTerm}
+              onChange={(e) => setLotSearchTerm(e.target.value)}
+              data-testid="input-search-lots"
+            />
+          </div>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[140px]">Lot / Barcode</TableHead>
+                    <TableHead className="min-w-[150px]">Item</TableHead>
+                    <TableHead className="min-w-[90px] text-center">Status</TableHead>
+                    <TableHead className="min-w-[110px] text-right">Qty Remaining</TableHead>
+                    <TableHead className="min-w-[120px]">Source</TableHead>
+                    <TableHead className="min-w-[100px]">Dates</TableHead>
+                    <TableHead className="min-w-[90px] text-right">Label</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredLots.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        {lotSearchTerm ? 'No lots match your search.' : 'No lots yet. Use "Receive Stock" to create your first lot.'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredLots.map((lot) => renderLotRow(lot as Lot))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </TabsContent>
       </Tabs>
 
+      {/* Receive Stock Dialog */}
+      <Dialog open={isReceiveStockOpen} onOpenChange={(open) => { if (!open) handleCloseReceive(); }}>
+        <DialogContent className="w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5" /> Receive Stock
+            </DialogTitle>
+            <DialogDescription>Record incoming raw materials. A lot number and barcode will be generated automatically.</DialogDescription>
+          </DialogHeader>
+
+          {receivedLot ? (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-2 text-green-700">
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="font-semibold">Stock received successfully</span>
+              </div>
+              <div className="bg-muted rounded-lg p-4 space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Material</span>
+                  <span className="font-medium">{receivedLot.materialName || getLotItemName(receivedLot as Lot)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Quantity</span>
+                  <span className="font-mono font-medium">{receivedLot.quantity} {getLotUnit(receivedLot as Lot)}</span>
+                </div>
+                <div className="border-t pt-3">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-muted-foreground">Lot Number</span>
+                    <span className="font-mono font-bold text-lg tracking-wide">{receivedLot.lotNumber}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Barcode</span>
+                    <span className="font-mono text-sm text-muted-foreground">{receivedLot.barcodeValue}</span>
+                  </div>
+                </div>
+              </div>
+              <Button
+                className="w-full gap-2"
+                onClick={() => handlePrintLabel(receivedLot as Lot)}
+                data-testid="button-print-label-received"
+              >
+                <Printer className="h-4 w-4" /> Print Label
+              </Button>
+              <Button variant="outline" className="w-full" onClick={handleCloseReceive} data-testid="button-close-receive">
+                Done
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Material *</Label>
+                <Popover open={materialSearchOpen} onOpenChange={setMaterialSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between font-normal"
+                      data-testid="select-receive-material"
+                    >
+                      {selectedReceiveMaterial ? selectedReceiveMaterial.name : 'Select material...'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search materials..." />
+                      <CommandList>
+                        <CommandEmpty>No material found.</CommandEmpty>
+                        <CommandGroup>
+                          {materials.map(material => (
+                            <CommandItem
+                              key={material.id}
+                              value={`${material.sku} ${material.name}`}
+                              onSelect={() => {
+                                setReceiveForm({ ...receiveForm, materialId: material.id });
+                                setMaterialSearchOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", receiveForm.materialId === material.id ? "opacity-100" : "opacity-0")} />
+                              {material.sku ? `${material.sku} — ` : ''}{material.name} ({material.unit})
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Quantity *</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g. 500"
+                    value={receiveForm.quantity}
+                    onChange={(e) => setReceiveForm({ ...receiveForm, quantity: e.target.value })}
+                    data-testid="input-receive-quantity"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Source Type</Label>
+                  <Select
+                    value={receiveForm.sourceType}
+                    onValueChange={(v) => setReceiveForm({ ...receiveForm, sourceType: v as typeof receiveForm.sourceType })}
+                  >
+                    <SelectTrigger data-testid="select-receive-source-type">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="supplier">Supplier</SelectItem>
+                      <SelectItem value="farmer">Farmer</SelectItem>
+                      <SelectItem value="internal_batch">Internal Batch</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Supplier / Source Name</Label>
+                  <Input
+                    placeholder="e.g. Farm Fresh Co."
+                    value={receiveForm.supplierName}
+                    onChange={(e) => setReceiveForm({ ...receiveForm, supplierName: e.target.value, sourceName: e.target.value })}
+                    data-testid="input-receive-supplier-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Supplier Lot #</Label>
+                  <Input
+                    placeholder="e.g. SL-2024-001"
+                    value={receiveForm.supplierLot}
+                    onChange={(e) => setReceiveForm({ ...receiveForm, supplierLot: e.target.value })}
+                    data-testid="input-receive-supplier-lot"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Received Date</Label>
+                  <Input
+                    type="date"
+                    value={receiveForm.receivedDate}
+                    onChange={(e) => setReceiveForm({ ...receiveForm, receivedDate: e.target.value })}
+                    data-testid="input-receive-date"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Expiry Date (optional)</Label>
+                  <Input
+                    type="date"
+                    value={receiveForm.expiryDate}
+                    onChange={(e) => setReceiveForm({ ...receiveForm, expiryDate: e.target.value })}
+                    data-testid="input-receive-expiry"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Notes (optional)</Label>
+                <Input
+                  placeholder="Any additional notes..."
+                  value={receiveForm.notes}
+                  onChange={(e) => setReceiveForm({ ...receiveForm, notes: e.target.value })}
+                  data-testid="input-receive-notes"
+                />
+              </div>
+            </div>
+          )}
+
+          {!receivedLot && (
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCloseReceive}>Cancel</Button>
+              <Button onClick={handleReceiveStock} disabled={receiveStock.isPending} data-testid="button-submit-receive">
+                {receiveStock.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Receive Stock
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Product Dialog */}
       <Dialog open={isCreateProductOpen} onOpenChange={setIsCreateProductOpen}>
         <DialogContent>
           <DialogHeader>
@@ -479,9 +888,7 @@ export default function Inventory() {
             <div className="space-y-2">
               <Label>Unit of Measure</Label>
               <Select value={productForm.unit} onValueChange={(v) => setProductForm({ ...productForm, unit: v })}>
-                <SelectTrigger data-testid="select-product-unit">
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
+                <SelectTrigger data-testid="select-product-unit"><SelectValue placeholder="Select unit" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="KG">KG (Kilograms)</SelectItem>
                   <SelectItem value="QTY">QTY (Quantity/Pieces)</SelectItem>
@@ -501,17 +908,10 @@ export default function Inventory() {
             </div>
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select
-                value={productForm.categoryId || ''}
-                onValueChange={(v) => setProductForm({ ...productForm, categoryId: v || null })}
-              >
-                <SelectTrigger data-testid="select-product-category">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
+              <Select value={productForm.categoryId || ''} onValueChange={(v) => setProductForm({ ...productForm, categoryId: v || null })}>
+                <SelectTrigger data-testid="select-product-category"><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
+                  {categories.map((cat) => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
@@ -526,6 +926,7 @@ export default function Inventory() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Material Dialog */}
       <Dialog open={isEditMaterialOpen} onOpenChange={setIsEditMaterialOpen}>
         <DialogContent>
           <DialogHeader>
@@ -548,9 +949,7 @@ export default function Inventory() {
             <div className="space-y-2">
               <Label>Unit of Measure</Label>
               <Select value={materialForm.unit} onValueChange={(v) => setMaterialForm({ ...materialForm, unit: v })}>
-                <SelectTrigger data-testid="select-edit-material-unit">
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
+                <SelectTrigger data-testid="select-edit-material-unit"><SelectValue placeholder="Select unit" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="KG">KG (Kilograms)</SelectItem>
                   <SelectItem value="QTY">QTY (Quantity/Pieces)</SelectItem>
@@ -570,17 +969,10 @@ export default function Inventory() {
             </div>
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select
-                value={materialForm.categoryId || ''}
-                onValueChange={(v) => setMaterialForm({ ...materialForm, categoryId: v || null })}
-              >
-                <SelectTrigger data-testid="select-edit-material-category">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
+              <Select value={materialForm.categoryId || ''} onValueChange={(v) => setMaterialForm({ ...materialForm, categoryId: v || null })}>
+                <SelectTrigger data-testid="select-edit-material-category"><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
+                  {categories.map((cat) => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
@@ -595,6 +987,7 @@ export default function Inventory() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Product Dialog */}
       <Dialog open={isEditProductOpen} onOpenChange={setIsEditProductOpen}>
         <DialogContent>
           <DialogHeader>
@@ -617,9 +1010,7 @@ export default function Inventory() {
             <div className="space-y-2">
               <Label>Unit of Measure</Label>
               <Select value={productForm.unit} onValueChange={(v) => setProductForm({ ...productForm, unit: v })}>
-                <SelectTrigger data-testid="select-edit-product-unit">
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
+                <SelectTrigger data-testid="select-edit-product-unit"><SelectValue placeholder="Select unit" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="KG">KG (Kilograms)</SelectItem>
                   <SelectItem value="QTY">QTY (Quantity/Pieces)</SelectItem>
@@ -639,17 +1030,10 @@ export default function Inventory() {
             </div>
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select
-                value={productForm.categoryId || ''}
-                onValueChange={(v) => setProductForm({ ...productForm, categoryId: v || null })}
-              >
-                <SelectTrigger data-testid="select-edit-product-category">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
+              <Select value={productForm.categoryId || ''} onValueChange={(v) => setProductForm({ ...productForm, categoryId: v || null })}>
+                <SelectTrigger data-testid="select-edit-product-category"><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
+                  {categories.map((cat) => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>

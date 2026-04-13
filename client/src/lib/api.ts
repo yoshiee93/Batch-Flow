@@ -56,17 +56,32 @@ export interface Material {
 export interface Lot {
   id: string;
   lotNumber: string;
+  lotType: string | null;
+  status: string | null;
+  barcodeValue: string | null;
   materialId: string | null;
   productId: string | null;
   supplierLot: string | null;
   supplierName: string | null;
+  sourceName: string | null;
+  sourceType: string | null;
+  originalQuantity: string | null;
   quantity: string;
   remainingQuantity: string;
   expiryDate: string | null;
   receivedDate: string;
+  producedDate: string | null;
   sourceBatchId: string | null;
+  barcodePrintedAt: string | null;
   notes: string | null;
   createdAt: string;
+}
+
+export interface LotWithDetails extends Lot {
+  materialName?: string;
+  materialUnit?: string;
+  productName?: string;
+  productUnit?: string;
 }
 
 export interface Recipe {
@@ -255,6 +270,14 @@ export function useBatches() {
   });
 }
 
+export function useBatch(batchId: string) {
+  return useQuery<Batch>({
+    queryKey: ["batch", batchId],
+    queryFn: () => fetchApi(`/batches/${batchId}`),
+    enabled: !!batchId,
+  });
+}
+
 export function useOrders() {
   return useQuery<Order[]>({
     queryKey: ["orders"],
@@ -366,7 +389,8 @@ export function useDeleteBatch() {
 export interface BatchMaterial {
   id: string;
   batchId: string;
-  materialId: string;
+  materialId: string | null;
+  productId: string | null;
   lotId: string | null;
   quantity: string;
 }
@@ -382,15 +406,52 @@ export function useBatchMaterials(batchId: string) {
 export function useRecordBatchInput() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ batchId, materialId, productId, quantity }: { batchId: string; materialId?: string; productId?: string; quantity: string }) =>
-      fetchApi<BatchMaterial>(`/batches/${batchId}/input`, { method: "POST", body: JSON.stringify({ materialId, productId, quantity }) }),
+    mutationFn: ({ batchId, materialId, productId, quantity, lotId, sourceLotId }: {
+      batchId: string; materialId?: string; productId?: string; quantity: string; lotId?: string; sourceLotId?: string;
+    }) =>
+      fetchApi<BatchMaterial>(`/batches/${batchId}/input`, { method: "POST", body: JSON.stringify({ materialId, productId, quantity, lotId, sourceLotId }) }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["batchMaterials", variables.batchId] });
       queryClient.invalidateQueries({ queryKey: ["materials"] });
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
+  });
+}
+
+export function useReceiveStock() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      materialId: string;
+      quantity: string;
+      supplierName?: string;
+      sourceName?: string;
+      supplierLot?: string;
+      sourceType?: string;
+      receivedDate?: string;
+      expiryDate?: string;
+      notes?: string;
+    }) => fetchApi<{ lot: LotWithDetails; movement: Record<string, unknown> }>("/receive-stock", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    },
+  });
+}
+
+export function fetchLotByBarcode(value: string): Promise<LotWithDetails> {
+  return fetchApi<LotWithDetails>(`/lots/barcode/${encodeURIComponent(value)}`);
+}
+
+export function useMarkBarcodePrinted() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (lotId: string) => fetchApi<Lot>(`/lots/${lotId}/barcode-printed`, { method: "PATCH" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["lots"] }),
   });
 }
 
@@ -449,8 +510,11 @@ export function useRecordBatchOutput() {
 export interface BatchOutput {
   id: string;
   batchId: string;
-  productId: string;
+  productId: string | null;
   quantity: string;
+  actualQuantity: string | null;
+  lotId: string | null;
+  notes: string | null;
   addedAt: string;
 }
 

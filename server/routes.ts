@@ -128,7 +128,22 @@ export async function registerRoutes(
   app.get("/api/lots/barcode/:value", asyncHandler(async (req, res) => {
     const lot = await storage.getLotByBarcode(req.params.value);
     if (!lot) return res.status(404).json({ error: "Lot not found for barcode" });
-    res.json(lot);
+    // Enrich with material/product name for UI
+    let materialName: string | undefined;
+    let materialUnit: string | undefined;
+    let productName: string | undefined;
+    let productUnit: string | undefined;
+    if (lot.materialId) {
+      const material = await storage.getMaterial(lot.materialId);
+      materialName = material?.name;
+      materialUnit = material?.unit;
+    }
+    if (lot.productId) {
+      const product = await storage.getProduct(lot.productId);
+      productName = product?.name;
+      productUnit = product?.unit;
+    }
+    res.json({ ...lot, materialName, materialUnit, productName, productUnit });
   }));
 
   app.get("/api/lots/:id", asyncHandler(async (req, res) => {

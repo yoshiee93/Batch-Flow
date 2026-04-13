@@ -11,7 +11,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle, ChevronDown, ChevronRight, ChevronsUpDown, Check } from 'lucide-react';
+import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle, ChevronDown, ChevronRight, ChevronsUpDown, Check, ExternalLink } from 'lucide-react';
+import { Link } from 'wouter';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import {
@@ -22,13 +23,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { 
+import {
   useBatches, useProducts, useRecipes, useMaterials, useLots, useCategories,
   useUpdateBatch, useCreateBatch, useDeleteBatch,
   useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useUpdateBatchMaterial, useRecordBatchOutput,
   useBatchOutputs, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch,
-  type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput, type Category
+  fetchLotByBarcode,
+  type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput, type Category, type LotWithDetails
 } from '@/lib/api';
+import { printBarcodeLabel } from '@/lib/barcodePrint';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Production() {
@@ -59,9 +62,14 @@ export default function Production() {
     materialId: '',
     productId: '',
     quantity: '',
+    lotId: '',
   });
   const [materialSearchOpen, setMaterialSearchOpen] = useState(false);
   const [inputProductSearchOpen, setInputProductSearchOpen] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [scannedLot, setScannedLot] = useState<LotWithDetails | null>(null);
+  const [barcodeError, setBarcodeError] = useState('');
+  const [isLookingUpBarcode, setIsLookingUpBarcode] = useState(false);
   const [createProductSearchOpen, setCreateProductSearchOpen] = useState(false);
   
   const [recordOutputForm, setRecordOutputForm] = useState({
@@ -185,8 +193,48 @@ export default function Production() {
 
   const handleRecordInputClick = (batch: Batch) => {
     setSelectedBatch(batch);
-    setRecordInputForm({ inputType: 'material', materialId: '', productId: '', quantity: '' });
+    setRecordInputForm({ inputType: 'material', materialId: '', productId: '', quantity: '', lotId: '' });
+    setBarcodeInput('');
+    setScannedLot(null);
+    setBarcodeError('');
     setIsRecordInputOpen(true);
+  };
+
+  const handleBarcodeLookup = async (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    setIsLookingUpBarcode(true);
+    setBarcodeError('');
+    setScannedLot(null);
+    try {
+      const lot = await fetchLotByBarcode(trimmed);
+      if (lot.status === 'consumed') {
+        setBarcodeError('This lot has been fully consumed and cannot be used.');
+        setIsLookingUpBarcode(false);
+        return;
+      }
+      if (lot.status === 'quarantined') {
+        setBarcodeError('This lot is quarantined and cannot be used for production.');
+        setIsLookingUpBarcode(false);
+        return;
+      }
+      if (lot.status === 'expired') {
+        setBarcodeError('This lot has expired.');
+        setIsLookingUpBarcode(false);
+        return;
+      }
+      setScannedLot(lot);
+      setRecordInputForm(prev => ({
+        ...prev,
+        materialId: lot.materialId || prev.materialId,
+        lotId: lot.id,
+        quantity: '',
+      }));
+    } catch {
+      setBarcodeError('Lot not found. Check the barcode or lot number and try again.');
+    } finally {
+      setIsLookingUpBarcode(false);
+    }
   };
 
   const handleAddOutputClick = (batch: Batch) => {
@@ -196,42 +244,56 @@ export default function Production() {
 
   const handleRecordInput = async () => {
     if (!selectedBatch) return;
-    
-    const { inputType, materialId, productId, quantity } = recordInputForm;
-    
+
+    const { inputType, materialId, productId, quantity, lotId } = recordInputForm;
+
     if (!quantity) {
       toast({ title: "Missing quantity", description: "Please enter quantity", variant: "destructive" });
       return;
     }
-    
-    if (inputType === 'material' && !materialId) {
-      toast({ title: "Missing material", description: "Please select a material", variant: "destructive" });
-      return;
+
+    if (inputType === 'material') {
+      if (!scannedLot && !lotId) {
+        toast({ title: "No lot scanned", description: "Scan or type a barcode/lot number to identify the input lot", variant: "destructive" });
+        return;
+      }
+      const availableQty = parseFloat(scannedLot?.remainingQuantity || '0');
+      const consumeQty = parseFloat(quantity);
+      if (consumeQty > availableQty) {
+        toast({ title: "Insufficient lot quantity", description: `Only ${availableQty} available in lot ${scannedLot?.lotNumber}`, variant: "destructive" });
+        return;
+      }
     }
-    
+
     if (inputType === 'product' && !productId) {
       toast({ title: "Missing product", description: "Please select a product", variant: "destructive" });
       return;
     }
-    
+
     try {
-      const payload: { batchId: string; quantity: string; materialId?: string; productId?: string } = {
-        batchId: selectedBatch.id,
-        quantity,
-      };
-      
       if (inputType === 'material') {
-        payload.materialId = materialId;
+        await recordBatchInput.mutateAsync({
+          batchId: selectedBatch.id,
+          materialId: scannedLot?.materialId || materialId,
+          quantity,
+          lotId: lotId || scannedLot?.id,
+        });
+        toast({ title: "Input recorded", description: `Lot ${scannedLot?.lotNumber} consumed — deducted from inventory` });
       } else {
-        payload.productId = productId;
+        await recordBatchInput.mutateAsync({
+          batchId: selectedBatch.id,
+          productId,
+          quantity,
+        });
+        toast({ title: "Input recorded", description: "Product has been added to batch and deducted from inventory" });
       }
-      
-      await recordBatchInput.mutateAsync(payload);
-      const itemType = inputType === 'material' ? 'Material' : 'Product';
-      toast({ title: "Input recorded", description: `${itemType} has been added to batch and deducted from inventory` });
-      setRecordInputForm({ inputType: 'material', materialId: '', productId: '', quantity: '' });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to record input", variant: "destructive" });
+      setRecordInputForm({ inputType: 'material', materialId: '', productId: '', quantity: '', lotId: '' });
+      setBarcodeInput('');
+      setScannedLot(null);
+      setBarcodeError('');
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Failed to record input';
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
 
@@ -594,7 +656,14 @@ export default function Production() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isRecordInputOpen} onOpenChange={setIsRecordInputOpen}>
+      <Dialog open={isRecordInputOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsRecordInputOpen(false);
+          setBarcodeInput('');
+          setScannedLot(null);
+          setBarcodeError('');
+        }
+      }}>
         <DialogContent className="w-full sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Record Input for {selectedBatch?.batchNumber}</DialogTitle>
@@ -608,7 +677,12 @@ export default function Production() {
                   type="button"
                   variant={recordInputForm.inputType === 'material' ? 'default' : 'outline'}
                   className="flex-1"
-                  onClick={() => setRecordInputForm({ ...recordInputForm, inputType: 'material', productId: '' })}
+                  onClick={() => {
+                    setRecordInputForm({ inputType: 'material', materialId: '', productId: '', quantity: '', lotId: '' });
+                    setBarcodeInput('');
+                    setScannedLot(null);
+                    setBarcodeError('');
+                  }}
                   data-testid="button-input-type-material"
                 >
                   Raw Material
@@ -617,64 +691,76 @@ export default function Production() {
                   type="button"
                   variant={recordInputForm.inputType === 'product' ? 'default' : 'outline'}
                   className="flex-1"
-                  onClick={() => setRecordInputForm({ ...recordInputForm, inputType: 'product', materialId: '' })}
+                  onClick={() => {
+                    setRecordInputForm({ inputType: 'product', materialId: '', productId: '', quantity: '', lotId: '' });
+                    setBarcodeInput('');
+                    setScannedLot(null);
+                    setBarcodeError('');
+                  }}
                   data-testid="button-input-type-product"
                 >
                   Finished Product
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {recordInputForm.inputType === 'material' 
-                  ? 'Use raw materials from inventory as inputs'
-                  : 'Use finished products as ingredients (for multi-step processing)'}
-              </p>
             </div>
-            
+
             {recordInputForm.inputType === 'material' ? (
-              <div className="space-y-2">
-                <Label htmlFor="input-material">Material *</Label>
-                <Popover open={materialSearchOpen} onOpenChange={setMaterialSearchOpen}>
-                  <PopoverTrigger asChild>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="barcode-scan">Scan / Type Barcode or Lot Number *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="barcode-scan"
+                      autoFocus
+                      placeholder="Scan barcode or type lot number..."
+                      value={barcodeInput}
+                      onChange={(e) => {
+                        setBarcodeInput(e.target.value);
+                        setBarcodeError('');
+                        if (scannedLot) { setScannedLot(null); setRecordInputForm(f => ({ ...f, lotId: '', materialId: '' })); }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); handleBarcodeLookup(barcodeInput); }
+                      }}
+                      data-testid="input-barcode-scan"
+                    />
                     <Button
+                      type="button"
                       variant="outline"
-                      role="combobox"
-                      aria-expanded={materialSearchOpen}
-                      className="w-full justify-between font-normal"
-                      data-testid="select-input-material"
+                      disabled={isLookingUpBarcode || !barcodeInput.trim()}
+                      onClick={() => handleBarcodeLookup(barcodeInput)}
+                      data-testid="button-lookup-barcode"
                     >
-                      {recordInputForm.materialId
-                        ? materials.find(m => m.id === recordInputForm.materialId)?.name || "Select material..."
-                        : "Search materials..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      {isLookingUpBarcode ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Look up'}
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search materials..." />
-                      <CommandList>
-                        <CommandEmpty>No material found.</CommandEmpty>
-                        <CommandGroup>
-                          {materials.map(material => (
-                            <CommandItem
-                              key={material.id}
-                              value={`${material.sku} ${material.name}`}
-                              onSelect={() => {
-                                setRecordInputForm({ ...recordInputForm, materialId: material.id });
-                                setMaterialSearchOpen(false);
-                              }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", recordInputForm.materialId === material.id ? "opacity-100" : "opacity-0")} />
-                              {material.sku ? `${material.sku} - ` : ''}{material.name} ({material.currentStock} {material.unit})
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {recordInputForm.materialId && (
-                  <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
-                    Available: <span className="font-mono font-medium">{materials.find(m => m.id === recordInputForm.materialId)?.currentStock || '0'} {materials.find(m => m.id === recordInputForm.materialId)?.unit || 'KG'}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Press Enter or click "Look up" after scanning. Supports barcode values and lot numbers (e.g. RM-260413-0001).</p>
+                </div>
+
+                {barcodeError && (
+                  <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md" data-testid="text-barcode-error">
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>{barcodeError}</span>
+                  </div>
+                )}
+
+                {scannedLot && (
+                  <div className="bg-muted rounded-lg p-3 space-y-1.5" data-testid="card-scanned-lot">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-semibold">{scannedLot.materialName || scannedLot.productName || 'Unknown'}</div>
+                        <div className="text-xs text-muted-foreground font-mono">{scannedLot.lotNumber}</div>
+                      </div>
+                      <Badge className={scannedLot.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
+                        {scannedLot.status}
+                      </Badge>
+                    </div>
+                    <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1 pt-1 border-t">
+                      <div className="text-muted-foreground">Available</div>
+                      <div className="font-mono font-medium">{parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.materialUnit || scannedLot.productUnit || 'KG'}</div>
+                      {scannedLot.supplierName && <><div className="text-muted-foreground">Source</div><div>{scannedLot.supplierName}</div></>}
+                      {scannedLot.expiryDate && <><div className="text-muted-foreground">Expires</div><div>{new Date(scannedLot.expiryDate).toLocaleDateString()}</div></>}
+                    </div>
                   </div>
                 )}
               </div>
@@ -734,9 +820,14 @@ export default function Production() {
                 )}
               </div>
             )}
-            
+
             <div className="space-y-2">
-              <Label htmlFor="input-quantity">Quantity *</Label>
+              <Label htmlFor="input-quantity">
+                Quantity to consume *
+                {scannedLot && (
+                  <span className="text-xs text-muted-foreground ml-2">(max: {parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.materialUnit || 'KG'})</span>
+                )}
+              </Label>
               <Input
                 id="input-quantity"
                 type="number"
@@ -749,7 +840,7 @@ export default function Production() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRecordInputOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => { setIsRecordInputOpen(false); setBarcodeInput(''); setScannedLot(null); setBarcodeError(''); }}>Close</Button>
             <Button onClick={handleRecordInput} disabled={recordBatchInput.isPending} data-testid="button-add-input">
               {recordBatchInput.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add to Batch
@@ -1104,6 +1195,12 @@ function BatchCard({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                    <Link href={`/batches/${batch.id}`}>
+                      <DropdownMenuItem data-testid={`button-view-batch-${batch.id}`}>
+                        <ExternalLink size={14} className="mr-2" /> View Detail
+                      </DropdownMenuItem>
+                    </Link>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => onEditClick(batch)} data-testid={`button-edit-batch-${batch.id}`}>
                       <Pencil size={14} className="mr-2" /> Edit Batch
                     </DropdownMenuItem>
