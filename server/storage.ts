@@ -1,4 +1,4 @@
-import { eq, desc, and, sql, gte, lte, inArray, isNotNull } from "drizzle-orm";
+import { eq, desc, and, sql, gte, lte, inArray, isNotNull, or } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, products, materials, lots, recipes, recipeItems,
@@ -322,8 +322,14 @@ export class DatabaseStorage implements IStorage {
     await this.createAuditLog({ entityType: "lot", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
   }
 
-  async getLotByBarcode(barcodeValue: string): Promise<Lot | undefined> {
-    const [lot] = await db.select().from(lots).where(eq(lots.barcodeValue, barcodeValue));
+  async getLotByBarcode(query: string): Promise<Lot | undefined> {
+    const [lot] = await db.select().from(lots).where(
+      or(
+        eq(lots.barcodeValue, query),
+        eq(lots.lotNumber, query),
+        eq(lots.supplierLot, query)
+      )
+    );
     return lot;
   }
 

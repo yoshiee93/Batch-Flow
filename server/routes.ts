@@ -330,6 +330,20 @@ export async function registerRoutes(
     if (materialId && !lotId) {
       return res.status(400).json({ error: "lotId is required for material inputs (lot-based compliance)" });
     }
+    // Validate lot status: only active lots may be consumed
+    if (lotId) {
+      const lot = await storage.getLot(lotId);
+      if (!lot) return res.status(404).json({ error: "Lot not found" });
+      if (lot.status !== 'active') {
+        return res.status(400).json({ error: `Lot is not available for production (status: ${lot.status})` });
+      }
+      // Prevent duplicate lot entries for the same batch
+      const existingMaterials = await storage.getBatchMaterials(req.params.id);
+      const alreadyAdded = existingMaterials.some(m => m.lotId === lotId);
+      if (alreadyAdded) {
+        return res.status(409).json({ error: `Lot ${lot.lotNumber} has already been added to this batch. Remove it first if you need to change the quantity.` });
+      }
+    }
     let batchMaterial;
     if (materialId) {
       batchMaterial = await storage.recordBatchInput(req.params.id, materialId, quantity, lotId);

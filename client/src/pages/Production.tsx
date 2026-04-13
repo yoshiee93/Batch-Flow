@@ -208,19 +208,14 @@ export default function Production() {
     setScannedLot(null);
     try {
       const lot = await fetchLotByBarcode(trimmed);
-      if (lot.status === 'consumed') {
-        setBarcodeError('This lot has been fully consumed and cannot be used.');
-        setIsLookingUpBarcode(false);
-        return;
-      }
-      if (lot.status === 'quarantined') {
-        setBarcodeError('This lot is quarantined and cannot be used for production.');
-        setIsLookingUpBarcode(false);
-        return;
-      }
-      if (lot.status === 'expired') {
-        setBarcodeError('This lot has expired.');
-        setIsLookingUpBarcode(false);
+      if (lot.status !== 'active') {
+        const statusMessages: Record<string, string> = {
+          consumed: 'This lot has been fully consumed and cannot be used.',
+          quarantined: 'This lot is quarantined — it cannot be used for production.',
+          expired: 'This lot has expired and cannot be used for production.',
+          released: 'This lot has been released and is no longer available for production.',
+        };
+        setBarcodeError(statusMessages[lot.status ?? ''] || `Lot status is "${lot.status}" — only active lots can be consumed.`);
         return;
       }
       setScannedLot(lot);
@@ -231,7 +226,7 @@ export default function Production() {
         quantity: '',
       }));
     } catch {
-      setBarcodeError('Lot not found. Check the barcode or lot number and try again.');
+      setBarcodeError('Lot not found. Try a different barcode value, lot number (e.g. RM-260413-0001), or supplier batch ID.');
     } finally {
       setIsLookingUpBarcode(false);
     }
@@ -293,6 +288,7 @@ export default function Production() {
       setBarcodeError('');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Failed to record input';
+      setBarcodeError(msg);
       toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
