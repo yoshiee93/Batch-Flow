@@ -722,6 +722,7 @@ export class DatabaseStorage implements IStorage {
       // Get batch materials to restore inventory
       const inputMaterials = await tx.select().from(batchMaterials).where(eq(batchMaterials.batchId, id));
       for (const bm of inputMaterials) {
+        if (!bm.materialId) continue;
         const [material] = await tx.select().from(materials).where(eq(materials.id, bm.materialId));
         if (material) {
           const restoredStock = (parseFloat(material.currentStock || "0") + parseFloat(bm.quantity)).toFixed(2);
@@ -782,11 +783,13 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // Restore material stock
-      const [material] = await db.select().from(materials).where(eq(materials.id, bm.materialId));
-      if (material) {
-        const restoredStock = (parseFloat(material.currentStock || "0") + parseFloat(bm.quantity)).toFixed(2);
-        await db.update(materials).set({ currentStock: restoredStock }).where(eq(materials.id, bm.materialId));
+      // Restore material stock (only for material inputs; product inputs don't have materialId)
+      if (bm.materialId) {
+        const [material] = await db.select().from(materials).where(eq(materials.id, bm.materialId));
+        if (material) {
+          const restoredStock = (parseFloat(material.currentStock || "0") + parseFloat(bm.quantity)).toFixed(2);
+          await db.update(materials).set({ currentStock: restoredStock }).where(eq(materials.id, bm.materialId));
+        }
       }
       
       // Create reversal stock movement
@@ -829,17 +832,18 @@ export class DatabaseStorage implements IStorage {
       return bm; // No change needed
     }
     
-    // Get the material to check availability
-    const [material] = await db.select().from(materials).where(eq(materials.id, bm.materialId));
-    if (!material) throw new Error("Material not found");
-    
-    const materialStock = parseFloat(material.currentStock || "0");
-    
-    // If delta > 0, we need more from stock (check availability)
-    if (delta > 0 && delta > materialStock) {
-      throw new Error(`Insufficient stock. Available: ${materialStock} KG`);
+    // Get the material to check availability (only for material inputs)
+    let materialStock = 0;
+    if (bm.materialId) {
+      const [material] = await db.select().from(materials).where(eq(materials.id, bm.materialId));
+      if (!material) throw new Error("Material not found");
+      materialStock = parseFloat(material.currentStock || "0");
+      // If delta > 0, we need more from stock (check availability)
+      if (delta > 0 && delta > materialStock) {
+        throw new Error(`Insufficient stock. Available: ${materialStock} KG`);
+      }
     }
-    
+
     // Update lot remaining quantity (if lot exists)
     if (bm.lotId) {
       const [lot] = await db.select().from(lots).where(eq(lots.id, bm.lotId));
@@ -848,10 +852,12 @@ export class DatabaseStorage implements IStorage {
         await db.update(lots).set({ remainingQuantity: newLotRemaining }).where(eq(lots.id, bm.lotId));
       }
     }
-    
-    // Update material current stock
-    const newStock = (materialStock - delta).toFixed(2);
-    await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, bm.materialId));
+
+    // Update material current stock (only for material inputs)
+    if (bm.materialId) {
+      const newStock = (materialStock - delta).toFixed(2);
+      await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, bm.materialId));
+    }
     
     // Update batch material record
     const [updated] = await db.update(batchMaterials)

@@ -619,17 +619,17 @@ export function useCompleteOrder() {
 }
 
 export function useTraceabilityForward(lotId: string) {
-  return useQuery({
+  return useQuery<Record<string, unknown>>({
     queryKey: ["traceability", "forward", lotId],
-    queryFn: () => fetchApi(`/traceability/forward/${lotId}`),
+    queryFn: () => fetchApi<Record<string, unknown>>(`/traceability/forward/${lotId}`),
     enabled: !!lotId,
   });
 }
 
 export function useTraceabilityBackward(batchId: string) {
-  return useQuery({
+  return useQuery<Record<string, unknown>>({
     queryKey: ["traceability", "backward", batchId],
-    queryFn: () => fetchApi(`/traceability/backward/${batchId}`),
+    queryFn: () => fetchApi<Record<string, unknown>>(`/traceability/backward/${batchId}`),
     enabled: !!batchId,
   });
 }
