@@ -13,12 +13,22 @@ export interface LabelData {
   supplierLot?: string | null;
 }
 
+function esc(raw: string | null | undefined): string {
+  if (!raw) return "";
+  return raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "";
   try {
     return format(new Date(dateStr), "dd/MM/yyyy");
   } catch {
-    return dateStr;
+    return esc(dateStr);
   }
 }
 
@@ -46,11 +56,23 @@ export function printBarcodeLabel(data: LabelData): void {
   const barcodeValue = data.barcodeValue || data.lotNumber;
   const svgString = generateBarcodeSvg(barcodeValue);
 
+  const receivedStr = formatDate(data.receivedDate);
+  const expiryStr = formatDate(data.expiryDate);
+
+  const rowHtml = (key: string, val: string): string =>
+    val
+      ? `<div class="row"><span class="label-key">${esc(key)}</span><span class="label-val">${esc(val)}</span></div>`
+      : "";
+
+  const barcodeSection = svgString
+    ? `<div class="barcode-wrap">${svgString}</div>`
+    : `<div style="font-size:12px;text-align:center;padding:8px;border:1px dashed #ccc;margin:6px 0;">Barcode: ${esc(barcodeValue)}</div>`;
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Lot Label - ${data.lotNumber}</title>
+  <title>Lot Label - ${esc(data.lotNumber)}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: "Courier New", monospace; background: #fff; }
@@ -62,7 +84,6 @@ export function printBarcodeLabel(data: LabelData): void {
     }
     .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
     .lot-number { font-size: 16px; font-weight: bold; letter-spacing: 0.5px; }
-    .lot-type { font-size: 10px; color: #555; border: 1px solid #999; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; }
     .item-name { font-size: 14px; font-weight: bold; margin-bottom: 4px; }
     .barcode-wrap { text-align: center; margin: 6px 0; }
     .barcode-wrap svg { max-width: 100%; }
@@ -79,19 +100,16 @@ export function printBarcodeLabel(data: LabelData): void {
 <body>
   <div class="label">
     <div class="header">
-      <div class="lot-number">${data.lotNumber}</div>
+      <div class="lot-number">${esc(data.lotNumber)}</div>
     </div>
-    <div class="item-name">${data.itemName}</div>
-    ${svgString ? `<div class="barcode-wrap">${svgString}</div>` : `<div style="font-size:12px;text-align:center;padding:8px;border:1px dashed #ccc;margin:6px 0;">Barcode: ${barcodeValue}</div>`}
+    <div class="item-name">${esc(data.itemName)}</div>
+    ${barcodeSection}
     <div class="details">
-      <div class="row">
-        <span class="label-key">Quantity:</span>
-        <span class="label-val">${data.quantity} ${data.unit}</span>
-      </div>
-      ${data.receivedDate ? `<div class="row"><span class="label-key">Received:</span><span class="label-val">${formatDate(data.receivedDate)}</span></div>` : ""}
-      ${data.expiryDate ? `<div class="row"><span class="label-key">Expires:</span><span class="label-val">${formatDate(data.expiryDate)}</span></div>` : ""}
-      ${data.sourceLabel ? `<div class="row"><span class="label-key">Source:</span><span class="label-val">${data.sourceLabel}</span></div>` : ""}
-      ${data.supplierLot ? `<div class="row"><span class="label-key">Sup. Lot:</span><span class="label-val">${data.supplierLot}</span></div>` : ""}
+      ${rowHtml("Quantity:", `${esc(data.quantity)} ${esc(data.unit)}`)}
+      ${rowHtml("Received:", receivedStr)}
+      ${rowHtml("Expires:", expiryStr)}
+      ${rowHtml("Source:", data.sourceLabel ?? "")}
+      ${rowHtml("Sup. Lot:", data.supplierLot ?? "")}
     </div>
   </div>
   <script>
