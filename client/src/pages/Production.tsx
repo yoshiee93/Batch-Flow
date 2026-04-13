@@ -249,13 +249,17 @@ export default function Production() {
 
     if (inputType === 'material') {
       if (!scannedLot && !lotId) {
-        toast({ title: "No lot scanned", description: "Scan or type a barcode/lot number to identify the input lot", variant: "destructive" });
+        const msg = 'Scan or type a barcode/lot number to identify the input lot before submitting.';
+        setBarcodeError(msg);
+        toast({ title: "No lot scanned", description: msg, variant: "destructive" });
         return;
       }
       const availableQty = parseFloat(scannedLot?.remainingQuantity || '0');
       const consumeQty = parseFloat(quantity);
       if (consumeQty > availableQty) {
-        toast({ title: "Insufficient lot quantity", description: `Only ${availableQty} available in lot ${scannedLot?.lotNumber}`, variant: "destructive" });
+        const msg = `Quantity exceeds available lot stock. Only ${availableQty.toFixed(2)} available in lot ${scannedLot?.lotNumber}.`;
+        setBarcodeError(msg);
+        toast({ title: "Insufficient lot quantity", description: msg, variant: "destructive" });
         return;
       }
     }
