@@ -120,7 +120,7 @@ export interface IStorage {
   getQualityChecks(batchId: string): Promise<QualityCheck[]>;
   createQualityCheck(check: InsertQualityCheck): Promise<QualityCheck>;
 
-  getStockMovements(limit?: number): Promise<StockMovement[]>;
+  getStockMovements(limit?: number, batchId?: string): Promise<StockMovement[]>;
   createStockMovement(movement: InsertStockMovement): Promise<StockMovement>;
 
   getAuditLogs(entityType?: string, entityId?: string): Promise<AuditLog[]>;
@@ -1338,7 +1338,10 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getStockMovements(limit = 100): Promise<StockMovement[]> {
+  async getStockMovements(limit = 100, batchId?: string): Promise<StockMovement[]> {
+    if (batchId) {
+      return db.select().from(stockMovements).where(eq(stockMovements.batchId, batchId)).orderBy(desc(stockMovements.createdAt)).limit(limit);
+    }
     return db.select().from(stockMovements).orderBy(desc(stockMovements.createdAt)).limit(limit);
   }
 

@@ -158,16 +158,23 @@ function ForwardTraceView({ trace }: { trace: Record<string, unknown> }) {
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Card className="border-l-4 border-l-primary">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Box className="h-5 w-5" />
-            Material Lot: {lot.lotNumber as string}
-          </CardTitle>
-          <CardDescription className="font-mono flex gap-3 flex-wrap">
-            <span>Qty: {parseFloat(lot.quantity as string).toFixed(2)} KG</span>
-            <span>Remaining: {parseFloat(lot.remainingQuantity as string).toFixed(2)} KG</span>
-            {(lot.supplierLot as string) && <span>Supplier Lot: {lot.supplierLot as string}</span>}
-            {(lot.barcodeValue as string) && <Badge variant="outline" className="font-mono text-xs">{lot.barcodeValue as string}</Badge>}
-          </CardDescription>
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Box className="h-5 w-5" />
+                Lot: {lot.lotNumber as string}
+              </CardTitle>
+              <CardDescription className="font-mono flex gap-3 flex-wrap mt-1">
+                <span>Qty: {parseFloat(lot.quantity as string).toFixed(2)} KG</span>
+                <span>Remaining: {parseFloat(lot.remainingQuantity as string).toFixed(2)} KG</span>
+                {(lot.supplierLot as string) && <span>Supplier Lot: {lot.supplierLot as string}</span>}
+                {(lot.barcodeValue as string) && <Badge variant="outline" className="font-mono text-xs">{lot.barcodeValue as string}</Badge>}
+              </CardDescription>
+            </div>
+            <Link href={`/lots/${lot.id}`}>
+              <Button variant="outline" size="sm">View Lot Detail</Button>
+            </Link>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="relative border-l-2 border-dashed border-border ml-6 pl-8 py-2 space-y-8">
@@ -213,15 +220,17 @@ function ForwardTraceView({ trace }: { trace: Record<string, unknown> }) {
                 <h4 className="font-bold text-sm uppercase text-muted-foreground mb-2">Produced Output Lots</h4>
                 <div className="grid gap-2">
                   {(trace.outputLots as Array<Record<string, unknown>>).map((outputLot, i) => (
-                    <div key={i} className="flex justify-between items-center p-3 border rounded bg-card">
-                      <div className="flex flex-col">
-                        <span className="font-mono font-bold text-sm">{outputLot.lotNumber as string}</span>
-                        {(outputLot.barcodeValue as string) && (
-                          <span className="text-xs text-muted-foreground font-mono">{outputLot.barcodeValue as string}</span>
-                        )}
+                    <Link key={i} href={`/lots/${outputLot.id}`}>
+                      <div className="flex justify-between items-center p-3 border rounded bg-card hover:bg-accent cursor-pointer">
+                        <div className="flex flex-col">
+                          <span className="font-mono font-bold text-sm">{outputLot.lotNumber as string}</span>
+                          {(outputLot.barcodeValue as string) && (
+                            <span className="text-xs text-muted-foreground font-mono">{outputLot.barcodeValue as string}</span>
+                          )}
+                        </div>
+                        <span className="font-mono text-sm">{parseFloat(outputLot.quantity as string).toFixed(2)} KG</span>
                       </div>
-                      <span className="font-mono text-sm">{parseFloat(outputLot.quantity as string).toFixed(2)} KG</span>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </div>
@@ -291,14 +300,11 @@ function BackwardTraceView({ trace }: { trace: Record<string, unknown> }) {
                         <div className="flex flex-col">
                           <span className="font-medium text-sm">{material ? (material.name as string) : 'Material'}</span>
                           <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                            <button
-                              className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded hover:bg-muted/80"
-                              onClick={() => {
-                                window.location.href = `/traceability?lot=${lot.lotNumber}`;
-                              }}
-                            >
-                              {lot.lotNumber as string}
-                            </button>
+                            <Link href={`/lots/${lot.id}`}>
+                              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded hover:bg-accent cursor-pointer">
+                                {lot.lotNumber as string}
+                              </span>
+                            </Link>
                             {(lot.supplierLot as string) && (
                               <span className="text-xs text-muted-foreground">Supplier: {lot.supplierLot as string}</span>
                             )}

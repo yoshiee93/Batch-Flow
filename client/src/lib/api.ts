@@ -749,3 +749,121 @@ export function useDeleteOrderItem() {
     },
   });
 }
+
+export interface InputLot {
+  batchMaterialId: string;
+  lotId: string;
+  lotNumber: string;
+  barcodeValue: string | null;
+  lotType: string;
+  status: string;
+  materialId: string | null;
+  materialName: string | null;
+  productId: string | null;
+  productName: string | null;
+  supplierName: string | null;
+  supplierLot: string | null;
+  sourceType: string | null;
+  receivedDate: string | null;
+  expiryDate: string | null;
+  quantityConsumed: string;
+  remainingQuantity: string | null;
+  addedAt: string | null;
+}
+
+export interface OutputLot {
+  lotId: string;
+  lotNumber: string;
+  barcodeValue: string | null;
+  lotType: string;
+  status: string;
+  productId: string | null;
+  productName: string | null;
+  quantity: string | null;
+  remainingQuantity: string | null;
+  producedDate: string | null;
+  expiryDate: string | null;
+  barcodePrintedAt: string | null;
+}
+
+export interface StockMovement {
+  id: string;
+  movementType: string;
+  materialId: string | null;
+  productId: string | null;
+  lotId: string | null;
+  batchId: string | null;
+  orderId: string | null;
+  quantity: string;
+  reference: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export function useBatchInputLots(batchId: string) {
+  return useQuery<InputLot[]>({
+    queryKey: ["batchInputLots", batchId],
+    queryFn: () => fetchApi<InputLot[]>(`/batches/${batchId}/input-lots`),
+    enabled: !!batchId,
+  });
+}
+
+export function useBatchOutputLots(batchId: string) {
+  return useQuery<OutputLot[]>({
+    queryKey: ["batchOutputLots", batchId],
+    queryFn: () => fetchApi<OutputLot[]>(`/batches/${batchId}/output-lots`),
+    enabled: !!batchId,
+  });
+}
+
+export function useStockMovements(batchId?: string) {
+  return useQuery<StockMovement[]>({
+    queryKey: ["stockMovements", batchId ?? "all"],
+    queryFn: () => {
+      const params = batchId ? `?batchId=${encodeURIComponent(batchId)}` : "";
+      return fetchApi<StockMovement[]>(`/stock-movements${params}`);
+    },
+  });
+}
+
+export function useLotById(lotId: string) {
+  return useQuery<Lot>({
+    queryKey: ["lot", lotId],
+    queryFn: () => fetchApi<Lot>(`/lots/${lotId}`),
+    enabled: !!lotId,
+  });
+}
+
+export interface LotUsageEntry {
+  batchId: string;
+  batchNumber: string;
+  batchStatus: string;
+  productId: string;
+  productName: string;
+  quantityConsumed: string;
+  addedAt: string | null;
+}
+
+export interface LotLineageResponse {
+  lot: Lot;
+  sourceBatch: Record<string, unknown> | null;
+  sourceInputLots: InputLot[];
+  usedInBatches: LotUsageEntry[];
+  outputLots: Array<OutputLot & { fromBatchId?: string; fromBatchNumber?: string }>;
+}
+
+export function useLotUsage(lotId: string) {
+  return useQuery<LotUsageEntry[]>({
+    queryKey: ["lotUsage", lotId],
+    queryFn: () => fetchApi<LotUsageEntry[]>(`/lots/${lotId}/usage`),
+    enabled: !!lotId,
+  });
+}
+
+export function useLotLineage(lotId: string) {
+  return useQuery<LotLineageResponse>({
+    queryKey: ["lotLineage", lotId],
+    queryFn: () => fetchApi<LotLineageResponse>(`/lots/${lotId}/lineage`),
+    enabled: !!lotId,
+  });
+}

@@ -15,6 +15,7 @@ import Settings from "@/pages/Settings";
 import Calculator from "@/pages/Calculator";
 import NotFound from "@/pages/not-found";
 import BatchDetail from "@/pages/BatchDetail";
+import LotDetail from "@/pages/LotDetail";
 
 // Placeholder pages for routes that aren't built yet
 const Placeholder = ({ title }: { title: string }) => (
@@ -33,6 +34,7 @@ function Router() {
         <Route path="/customers" component={Customers} />
         <Route path="/production" component={Production} />
         <Route path="/batches/:id" component={BatchDetail} />
+        <Route path="/lots/:id" component={LotDetail} />
         <Route path="/inventory" component={Inventory} />
         <Route path="/products"><Redirect to="/inventory" /></Route>
         <Route path="/traceability" component={Traceability} />

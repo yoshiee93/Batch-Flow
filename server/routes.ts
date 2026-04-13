@@ -537,7 +537,8 @@ export async function registerRoutes(
 
   app.get("/api/stock-movements", asyncHandler(async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 100;
-    const movements = await storage.getStockMovements(limit);
+    const batchId = req.query.batchId as string | undefined;
+    const movements = await storage.getStockMovements(limit, batchId);
     res.json(movements);
   }));
 

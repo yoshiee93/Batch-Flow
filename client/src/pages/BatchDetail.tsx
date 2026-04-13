@@ -5,29 +5,55 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
   ArrowLeft, Package, Factory, Box, ChevronRight, Loader2,
-  ClipboardList, Calendar, AlertCircle, CheckCircle, Scale
+  ClipboardList, Calendar, AlertCircle, CheckCircle, Scale,
+  TrendingDown, ArrowRightLeft, ExternalLink
 } from 'lucide-react';
 import {
-  useBatch, useProducts, useMaterials, useBatchMaterials, useBatchOutputs, useLots,
-  type Lot, type BatchMaterial, type BatchOutput
+  useBatch, useProducts, useBatchInputLots, useBatchOutputLots, useStockMovements,
+  type InputLot, type OutputLot, type StockMovement
 } from '@/lib/api';
 import { format } from 'date-fns';
 
-const statusColors: Record<string, string> = {
+const batchStatusColors: Record<string, string> = {
   pending: 'bg-gray-100 text-gray-800',
   in_progress: 'bg-blue-100 text-blue-800',
   completed: 'bg-green-100 text-green-800',
   cancelled: 'bg-red-100 text-red-800',
 };
 
+const lotStatusColors: Record<string, string> = {
+  active: 'bg-green-100 text-green-700',
+  quarantine: 'bg-yellow-100 text-yellow-700',
+  consumed: 'bg-gray-100 text-gray-600',
+  expired: 'bg-red-100 text-red-700',
+};
+
+const movementLabels: Record<string, string> = {
+  receive: 'Received',
+  consume: 'Consumed',
+  produce: 'Produced',
+  adjust: 'Adjusted',
+  ship: 'Shipped',
+  transfer: 'Transferred',
+};
+
+function fmtQty(q: string | null | undefined, unit = 'KG') {
+  if (!q) return '—';
+  return `${parseFloat(q).toFixed(2)} ${unit}`;
+}
+
+function fmtDate(d: string | null | undefined, fmt = 'dd MMM yyyy') {
+  if (!d) return '—';
+  try { return format(new Date(d), fmt); } catch { return d; }
+}
+
 export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: batch, isLoading: batchLoading, isError } = useBatch(id!);
   const { data: products = [] } = useProducts();
-  const { data: materials = [] } = useMaterials();
-  const { data: batchMaterials = [] } = useBatchMaterials(id!);
-  const { data: batchOutputs = [] } = useBatchOutputs(id!);
-  const { data: lots = [] } = useLots();
+  const { data: inputLots = [], isLoading: inputsLoading } = useBatchInputLots(id!);
+  const { data: outputLots = [], isLoading: outputsLoading } = useBatchOutputLots(id!);
+  const { data: movements = [], isLoading: movementsLoading } = useStockMovements(id!);
 
   if (batchLoading) {
     return (
@@ -51,11 +77,11 @@ export default function BatchDetail() {
   }
 
   const product = products.find(p => p.id === batch.productId);
-  const statusClass = statusColors[batch.status] || 'bg-gray-100 text-gray-800';
+  const statusClass = batchStatusColors[batch.status] || 'bg-gray-100 text-gray-800';
   const statusLabel = batch.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-  const totalInputKg = batchMaterials.reduce((sum: number, m: BatchMaterial) => sum + parseFloat(m.quantity || '0'), 0);
-  const totalOutputKg = batchOutputs.reduce((sum: number, o: BatchOutput) => sum + parseFloat(o.actualQuantity || '0'), 0);
+  const totalInputKg = inputLots.reduce((sum, m) => sum + parseFloat(m.quantityConsumed || '0'), 0);
+  const totalOutputKg = outputLots.reduce((sum, o) => sum + parseFloat(o.quantity || '0'), 0);
   const yieldPct = totalInputKg > 0 ? ((totalOutputKg / totalInputKg) * 100).toFixed(1) : null;
 
   return (
@@ -91,15 +117,11 @@ export default function BatchDetail() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Start Date</div>
-                <div data-testid="text-start-date">
-                  {batch.startDate ? format(new Date(batch.startDate), 'dd MMM yyyy') : '—'}
-                </div>
+                <div data-testid="text-start-date">{fmtDate(batch.startDate)}</div>
               </div>
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">End Date</div>
-                <div data-testid="text-end-date">
-                  {batch.endDate ? format(new Date(batch.endDate), 'dd MMM yyyy') : '—'}
-                </div>
+                <div data-testid="text-end-date">{fmtDate(batch.endDate)}</div>
               </div>
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Assigned To</div>
@@ -107,30 +129,26 @@ export default function BatchDetail() {
               </div>
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Planned Qty</div>
-                <div className="font-mono">{parseFloat(batch.plannedQuantity || '0').toFixed(2)} KG</div>
+                <div className="font-mono">{fmtQty(batch.plannedQuantity)}</div>
               </div>
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Actual Output</div>
-                <div className="font-mono" data-testid="text-actual-qty">
-                  {batch.actualQuantity ? `${parseFloat(batch.actualQuantity).toFixed(2)} KG` : '—'}
-                </div>
+                <div className="font-mono" data-testid="text-actual-qty">{fmtQty(batch.actualQuantity)}</div>
               </div>
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Waste</div>
-                <div className="font-mono">
-                  {batch.wasteQuantity ? `${parseFloat(batch.wasteQuantity).toFixed(2)} KG` : '—'}
-                </div>
+                <div className="font-mono">{fmtQty(batch.wasteQuantity)}</div>
               </div>
               {batch.wetQuantity && parseFloat(batch.wetQuantity) > 0 && (
                 <div>
                   <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Wet Qty</div>
-                  <div className="font-mono">{parseFloat(batch.wetQuantity).toFixed(2)} KG</div>
+                  <div className="font-mono">{fmtQty(batch.wetQuantity)}</div>
                 </div>
               )}
               {batch.millingQuantity && parseFloat(batch.millingQuantity) > 0 && (
                 <div>
                   <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Milling Qty</div>
-                  <div className="font-mono">{parseFloat(batch.millingQuantity).toFixed(2)} KG</div>
+                  <div className="font-mono">{fmtQty(batch.millingQuantity)}</div>
                 </div>
               )}
             </div>
@@ -185,43 +203,46 @@ export default function BatchDetail() {
           <CardTitle className="flex items-center gap-2 text-base">
             <Box className="h-4 w-4" />
             Input Lots Consumed
-            <Badge variant="secondary" className="ml-1">{batchMaterials.length}</Badge>
+            <Badge variant="secondary" className="ml-1">{inputLots.length}</Badge>
           </CardTitle>
           <CardDescription>Raw material lots used in this production batch, tracked for compliance.</CardDescription>
         </CardHeader>
         <CardContent>
-          {batchMaterials.length === 0 ? (
+          {inputsLoading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : inputLots.length === 0 ? (
             <div className="text-center text-muted-foreground py-6 text-sm">
               No material inputs recorded for this batch.
             </div>
           ) : (
             <div className="space-y-2">
-              {batchMaterials.map((bm: BatchMaterial) => {
-                const material = bm.materialId ? materials.find(m => m.id === bm.materialId) : null;
-                const product = bm.productId ? products.find(p => p.id === bm.productId) : null;
-                const lot: Lot | undefined = bm.lotId ? lots.find(l => l.id === bm.lotId) : undefined;
-                const name = material?.name || product?.name || 'Unknown';
-                const unit = material?.unit || product?.unit || 'KG';
+              {inputLots.map((il: InputLot) => {
+                const itemName = il.materialName || il.productName || 'Unknown';
                 return (
-                  <div key={bm.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30" data-testid={`row-input-${bm.id}`}>
-                    <div className="space-y-0.5">
-                      <div className="font-medium text-sm">{name}</div>
-                      {lot && (
-                        <div className="text-xs text-muted-foreground flex items-center gap-2">
-                          <span className="font-mono bg-background border px-1.5 py-0.5 rounded">{lot.lotNumber}</span>
-                          {lot.supplierLot && <span>Supplier: {lot.supplierLot}</span>}
-                          {lot.supplierName && <span>· {lot.supplierName}</span>}
-                          {lot.expiryDate && <span>· Exp: {format(new Date(lot.expiryDate), 'dd/MM/yy')}</span>}
-                        </div>
-                      )}
-                      {!lot && bm.lotId && (
-                        <div className="text-xs text-muted-foreground font-mono">Lot ID: {bm.lotId}</div>
-                      )}
+                  <div key={il.batchMaterialId} className="flex items-start justify-between p-3 border rounded-lg bg-muted/30 gap-2" data-testid={`row-input-${il.batchMaterialId}`}>
+                    <div className="space-y-1 min-w-0">
+                      <div className="font-medium text-sm">{itemName}</div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                        <Link href={`/lots/${il.lotId}`}>
+                          <span className="font-mono bg-background border px-1.5 py-0.5 rounded hover:bg-accent cursor-pointer inline-flex items-center gap-1" data-testid={`link-lot-${il.lotId}`}>
+                            {il.lotNumber}
+                            <ExternalLink className="h-2.5 w-2.5" />
+                          </span>
+                        </Link>
+                        {il.barcodeValue && <span className="font-mono">{il.barcodeValue}</span>}
+                        {il.supplierLot && <span>Supplier Lot: {il.supplierLot}</span>}
+                        {il.supplierName && <span>· {il.supplierName}</span>}
+                        {il.expiryDate && <span>· Exp: {fmtDate(il.expiryDate, 'dd/MM/yy')}</span>}
+                        {il.addedAt && <span>· Added: {fmtDate(il.addedAt, 'dd MMM yy')}</span>}
+                      </div>
+                      <Badge className={`text-xs px-1.5 py-0 ${lotStatusColors[il.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {il.status}
+                      </Badge>
                     </div>
-                    <div className="text-right">
-                      <div className="font-mono font-medium text-sm">{parseFloat(bm.quantity || '0').toFixed(2)} {unit}</div>
-                      {lot?.barcodeValue && (
-                        <div className="text-xs text-muted-foreground font-mono">{lot.barcodeValue}</div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono font-medium text-sm">{fmtQty(il.quantityConsumed)}</div>
+                      {il.remainingQuantity && (
+                        <div className="text-xs text-muted-foreground font-mono">{fmtQty(il.remainingQuantity)} left</div>
                       )}
                     </div>
                   </div>
@@ -236,37 +257,87 @@ export default function BatchDetail() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <CheckCircle className="h-4 w-4" />
-            Output Products
-            <Badge variant="secondary" className="ml-1">{batchOutputs.length}</Badge>
+            Output Lots Produced
+            <Badge variant="secondary" className="ml-1">{outputLots.length}</Badge>
           </CardTitle>
           <CardDescription>Finished goods and lots produced by this batch.</CardDescription>
         </CardHeader>
         <CardContent>
-          {batchOutputs.length === 0 ? (
+          {outputsLoading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : outputLots.length === 0 ? (
             <div className="text-center text-muted-foreground py-6 text-sm">
-              No outputs recorded yet.
+              No output lots recorded yet.
             </div>
           ) : (
             <div className="space-y-2">
-              {batchOutputs.map((output: BatchOutput) => {
-                const outputProduct = output.productId ? products.find(p => p.id === output.productId) : null;
-                const outputLot = output.lotId ? lots.find(l => l.id === output.lotId) : null;
-                return (
-                  <div key={output.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30" data-testid={`row-output-${output.id}`}>
-                    <div className="space-y-0.5">
-                      <div className="font-medium text-sm">{outputProduct?.name || 'Output'}</div>
-                      {outputLot && (
-                        <div className="text-xs text-muted-foreground flex items-center gap-2">
-                          <span className="font-mono bg-background border px-1.5 py-0.5 rounded">{outputLot.lotNumber}</span>
-                          {outputLot.barcodeValue && <span className="font-mono text-xs">{outputLot.barcodeValue}</span>}
-                        </div>
-                      )}
-                      {output.notes && (
-                        <div className="text-xs text-muted-foreground">{output.notes}</div>
-                      )}
+              {outputLots.map((ol: OutputLot) => (
+                <div key={ol.lotId} className="flex items-start justify-between p-3 border rounded-lg bg-muted/30 gap-2" data-testid={`row-output-${ol.lotId}`}>
+                  <div className="space-y-1 min-w-0">
+                    <div className="font-medium text-sm">{ol.productName || 'Output'}</div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                      <Link href={`/lots/${ol.lotId}`}>
+                        <span className="font-mono bg-background border px-1.5 py-0.5 rounded hover:bg-accent cursor-pointer inline-flex items-center gap-1" data-testid={`link-outlot-${ol.lotId}`}>
+                          {ol.lotNumber}
+                          <ExternalLink className="h-2.5 w-2.5" />
+                        </span>
+                      </Link>
+                      {ol.barcodeValue && <span className="font-mono">{ol.barcodeValue}</span>}
+                      {ol.producedDate && <span>Produced: {fmtDate(ol.producedDate, 'dd/MM/yy')}</span>}
+                      {ol.expiryDate && <span>· Exp: {fmtDate(ol.expiryDate, 'dd/MM/yy')}</span>}
+                      {ol.barcodePrintedAt && <span className="text-green-600">· Label printed</span>}
                     </div>
-                    <div className="font-mono font-medium text-sm">
-                      {parseFloat(output.actualQuantity || '0').toFixed(2)} {outputProduct?.unit || 'KG'}
+                    <Badge className={`text-xs px-1.5 py-0 ${lotStatusColors[ol.status] || 'bg-gray-100 text-gray-600'}`}>
+                      {ol.status}
+                    </Badge>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-mono font-medium text-sm">{fmtQty(ol.quantity)}</div>
+                    {ol.remainingQuantity && (
+                      <div className="text-xs text-muted-foreground font-mono">{fmtQty(ol.remainingQuantity)} left</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ArrowRightLeft className="h-4 w-4" />
+            Stock Movements
+            <Badge variant="secondary" className="ml-1">{movements.length}</Badge>
+          </CardTitle>
+          <CardDescription>All inventory movements recorded against this batch.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {movementsLoading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : movements.length === 0 ? (
+            <div className="text-center text-muted-foreground py-6 text-sm">
+              No stock movements linked to this batch.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {movements.map((mv: StockMovement) => {
+                const isOut = ['consume', 'ship', 'adjust'].includes(mv.movementType);
+                return (
+                  <div key={mv.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 text-sm" data-testid={`row-movement-${mv.id}`}>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <TrendingDown className={`h-3.5 w-3.5 ${isOut ? 'text-red-500' : 'text-green-500 rotate-180'}`} />
+                        <span className="font-medium">{movementLabels[mv.movementType] ?? mv.movementType}</span>
+                      </div>
+                      {mv.reference && (
+                        <div className="text-xs text-muted-foreground">{mv.reference}</div>
+                      )}
+                      <div className="text-xs text-muted-foreground">{fmtDate(mv.createdAt, 'dd MMM yyyy, h:mm a')}</div>
+                    </div>
+                    <div className={`font-mono font-medium ${isOut ? 'text-red-600' : 'text-green-600'}`}>
+                      {isOut ? '-' : '+'}{parseFloat(mv.quantity).toFixed(2)}
                     </div>
                   </div>
                 );
@@ -280,7 +351,7 @@ export default function BatchDetail() {
         <CardContent className="py-4 flex items-center justify-between">
           <div className="text-sm text-muted-foreground flex items-center gap-2">
             <Calendar className="h-4 w-4" />
-            Created {batch.createdAt ? format(new Date(batch.createdAt), 'dd MMM yyyy, h:mm a') : '—'}
+            Created {batch.createdAt ? fmtDate(batch.createdAt, 'dd MMM yyyy, h:mm a') : '—'}
           </div>
           <Link href={`/traceability?batch=${batch.batchNumber}`}>
             <Button size="sm" variant="outline" data-testid="button-trace-bottom">
