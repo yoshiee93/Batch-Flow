@@ -130,11 +130,11 @@ export default function LotDetail() {
                 <CardDescription className="mt-1">{itemName}</CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge className={lotStatusColors[lot.status] ?? 'bg-gray-100 text-gray-700'} data-testid="badge-lot-status">
-                  {lot.status}
+                <Badge className={(lot.status ? lotStatusColors[lot.status] : null) ?? 'bg-gray-100 text-gray-700'} data-testid="badge-lot-status">
+                  {lot.status ?? '—'}
                 </Badge>
                 <Badge variant="outline" data-testid="badge-lot-type">
-                  {lotTypeLabels[lot.lotType] ?? lot.lotType}
+                  {lot.lotType ? (lotTypeLabels[lot.lotType] ?? lot.lotType) : '—'}
                 </Badge>
               </div>
             </div>
@@ -225,7 +225,7 @@ export default function LotDetail() {
               <div className="flex items-center gap-2 text-sm">
                 <Tag className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Type</span>
-                <span className="ml-auto font-medium">{lotTypeLabels[lot.lotType] ?? lot.lotType}</span>
+                <span className="ml-auto font-medium">{lot.lotType ? (lotTypeLabels[lot.lotType] ?? lot.lotType) : '—'}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Hash className="h-4 w-4 text-muted-foreground" />

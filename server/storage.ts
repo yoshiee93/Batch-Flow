@@ -1369,7 +1369,7 @@ export class DatabaseStorage implements IStorage {
     const lot = await this.getLot(lotId);
     if (!lot) return null;
 
-    const usedInBatches = await db.select({
+    const directUsage = await db.select({
       batchMaterial: batchMaterials,
       batch: batches,
       product: products,
@@ -1379,13 +1379,36 @@ export class DatabaseStorage implements IStorage {
     .innerJoin(products, eq(batches.productId, products.id))
     .where(eq(batchMaterials.lotId, lotId));
 
-    const outputLots = await db.select().from(lots).where(
-      sql`${lots.sourceBatchId} IN (SELECT ${batchMaterials.batchId} FROM ${batchMaterials} WHERE ${batchMaterials.lotId} = ${lotId})`
-    );
+    const sourceLotUsage = await db.select({
+      batchMaterial: batchMaterials,
+      batch: batches,
+      product: products,
+    })
+    .from(batchMaterials)
+    .innerJoin(batches, eq(batchMaterials.batchId, batches.id))
+    .innerJoin(products, eq(batches.productId, products.id))
+    .where(eq(batchMaterials.sourceLotId, lotId));
+
+    const seenBmIds = new Set<string>();
+    const allUsage = [...directUsage, ...sourceLotUsage].filter(r => {
+      if (seenBmIds.has(r.batchMaterial.id)) return false;
+      seenBmIds.add(r.batchMaterial.id);
+      return true;
+    });
+
+    const batchIdSet: Record<string, boolean> = {};
+    allUsage.forEach(r => { batchIdSet[r.batch.id] = true; });
+    const usedBatchIds = Object.keys(batchIdSet);
+
+    const outputLots = usedBatchIds.length > 0
+      ? await db.select().from(lots).where(
+          sql`${lots.sourceBatchId} IN (${sql.join(usedBatchIds.map(id => sql`${id}`), sql`, `)})`
+        )
+      : [];
 
     return {
       lot,
-      usedInBatches: usedInBatches.map(r => ({
+      usedInBatches: allUsage.map(r => ({
         batch: r.batch,
         product: r.product,
         quantityUsed: r.batchMaterial.quantity,
