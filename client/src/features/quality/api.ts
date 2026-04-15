@@ -1,2 +1,2 @@
-// Quality domain — no hooks implemented yet.
-// Placeholder for future quality check endpoints.
+// Quality domain — placeholder for future quality check endpoints.
+export {};

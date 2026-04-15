@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/fetchApi";
-import type { InputLot, OutputLot } from "@/features/production/api";
 
 export interface Lot {
   id: string;
@@ -45,24 +44,6 @@ export interface StockMovement {
   reference: string | null;
   createdBy: string | null;
   createdAt: string;
-}
-
-export interface LotUsageEntry {
-  batchId: string;
-  batchNumber: string;
-  batchStatus: string;
-  productId: string;
-  productName: string;
-  quantityConsumed: string;
-  addedAt: string | null;
-}
-
-export interface LotLineageResponse {
-  lot: Lot;
-  sourceBatch: Record<string, unknown> | null;
-  sourceInputLots: InputLot[];
-  usedInBatches: LotUsageEntry[];
-  outputLots: Array<OutputLot & { fromBatchId?: string; fromBatchNumber?: string }>;
 }
 
 export function useLots() {
@@ -138,21 +119,5 @@ export function useStockMovements(batchId?: string) {
       const params = batchId ? `?batchId=${encodeURIComponent(batchId)}` : "";
       return fetchApi<StockMovement[]>(`/stock-movements${params}`);
     },
-  });
-}
-
-export function useLotUsage(lotId: string) {
-  return useQuery<LotUsageEntry[]>({
-    queryKey: ["lotUsage", lotId],
-    queryFn: () => fetchApi<LotUsageEntry[]>(`/lots/${lotId}/usage`),
-    enabled: !!lotId,
-  });
-}
-
-export function useLotLineage(lotId: string) {
-  return useQuery<LotLineageResponse>({
-    queryKey: ["lotLineage", lotId],
-    queryFn: () => fetchApi<LotLineageResponse>(`/lots/${lotId}/lineage`),
-    enabled: !!lotId,
   });
 }
