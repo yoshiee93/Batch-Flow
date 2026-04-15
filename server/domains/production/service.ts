@@ -8,9 +8,11 @@ import {
   batches as batchesTable, products as productsTable, materials as materialsTable,
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
-import type { Batch, InsertBatch, BatchMaterial, BatchOutput } from "@shared/schema";
+import type {
+  Batch, InsertBatch, BatchMaterial, InsertBatchMaterial, BatchOutput, InsertStockMovement,
+} from "@shared/schema";
 
-async function createStockMovement(data: any) {
+async function createStockMovement(data: InsertStockMovement) {
   return inventoryRepository.createStockMovement(data);
 }
 
@@ -24,7 +26,7 @@ export const productionService = {
     return repo.getLotById(lotId);
   },
 
-  async addBatchMaterial(data: any): Promise<BatchMaterial> {
+  async addBatchMaterial(data: InsertBatchMaterial): Promise<BatchMaterial> {
     const created = await repo.insertBatchMaterial(data);
     await createAuditLog({ entityType: "batch_material", entityId: created.id, action: "create", changes: JSON.stringify(data) });
     return created;

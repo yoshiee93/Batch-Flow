@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { products, materials, batches, orders } from "@shared/schema";
 
@@ -14,24 +14,22 @@ export const dashboardRepository = {
     const allBatches = await db.select().from(batches);
     const allOrders = await db.select().from(orders);
 
-    const activeBatches = allBatches.filter(b => b.status === "in_progress").length;
-    const pendingOrders = allOrders.filter(o => o.status === "pending" || o.status === "in_production").length;
+    const activeBatches = allBatches.filter(b =>
+      ["planned", "in_progress", "quality_check"].includes(b.status)
+    ).length;
 
-    const lowStockProducts = allProducts.filter(p => {
-      const stock = parseFloat(p.currentStock || "0");
-      const threshold = parseFloat(p.minStock || "0");
-      return threshold > 0 && stock <= threshold;
-    }).length;
-    const lowStockMaterials = allMaterials.filter(m => {
-      const stock = parseFloat(m.currentStock || "0");
-      const threshold = parseFloat(m.minStock || "0");
-      return threshold > 0 && stock <= threshold;
-    }).length;
+    const pendingOrders = allOrders.filter(o =>
+      ["pending", "in_production"].includes(o.status)
+    ).length;
+
+    const lowStockAlerts = allMaterials.filter(
+      m => parseFloat(m.currentStock) <= parseFloat(m.minStock)
+    ).length;
 
     return {
       activeBatches,
       pendingOrders,
-      lowStockAlerts: lowStockProducts + lowStockMaterials,
+      lowStockAlerts,
       totalProducts: allProducts.length,
     };
   },

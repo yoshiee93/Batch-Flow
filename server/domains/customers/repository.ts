@@ -9,7 +9,7 @@ import {
 
 export const customersRepository = {
   async getCustomers(): Promise<Customer[]> {
-    return db.select().from(customers).orderBy(customers.name);
+    return db.select().from(customers).where(eq(customers.active, true)).orderBy(customers.name);
   },
 
   async getCustomer(id: string): Promise<Customer | undefined> {
@@ -28,7 +28,7 @@ export const customersRepository = {
   },
 
   async deleteCustomerRaw(id: string): Promise<void> {
-    await db.delete(customers).where(eq(customers.id, id));
+    await db.update(customers).set({ active: false }).where(eq(customers.id, id));
   },
 
   async getOrders(): Promise<Order[]> {
@@ -103,8 +103,8 @@ export const customersRepository = {
     await db.update(products).set({ currentStock: newStock }).where(eq(products.id, productId));
   },
 
-  async updateOrderStatus(id: string, status: string): Promise<Order> {
-    const [updated] = await db.update(orders).set({ status } as any).where(eq(orders.id, id)).returning();
+  async updateOrderStatus(id: string, status: "pending" | "in_production" | "ready" | "shipped" | "cancelled"): Promise<Order> {
+    const [updated] = await db.update(orders).set({ status }).where(eq(orders.id, id)).returning();
     return updated;
   },
 

@@ -91,8 +91,8 @@ export const productionRepository = {
     await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, materialId));
   },
 
-  async updateLotRemainingAndStatus(lotId: string, remainingQuantity: string, status: string): Promise<void> {
-    await db.update(lots).set({ remainingQuantity, status: status as any }).where(eq(lots.id, lotId));
+  async updateLotRemainingAndStatus(lotId: string, remainingQuantity: string, status: "active" | "quarantined" | "released" | "consumed" | "expired"): Promise<void> {
+    await db.update(lots).set({ remainingQuantity, status }).where(eq(lots.id, lotId));
   },
 
   async updateLotRemaining(lotId: string, remainingQuantity: string): Promise<void> {
