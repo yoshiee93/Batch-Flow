@@ -1,9 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 import { insertLotSchema, insertStockMovementSchema } from "@shared/schema";
-import type { ReceiveStockInput } from "../../storage";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { inventoryRepository as repo } from "./repository";
+import { inventoryService as svc } from "./service";
 
 export const inventoryRouter = Router();
 
@@ -24,19 +23,19 @@ const receiveStockSchema = z.object({
 });
 
 inventoryRouter.get("/lots/barcode/:value", asyncHandler(async (req, res) => {
-  const lot = await repo.getLotByBarcode(req.params.value);
+  const lot = await svc.getLotByBarcode(req.params.value);
   if (!lot) return res.status(404).json({ error: "Lot not found for barcode" });
   let materialName: string | undefined;
   let materialUnit: string | undefined;
   let productName: string | undefined;
   let productUnit: string | undefined;
   if (lot.materialId) {
-    const material = await repo.getMaterial(lot.materialId);
+    const material = await svc.getMaterial(lot.materialId);
     materialName = material?.name;
     materialUnit = material?.unit;
   }
   if (lot.productId) {
-    const product = await repo.getProduct(lot.productId);
+    const product = await svc.getProduct(lot.productId);
     productName = product?.name;
     productUnit = product?.unit;
   }
@@ -44,77 +43,77 @@ inventoryRouter.get("/lots/barcode/:value", asyncHandler(async (req, res) => {
 }));
 
 inventoryRouter.get("/lots/:id/usage", asyncHandler(async (req, res) => {
-  res.json(await repo.getLotUsage(req.params.id));
+  res.json(await svc.getLotUsage(req.params.id));
 }));
 
 inventoryRouter.get("/lots/:id/lineage", asyncHandler(async (req, res) => {
-  const lineage = await repo.getLotLineage(req.params.id);
+  const lineage = await svc.getLotLineage(req.params.id);
   if (!lineage) return res.status(404).json({ error: "Lot not found" });
   res.json(lineage);
 }));
 
 inventoryRouter.patch("/lots/:id/barcode-printed", asyncHandler(async (req, res) => {
-  const lot = await repo.updateLotBarcodePrinted(req.params.id);
+  const lot = await svc.updateLotBarcodePrinted(req.params.id);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
   res.json(lot);
 }));
 
 inventoryRouter.get("/lots/:id", asyncHandler(async (req, res) => {
-  const lot = await repo.getLot(req.params.id);
+  const lot = await svc.getLot(req.params.id);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
   res.json(lot);
 }));
 
 inventoryRouter.get("/lots", asyncHandler(async (_req, res) => {
-  res.json(await repo.getLots());
+  res.json(await svc.getLots());
 }));
 
 inventoryRouter.post("/lots", asyncHandler(async (req, res) => {
   const data = insertLotSchema.parse(req.body);
-  res.status(201).json(await repo.createLot(data));
+  res.status(201).json(await svc.createLot(data));
 }));
 
 inventoryRouter.patch("/lots/:id", asyncHandler(async (req, res) => {
   const data = insertLotSchema.partial().parse(req.body);
-  const lot = await repo.updateLot(req.params.id, data);
+  const lot = await svc.updateLot(req.params.id, data);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
   res.json(lot);
 }));
 
 inventoryRouter.delete("/lots/:id", asyncHandler(async (req, res) => {
-  await repo.deleteLot(req.params.id);
+  await svc.deleteLot(req.params.id);
   res.status(204).send();
 }));
 
 inventoryRouter.get("/materials/:id/lots", asyncHandler(async (req, res) => {
-  res.json(await repo.getLotsByMaterial(req.params.id));
+  res.json(await svc.getLotsByMaterial(req.params.id));
 }));
 
 inventoryRouter.get("/products/:id/lots", asyncHandler(async (req, res) => {
-  res.json(await repo.getLotsByProduct(req.params.id));
+  res.json(await svc.getLotsByProduct(req.params.id));
 }));
 
 inventoryRouter.post("/receive-stock", asyncHandler(async (req, res) => {
-  const data = receiveStockSchema.parse(req.body) as ReceiveStockInput;
+  const data = receiveStockSchema.parse(req.body);
   const qty = parseFloat(data.quantity);
   if (isNaN(qty) || qty <= 0) {
     return res.status(400).json({ error: "quantity must be a positive number" });
   }
-  res.status(201).json(await repo.receiveStock(data));
+  res.status(201).json(await svc.receiveStock(data));
 }));
 
 inventoryRouter.get("/stock-movements", asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit as string) || 100;
   const batchId = req.query.batchId as string | undefined;
-  res.json(await repo.getStockMovements(limit, batchId));
+  res.json(await svc.getStockMovements(limit, batchId));
 }));
 
 inventoryRouter.post("/stock-movements", asyncHandler(async (req, res) => {
   const data = insertStockMovementSchema.parse(req.body);
-  res.status(201).json(await repo.createStockMovement(data));
+  res.status(201).json(await svc.createStockMovement(data));
 }));
 
 inventoryRouter.get("/audit-logs", asyncHandler(async (req, res) => {
   const { entityType, entityId } = req.query;
-  res.json(await repo.getAuditLogs(entityType as string, entityId as string));
+  res.json(await svc.getAuditLogs(entityType as string, entityId as string));
 }));
