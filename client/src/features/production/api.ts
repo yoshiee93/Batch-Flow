@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/fetchApi";
 import type { InputLot, OutputLot } from "@/features/inventory/api";
+export type { InputLot, OutputLot } from "@/features/inventory/api";
 
 export interface Batch {
   id: string;
