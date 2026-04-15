@@ -1,0 +1,140 @@
+Task B: Make the traceability workflow audit-ready with fast barcode/lot lookup, full lineage visibility, and easy reprint access
+
+Before making changes:
+- Inspect the existing traceability page, batch detail page, lot detail page, barcode lookup route, lot routes, and batch routes
+- Reuse the current lot, batch, stock movement, audit log, and traceability logic
+- Extend the current pages and APIs instead of creating a second traceability interface
+
+Business goal:
+The traceability workflow must be fast, clear, and usable during compliance reviews, investigations, and day-to-day operational checks.
+
+Primary user outcomes:
+1. A user can scan or enter a barcode and immediately find the matching lot
+2. A user can search by lot number, barcode, supplier lot, or batch number
+3. A user can see backward and forward traceability without hunting through multiple pages
+4. A user can reprint barcode labels from the traceability result where appropriate
+5. The screen should feel operator-friendly, not developer-centric
+
+Required scope:
+
+1. Improve the main traceability search workflow
+Enhance the traceability page so it becomes the main investigation/search interface.
+
+The search input must support:
+- barcode
+- internal lot number
+- supplier lot
+- batch number
+
+Required behavior:
+- user can paste, type, or scan into one main search field
+- search should be tolerant of common operator behavior such as immediate scan input
+- if one exact match is found, show the result immediately
+- if multiple results are possible, show a clear result list to choose from
+
+2. Create a single-screen compliance view for lot results
+When the user opens a lot result, show a clear lot traceability summary on one page.
+
+The lot view should include:
+- lot number
+- barcode value
+- item/material/product name
+- lot type
+- status
+- source type
+- source name / supplier / farmer
+- supplier lot
+- received date or produced date
+- original quantity
+- remaining quantity
+- expiry date if available
+- notes if available
+
+Backward traceability section:
+- where the lot came from
+- if internally produced, show source batch
+- if externally received, show supplier/source details
+
+Forward traceability section:
+- show every batch that consumed this lot
+- show the resulting output lots created from those batches
+- allow navigation to related batch detail and lot detail records
+
+Related actions:
+- print/reprint barcode label
+- open batch detail
+- open related lot detail
+
+3. Improve the batch detail page for compliance investigation
+Make the batch detail page easier to use as an audit and investigation page.
+
+The batch detail page should clearly group:
+- batch header/details
+- all input lots used
+- all output lots created
+- stock movement history
+- audit history if available
+
+Required details for input lots:
+- lot number
+- barcode
+- item/material name
+- source/supplier/farmer
+- supplier lot
+- quantity consumed
+- status if relevant
+
+Required details for output lots:
+- lot number
+- barcode
+- product/item
+- quantity
+- produced date
+- status
+- print/reprint barcode action
+
+4. Add fast reprint access from traceability flows
+Users must be able to reprint labels during investigation without navigating awkwardly.
+
+Required behavior:
+- from lot detail / traceability result, user can print or reprint the lot label
+- from batch detail, user can print or reprint any output lot label
+- use the existing barcode print utility if already implemented
+- do not generate new barcodes during reprint; always reuse the stored barcode value
+
+5. Improve navigation between related records
+The workflow should allow a user to move naturally between linked records.
+
+Add or improve links/actions for:
+- lot -> source batch
+- lot -> consuming batch
+- batch -> input lot
+- batch -> output lot
+- output lot -> lot detail
+- traceability result -> related entities
+
+The user should be able to follow lineage in both directions with minimal clicks.
+
+6. Improve readability and audit usefulness
+This is important.
+Make the layout clear and non-technical.
+
+Requirements:
+- use clear section headings such as Source, Inputs, Outputs, Forward Trace, Backward Trace, Movements, Actions
+- avoid cluttered raw JSON-style rendering
+- prioritize the information a real auditor or operations user needs first
+- show empty states and not-found states clearly
+- make scanned lookup feel quick and reliable
+
+7. Keep the implementation aligned with the current app
+- do not create a separate duplicate search page if the current traceability page can be extended
+- do not duplicate lineage logic if server-side queries already exist
+- prefer improving current routes and UI components over replacing them
+
+Acceptance criteria:
+- a user can scan or enter a barcode and quickly get the matching lot
+- a user can search by lot number, barcode, supplier lot, or batch number
+- a lot detail/traceability view clearly shows source and usage history
+- a batch detail page clearly shows all input lots and output lots
+- users can reprint lot and output labels from the traceability flow
+- navigation between related lots and batches is clear and fast
