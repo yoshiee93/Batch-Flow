@@ -26,7 +26,24 @@ The frontend organizes features into pages (`client/src/pages/`), uses reusable 
 - **Database ORM**: Drizzle ORM (PostgreSQL dialect)
 - **Schema Validation**: Zod with drizzle-zod
 
-The backend structure includes `server/index.ts` for app setup, `server/routes.ts` for API registration, `server/storage.ts` for data access, `server/db.ts` for PostgreSQL connection, `server/seed.ts` for seeding, and integrates with Vite for development and static file serving for production.
+The backend is organized as a modular monolith by business domain:
+- `server/index.ts` — app setup and server startup
+- `server/routes.ts` — thin index that mounts all domain routers at `/api`
+- `server/domains/{catalog,inventory,production,traceability,quality,customers,dashboard}/` — each domain has a `routes.ts` (HTTP handlers) and `repository.ts` (data access delegation)
+- `server/storage.ts` — central data access layer (DatabaseStorage class implementing IStorage)
+- `server/lib/asyncHandler.ts` — shared Express async handler utility
+- `server/lib/lotUtils.ts` — lot number and barcode value generation
+- `server/db.ts` — PostgreSQL connection via Drizzle ORM
+- `server/seed.ts` — database seeding
+
+Domain routing map:
+- **catalog**: categories, products, materials, recipes
+- **inventory**: lots, stock movements, receive-stock, audit logs
+- **production**: batches, batch inputs/outputs, finalization, lot-based inputs
+- **traceability**: forward/backward traceability endpoints
+- **quality**: quality checks per batch
+- **customers**: customers, orders, order items, stock allocation
+- **dashboard**: dashboard statistics
 
 ### Data Storage
 - **Schema**: `shared/schema.ts` (shared between frontend/backend)
