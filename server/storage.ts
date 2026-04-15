@@ -1,19 +1,27 @@
 /**
  * storage.ts — interface contract (interface-only, no runtime implementation)
  *
- * The full implementation has been extracted into per-domain services and
- * repositories under server/domains/. This file retains the IStorage interface
- * as a compile-time contract reference only. There is no runtime DatabaseStorage
- * instance exported here — all API routes use domain services directly.
+ * MIGRATION NOTE: This file no longer contains any runtime logic.
+ * The full DatabaseStorage implementation was extracted into per-domain services
+ * and repositories under server/domains/. `IStorage` is retained here as a
+ * compile-time contract for reference only — it is NOT backed by any class or object.
  *
- * Domain structure:
- *   server/domains/catalog/    — categories, products, materials, recipes
- *   server/domains/inventory/  — lots, stock movements, audit logs, receive-stock
- *   server/domains/production/ — batches, batch inputs/outputs, finalization
+ * RUNTIME SOURCE OF TRUTH: Domain services (e.g. catalogService, inventoryService)
+ * are the actual implementations. All `/api/*` routes import from domain services directly.
+ *
+ * If you add a new feature, add it to the relevant domain:
+ *   server/domains/catalog/     — categories, products, materials, recipes
+ *   server/domains/inventory/   — lots, receive-stock, stock movements, audit logs
+ *   server/domains/production/  — batches, batch inputs/outputs, finalization
  *   server/domains/traceability/ — forward/backward lot traceability
- *   server/domains/quality/    — quality checks
- *   server/domains/customers/  — customers, orders, allocation
- *   server/domains/dashboard/  — dashboard stats
+ *   server/domains/quality/     — quality checks
+ *   server/domains/customers/   — customers, orders, stock allocation
+ *   server/domains/dashboard/   — dashboard stats
+ *
+ * Shared utilities:
+ *   server/lib/lotUtils.ts      — lot/barcode number generation
+ *   server/lib/auditLog.ts      — createAuditLog() helper
+ *   server/lib/asyncHandler.ts  — Express async route wrapper
  *
  * All API routes use domain services directly via server/routes.ts.
  */
