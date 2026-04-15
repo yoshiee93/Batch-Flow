@@ -1,9 +1,10 @@
 /**
- * storage.ts — thin adapter / backward-compatibility shim
+ * storage.ts — interface contract (interface-only, no runtime implementation)
  *
  * The full implementation has been extracted into per-domain services and
  * repositories under server/domains/. This file retains the IStorage interface
- * as a contract reference and delegates to the domain layer.
+ * as a compile-time contract reference only. There is no runtime DatabaseStorage
+ * instance exported here — all API routes use domain services directly.
  *
  * Domain structure:
  *   server/domains/catalog/    — categories, products, materials, recipes
