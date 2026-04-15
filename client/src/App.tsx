@@ -5,19 +5,18 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SettingsProvider } from "@/hooks/use-settings";
 import { Layout } from "@/components/layout/Layout";
-import Dashboard from "@/pages/Dashboard";
-import Orders from "@/pages/Orders";
-import Customers from "@/pages/Customers";
-import Production from "@/pages/Production";
-import Inventory from "@/pages/Inventory";
-import Traceability from "@/pages/Traceability";
-import Settings from "@/pages/Settings";
+import Dashboard from "@/features/dashboard/pages/Dashboard";
+import Orders from "@/features/customers/pages/Orders";
+import Customers from "@/features/customers/pages/Customers";
+import Production from "@/features/production/pages/Production";
+import Inventory from "@/features/inventory/pages/Inventory";
+import Traceability from "@/features/traceability/pages/Traceability";
+import Settings from "@/features/catalog/pages/Settings";
 import Calculator from "@/pages/Calculator";
 import NotFound from "@/pages/not-found";
-import BatchDetail from "@/pages/BatchDetail";
-import LotDetail from "@/pages/LotDetail";
+import BatchDetail from "@/features/production/pages/BatchDetail";
+import LotDetail from "@/features/inventory/pages/LotDetail";
 
-// Placeholder pages for routes that aren't built yet
 const Placeholder = ({ title }: { title: string }) => (
   <div className="flex flex-col items-center justify-center h-[60vh] text-muted-foreground">
     <h2 className="text-2xl font-mono font-bold mb-2">{title}</h2>

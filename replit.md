@@ -18,7 +18,20 @@ Preferred communication style: Simple, everyday language.
 - **Styling**: Tailwind CSS v4
 - **Build Tool**: Vite
 
-The frontend organizes features into pages (`client/src/pages/`), uses reusable UI components (`client/src/components/ui/`), layout components (`client/src/components/layout/`), custom hooks (`client/src/hooks/`), and an API client with React Query hooks (`client/src/lib/api.ts`).
+The frontend is organized into domain feature folders (`client/src/features/{domain}/`) to mirror the backend's modular structure:
+- `features/catalog/` — categories, products, materials, recipes (api.ts + Settings page)
+- `features/inventory/` — lots, stock movements, barcode lookup (api.ts + Inventory, LotDetail pages)
+- `features/production/` — batches, batch I/O (api.ts + Production, BatchDetail pages)
+- `features/traceability/` — forward/backward trace hooks (api.ts + Traceability page)
+- `features/customers/` — customers, orders, allocation (api.ts + Customers, Orders pages)
+- `features/dashboard/` — dashboard stats (api.ts + Dashboard page)
+- `features/quality/` — placeholder (no hooks yet)
+
+Shared utilities: `client/src/lib/fetchApi.ts` (HTTP utility), `client/src/lib/api.ts` (thin barrel re-export of all feature apis for backward compat), `client/src/lib/queryClient.ts`, `client/src/lib/barcodePrint.ts`.
+
+Cross-domain pages stay in `client/src/pages/`: `Calculator.tsx`, `not-found.tsx`.
+
+Reusable UI components: `client/src/components/ui/`, layout: `client/src/components/layout/`, custom hooks: `client/src/hooks/`.
 
 ### Backend
 - **Framework**: Express.js with TypeScript
