@@ -1,0 +1,120 @@
+Task: Unify and complete the barcode system across raw lots, finished goods, and batches
+
+Before making changes:
+- Inspect the existing lot barcode generation, lot detail page, batch detail page, production finalization flow, barcode print utility, traceability page, and any barcode lookup route
+- Reuse the current lot/barcode system instead of creating a second barcode implementation
+- Preserve existing receiving, production, and traceability behavior while making barcode handling consistent
+
+Business goal:
+Barcode handling must be complete and predictable across the system.
+Raw stock lots, finished goods lots, and batches must all support clear barcode workflows where appropriate.
+Users must also be able to re-open records later and reprint barcodes without generating new values.
+
+Core decisions to implement:
+1. Lots remain the primary physical barcode-tracked entities
+2. Finished goods output lots must always have barcode support
+3. Batches must support an optional batch-level barcode for identification, paperwork, QA, pallet grouping, and quick lookup
+4. Reprints must always reuse the original stored barcode value, never generate a new one
+5. Barcode behavior must be standardized and easy for operators to understand
+
+Required scope:
+
+1. Standardize barcode rules across the app
+Review the current barcode generation behavior and make it consistent.
+
+Required behavior:
+- raw material lots must have a stored barcode value
+- finished goods lots must have a stored barcode value
+- if practical within the current implementation, use the lot number itself as the barcode value for lots
+- do not allow the barcode format to drift between different lot types unless there is a clear system reason
+- barcode generation should be centralized in one helper/service, not repeated in multiple places
+
+2. Add optional batch-level barcode support
+Implement support for batch-level barcodes without replacing lot-level barcodes.
+
+Use case:
+- batches may need their own barcode for internal tracking, QA paperwork, operational lookup, pallet grouping, or re-opening the batch record later
+
+Required behavior:
+- add a batch barcode field if it does not already exist
+- generate a unique batch barcode value either on batch creation or on batch completion, depending on the current workflow and what fits best
+- batch barcode must be stored and reusable
+- scanning or searching a batch barcode should open the batch detail view
+- batch barcodes must not replace finished goods lot barcodes; they are an additional identifier for the batch itself
+
+3. Ensure finished goods/output lots always expose their barcodes clearly
+Review the batch finalization flow and batch detail UI.
+
+Required behavior:
+- when a batch is finalized and output lots are created, each output lot must clearly show:
+  - lot number
+  - barcode value
+  - quantity
+  - produced date
+  - status
+- after finalization, the user should be able to immediately print or reprint output lot barcode labels
+- batch detail page must clearly display output lot barcode actions for completed batches
+
+4. Add reprint support everywhere it is needed
+Users must be able to re-open existing records and print labels again.
+
+Required behavior:
+- lot detail page must support print/reprint of the lot barcode label
+- batch detail page must support print/reprint for output lot labels
+- batch detail page should also support print/reprint of the batch barcode label if batch barcode support is added
+- traceability results should expose print/reprint actions where appropriate
+- reprint must always use the already stored barcode value
+
+5. Improve barcode lookup behavior
+Users should be able to search or scan and land in the right place.
+
+Required behavior:
+- if a lot barcode is scanned or entered, open the matching lot
+- if a finished goods lot barcode is scanned or entered, open the matching lot
+- if a batch barcode is scanned or entered, open the matching batch
+- if the current traceability search can be extended, do that instead of creating a duplicate lookup page
+- make sure the system can distinguish between batch and lot barcode results clearly
+
+6. Keep barcode generation and printing centralized
+Refactor barcode logic so it is easier to maintain.
+
+Required implementation:
+- centralize barcode generation helper(s)
+- centralize barcode print/reprint helper(s)
+- avoid separate ad hoc implementations across inventory, production, and traceability
+- update imports/usages to use the shared barcode utility
+
+7. Preserve traceability relationships
+Do not break lineage.
+
+The system must still support:
+- raw/input lot -> batch -> finished output lot
+- finished output lot -> source batch -> input lots
+- batch barcode -> batch detail -> inputs and outputs
+
+Files likely involved:
+- shared schema/types
+- batch schema/model if batch barcode field needs to be added
+- server barcode helpers/utilities
+- server storage/repository logic for lots and batches
+- server routes/controllers for barcode lookup and batch/lot detail
+- client batch detail page
+- client lot detail page
+- client traceability page
+- barcode print utility/component
+
+Implementation requirements:
+- do not create a second parallel barcode subsystem
+- extend the current barcode and traceability flow
+- keep the existing lot-based compliance model intact
+- use targeted updates, not a broad rewrite
+- if a migration is required, include it or document how the schema should be updated
+
+Acceptance criteria:
+- raw lots have consistent stored barcode support
+- finished goods/output lots have consistent stored barcode support
+- batches can have an optional stored batch-level barcode
+- users can print and reprint barcodes for lots and completed batch outputs
+- users can re-open records later and reprint the same barcode
+- barcode lookup routes users to the correct lot or batch record
+- barcode logic is more centralized and maintainable than before
