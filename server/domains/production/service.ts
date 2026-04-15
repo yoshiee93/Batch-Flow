@@ -1,6 +1,6 @@
 import { db } from "../../db";
 import { productionRepository as repo } from "./repository";
-import { inventoryRepository } from "../inventory/repository";
+import { inventoryRepository, type BatchInputLotEntry, type BatchOutputLotEntry } from "../inventory/repository";
 import { createAuditLog } from "../../lib/auditLog";
 import { generateLotNumber, generateBarcodeValue } from "../../lib/lotUtils";
 import {
@@ -47,6 +47,9 @@ export const productionService = {
   },
 
   async deleteBatch(id: string): Promise<void> {
+    // Direct db.transaction used here: multi-table cascade + stock reversal must be atomic.
+    // Drizzle transactions require the tx context to be threaded through all statements,
+    // so repository methods (which use the module-level db) cannot participate in this tx.
     await db.transaction(async (tx) => {
       const outputs = await tx.select().from(batchOutputs).where(eq(batchOutputs.batchId, id));
       for (const output of outputs) {
@@ -406,11 +409,11 @@ export const productionService = {
     return updated;
   },
 
-  async getBatchInputLots(batchId: string): Promise<any[]> {
+  async getBatchInputLots(batchId: string): Promise<BatchInputLotEntry[]> {
     return inventoryRepository.getBatchInputLots(batchId);
   },
 
-  async getBatchOutputLots(batchId: string): Promise<any[]> {
+  async getBatchOutputLots(batchId: string): Promise<BatchOutputLotEntry[]> {
     return inventoryRepository.getBatchOutputLots(batchId);
   },
 };

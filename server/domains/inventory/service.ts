@@ -1,7 +1,16 @@
-import { inventoryRepository as repo } from "./repository";
+import { inventoryRepository as repo, type BatchInputLotEntry, type BatchOutputLotEntry } from "./repository";
 import { createAuditLog } from "../../lib/auditLog";
 import { generateLotNumber, generateBarcodeValue } from "../../lib/lotUtils";
-import type { InsertLot, InsertStockMovement, Lot, StockMovement } from "@shared/schema";
+import type { InsertLot, InsertStockMovement, Lot, StockMovement, Batch } from "@shared/schema";
+import type { LotUsageEntry } from "./repository";
+
+export type LotLineageNode = {
+  lot: Lot;
+  sourceBatch: Batch | null;
+  sourceInputLots: (BatchInputLotEntry & { lineage: LotLineageNode | null })[];
+  usedInBatches: LotUsageEntry[];
+  outputLots: (BatchOutputLotEntry & { lineage: LotLineageNode | null })[];
+} | null;
 
 export type ReceiveStockInput = {
   materialId: string;
@@ -117,43 +126,43 @@ export const inventoryService = {
     return repo.getProductById(productId);
   },
 
-  async getLotLineage(lotId: string, depth = 0, maxDepth = 5, visited = new Set<string>()): Promise<any> {
+  async getLotLineage(lotId: string, depth = 0, maxDepth = 5, visited = new Set<string>()): Promise<LotLineageNode> {
     if (depth > maxDepth || visited.has(lotId)) return null;
     visited.add(lotId);
 
     const lot = await repo.getLot(lotId);
     if (!lot) return null;
 
-    let sourceBatch = null;
-    let sourceInputLots: any[] = [];
+    let sourceBatch: Batch | null = null;
+    let sourceInputLots: (BatchInputLotEntry & { lineage: LotLineageNode })[] = [];
     if (lot.sourceBatchId) {
       const { productionRepository } = await import("../production/repository");
-      sourceBatch = await productionRepository.getBatch(lot.sourceBatchId);
+      sourceBatch = await productionRepository.getBatch(lot.sourceBatchId) ?? null;
       if (sourceBatch) {
         const rawInputLots = await repo.getBatchInputLots(lot.sourceBatchId);
         sourceInputLots = await Promise.all(
-          rawInputLots.map(async (inputLot: any) => {
+          rawInputLots.map(async (inputLot: BatchInputLotEntry) => {
             if (inputLot.lotId && !visited.has(inputLot.lotId)) {
               const upstreamLineage = await inventoryService.getLotLineage(inputLot.lotId, depth + 1, maxDepth, visited);
               return { ...inputLot, lineage: upstreamLineage };
             }
-            return inputLot;
+            return { ...inputLot, lineage: null };
           })
         );
       }
     }
 
-    const usedInBatches = await repo.getLotUsage(lotId);
-    const outputLots: any[] = [];
+    const usedInBatches: LotUsageEntry[] = await repo.getLotUsage(lotId);
+    const outputLots: (BatchOutputLotEntry & { lineage: LotLineageNode })[] = [];
     for (const usage of usedInBatches) {
       const batchOutputLotsResult = await repo.getBatchOutputLots(usage.batchId);
       const enriched = await Promise.all(
-        batchOutputLotsResult.map(async (outLot: any) => {
+        batchOutputLotsResult.map(async (outLot: BatchOutputLotEntry) => {
           if (outLot.lotId && !visited.has(outLot.lotId)) {
             const downstreamLineage = await inventoryService.getLotLineage(outLot.lotId, depth + 1, maxDepth, new Set(visited));
             return { ...outLot, lineage: downstreamLineage };
           }
-          return outLot;
+          return { ...outLot, lineage: null };
         })
       );
       outputLots.push(...enriched);

@@ -5,6 +5,7 @@ import {
   type Batch, type InsertBatch,
   type BatchMaterial, type InsertBatchMaterial,
   type BatchOutput, type InsertBatchOutput,
+  type Lot, type InsertLot,
 } from "@shared/schema";
 
 export const productionRepository = {
@@ -108,12 +109,12 @@ export const productionRepository = {
       .where(and(eq(lots.sourceBatchId, batchId), eq(lots.productId, productId)));
   },
 
-  async insertLot(data: any) {
+  async insertLot(data: InsertLot): Promise<Lot> {
     const [created] = await db.insert(lots).values(data).returning();
     return created;
   },
 
-  async updateLotFields(lotId: string, data: any) {
+  async updateLotFields(lotId: string, data: Partial<InsertLot>): Promise<void> {
     await db.update(lots).set(data).where(eq(lots.id, lotId));
   },
 

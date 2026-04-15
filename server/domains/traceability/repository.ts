@@ -1,12 +1,37 @@
-import { eq } from "drizzle-orm";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 import {
   batches, batchMaterials, lots, products, materials, recipes,
+  type Lot, type Batch, type Product, type Material, type Recipe,
 } from "@shared/schema";
 
+type BatchUsageEntry = {
+  batch: Batch;
+  product: Product;
+  quantityUsed: string;
+};
+
+type MaterialUsedEntry = {
+  material: Material;
+  lot: Lot;
+  quantityUsed: string;
+};
+
+export type TraceabilityForwardResult = {
+  lot: Lot;
+  usedInBatches: BatchUsageEntry[];
+  outputLots: Lot[];
+} | null;
+
+export type TraceabilityBackwardResult = {
+  batch: Batch;
+  product: Product | undefined;
+  recipe: Recipe | null;
+  materialsUsed: MaterialUsedEntry[];
+} | null;
+
 export const traceabilityRepository = {
-  async getTraceabilityForward(lotId: string): Promise<any> {
+  async getTraceabilityForward(lotId: string): Promise<TraceabilityForwardResult> {
     const [lot] = await db.select().from(lots).where(eq(lots.id, lotId));
     if (!lot) return null;
 
@@ -52,13 +77,13 @@ export const traceabilityRepository = {
     };
   },
 
-  async getTraceabilityBackward(batchId: string): Promise<any> {
+  async getTraceabilityBackward(batchId: string): Promise<TraceabilityBackwardResult> {
     const [batch] = await db.select().from(batches).where(eq(batches.id, batchId));
     if (!batch) return null;
 
     const [product] = await db.select().from(products).where(eq(products.id, batch.productId));
     const recipe = batch.recipeId
-      ? await (async () => { const [r] = await db.select().from(recipes).where(eq(recipes.id, batch.recipeId!)); return r; })()
+      ? await (async () => { const [r] = await db.select().from(recipes).where(eq(recipes.id, batch.recipeId!)); return r ?? null; })()
       : null;
 
     const materialsUsed = await db

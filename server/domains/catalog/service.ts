@@ -1,8 +1,5 @@
 import { catalogRepository as repo } from "./repository";
 import { createAuditLog } from "../../lib/auditLog";
-import { products } from "@shared/schema";
-import { db } from "../../db";
-import { eq } from "drizzle-orm";
 import {
   type Category, type InsertCategory,
   type Product, type InsertProduct,
@@ -33,7 +30,7 @@ export const catalogService = {
     const category = await repo.getCategory(id);
     if (!category) throw new Error("Category not found");
     if (category.isDefault) throw new Error("Cannot delete default category");
-    const usedBy = await db.select().from(products).where(eq(products.categoryId, id));
+    const usedBy = await repo.getProductsByCategoryId(id);
     if (usedBy.length > 0) {
       throw new Error(`Cannot delete category: ${usedBy.length} product(s) are using it`);
     }

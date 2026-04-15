@@ -29,6 +29,10 @@ export const catalogRepository = {
     return updated;
   },
 
+  async getProductsByCategoryId(categoryId: string): Promise<Product[]> {
+    return db.select().from(products).where(eq(products.categoryId, categoryId));
+  },
+
   async deleteCategory(id: string): Promise<void> {
     await db.delete(categories).where(eq(categories.id, id));
   },

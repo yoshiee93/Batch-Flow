@@ -99,6 +99,8 @@ export const customersService = {
   },
 
   async runStockAllocation(): Promise<void> {
+    // Direct db.transaction used here: allocation reads then writes across orders/items
+    // and must be atomic. The tx context is threaded through all sub-queries directly.
     await db.transaction(async (tx) => {
       const priorityOrder: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
       const activeOrders = await tx.select().from(orders)

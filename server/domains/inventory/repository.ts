@@ -7,6 +7,52 @@ import {
   type AuditLog,
 } from "@shared/schema";
 
+export type LotUsageEntry = {
+  batchId: string;
+  batchNumber: string;
+  batchStatus: string;
+  productId: string;
+  productName: string;
+  quantityConsumed: string;
+  addedAt: Date | null;
+};
+
+export type BatchInputLotEntry = {
+  batchMaterialId: string;
+  lotId: string;
+  lotNumber: string;
+  barcodeValue: string | null;
+  lotType: string;
+  status: string;
+  materialId: string | null;
+  materialName: string | null;
+  productId: string | null;
+  productName: string | null;
+  supplierName: string | null;
+  supplierLot: string | null;
+  sourceType: string | null;
+  receivedDate: Date | null;
+  expiryDate: Date | null;
+  quantityConsumed: string;
+  remainingQuantity: string | null;
+  addedAt: Date | null;
+};
+
+export type BatchOutputLotEntry = {
+  lotId: string;
+  lotNumber: string;
+  barcodeValue: string | null;
+  lotType: string;
+  status: string;
+  productId: string | null;
+  productName: string | null;
+  quantity: string;
+  remainingQuantity: string | null;
+  producedDate: Date | null;
+  expiryDate: Date | null;
+  barcodePrintedAt: Date | null;
+};
+
 export const inventoryRepository = {
   async getLots(): Promise<Lot[]> {
     return db.select().from(lots).orderBy(desc(lots.createdAt));
@@ -59,7 +105,7 @@ export const inventoryRepository = {
     return row;
   },
 
-  async getLotUsage(lotId: string): Promise<any[]> {
+  async getLotUsage(lotId: string): Promise<LotUsageEntry[]> {
     const directUsage = await db
       .select({ bm: batchMaterials, batch: batches, product: products })
       .from(batchMaterials)
@@ -88,7 +134,7 @@ export const inventoryRepository = {
       }));
   },
 
-  async getBatchInputLots(batchId: string): Promise<any[]> {
+  async getBatchInputLots(batchId: string): Promise<BatchInputLotEntry[]> {
     const materialLotInputs = await db
       .select({ bm: batchMaterials, lot: lots, material: materials })
       .from(batchMaterials)
@@ -147,7 +193,7 @@ export const inventoryRepository = {
     ];
   },
 
-  async getBatchOutputLots(batchId: string): Promise<any[]> {
+  async getBatchOutputLots(batchId: string): Promise<BatchOutputLotEntry[]> {
     const outputLots = await db
       .select({ lot: lots, product: products })
       .from(lots)
