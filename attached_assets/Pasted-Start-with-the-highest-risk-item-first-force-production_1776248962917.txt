@@ -1,0 +1,145 @@
+Start with the highest-risk item first: **force production to be strictly lot-based**, and include the finished-batch barcode/reprint requirement in the same pass so the workflow is complete.
+
+Use this in Replit.
+
+```text
+Task A: Harden production workflow so it is strictly lot-based, and ensure completed batches support output barcode generation and reprinting
+
+Before making changes:
+- Inspect the existing production flow, batch creation/edit flow, batch finalization flow, lot creation logic, barcode generation logic, batch detail page, and lot detail page
+- Reuse the current lot, batch, batch_materials, batch_outputs, stock_movements, and traceability structures
+- Extend the existing implementation instead of creating a second inventory or barcode system
+
+Business goal:
+Production must be compliance-safe.
+Users must consume exact lots in production, finished batches must create traceable output lots with barcodes, and users must be able to re-open and reprint those barcodes later.
+
+Critical rules:
+1. Production inputs must be tied to exact lots
+2. Users must not be able to finalize a production batch without proper lot-based inputs where traceability is required
+3. Finished outputs must create output lots with barcode values
+4. Output lot barcodes must be viewable and printable again later from batch detail and lot detail views
+
+Scope of this task:
+
+1. Enforce strict lot-based production inputs
+Review the current production UI and backend validation and make lot-based tracking mandatory for production inputs wherever traceability applies.
+
+Required behavior:
+- When adding an input to a batch, the user must select or scan a specific lot
+- The system must not allow generic material-only consumption if the item is traceable inventory
+- The system must validate:
+  - lot exists
+  - lot is active/usable
+  - lot has sufficient remaining quantity
+  - lot belongs to the expected material/product where applicable
+- Prevent over-consumption
+- Prevent duplicate accidental entries unless the user is intentionally adding another quantity from the same lot
+
+Important:
+If there are legacy code paths that still allow materialId-only usage without a lotId, update them so they cannot bypass traceability for relevant inventory items.
+
+2. Improve production input UX
+Make the production screen clearly lot-first.
+
+Required UI behavior:
+- barcode input field for scanner/keyboard entry
+- barcode lookup returns the lot
+- show lot details clearly:
+  - lot number
+  - barcode
+  - item/material name
+  - supplier/source
+  - supplier lot
+  - remaining quantity
+  - status
+- allow user to enter consumption quantity
+- show current batch inputs in a clear table/list
+- show validation errors clearly
+
+The workflow should feel like:
+- scan barcode
+- confirm lot found
+- enter quantity
+- add to batch
+- repeat
+
+3. Batch finalization must create output lots with barcodes
+Review the batch completion/finalization logic and ensure completed production creates finished output lots correctly.
+
+Required behavior:
+- when a batch is finalized, create one or more finished lots
+- each finished lot must have:
+  - unique lot number
+  - barcode value
+  - produced date
+  - source batch reference
+  - quantity
+  - status
+- create stock movement and audit records
+- do not leave completed batch outputs unlinked to real lots
+
+4. Make completed batch barcodes accessible after completion
+This is required.
+
+Add support so users can open a completed batch later and view the output lot barcode(s) again.
+
+Required behavior:
+- batch detail page must show all output lots created from that batch
+- for each output lot, show:
+  - lot number
+  - barcode value
+  - quantity
+  - status
+  - produced date
+- add a clear action to view/print/reprint the barcode label for each output lot
+- this must work after the batch is already completed, not only during finalization
+
+5. Reprint support for lots and output lots
+Users must be able to re-open a lot later and print the barcode label again.
+
+Required behavior:
+- lot detail page must include:
+  - barcode display
+  - print/reprint label action
+- batch detail page must include print/reprint actions for output lots
+- if barcodePrintedAt exists, update it appropriately when printing/reprinting if that fits the current data model
+- do not generate a different barcode on reprint; reprints must use the same barcode value already assigned to the lot
+
+6. Keep barcode standard simple and consistent
+Standardize this across the app:
+- barcode value should match the internal lot number unless there is already a good reason in the codebase not to do that
+- use a consistent barcode format for raw lots and finished lots
+- keep scanner workflow simple and operator-friendly
+
+7. Preserve traceability
+After these changes, the system must still support:
+- raw/input lot -> batch -> finished output lot
+- finished output lot -> source batch -> input lots
+
+Files likely involved:
+- shared schema/types
+- server storage/repository logic
+- server routes/controllers for production, lots, finalize batch, barcode lookup
+- client production page
+- client batch detail page
+- client lot detail page
+- barcode print utility/component
+
+Implementation requirements:
+- do not create a second barcode subsystem
+- do not create a second lot/output model if one already exists
+- keep existing routes functional where possible
+- prefer targeted updates over broad rewrites
+- clean up any legacy bypasses that undermine compliance
+
+Acceptance criteria:
+- user cannot consume traceable stock in production without selecting/scanning a real lot
+- user can scan a lot barcode into production and consume quantity safely
+- finalizing a batch creates finished output lot(s) with barcode values
+- user can open a completed batch later and reprint output lot barcode labels
+- user can open a lot later and reprint its barcode label
+- traceability remains intact from input lots through to output lots
+```
+
+After that, the next task should be the audit-ready traceability screen.

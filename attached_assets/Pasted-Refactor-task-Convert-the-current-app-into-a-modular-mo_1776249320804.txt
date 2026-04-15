@@ -1,0 +1,79 @@
+Refactor task: Convert the current app into a modular monolith organized by business domain before further feature development and testing
+
+Context:
+This is an existing React + TypeScript + Express + Drizzle/Postgres application. It already supports catalog/inventory/production/traceability-style workflows and has recently been expanded with lot/barcode functionality.
+
+Business reason:
+We are going to keep adding major features, including CRM and sales functionality. Before further testing and feature expansion, the codebase needs to be reorganized to reduce bloat, separate concerns, and make future development safer.
+
+Important constraints:
+- Do not rebuild the app
+- Do not replace working functionality
+- Do not introduce microservices
+- Keep this as a modular monolith
+- Preserve all current routes and behavior where possible
+- Refactor structure and responsibilities first, not product behavior
+- Minimize regressions
+
+Primary objective:
+Separate the codebase by domain so inventory, production, traceability, and future CRM/sales features do not become tangled.
+
+Target backend structure:
+- modules/catalog
+- modules/inventory
+- modules/production
+- modules/traceability
+- modules/quality
+- modules/customers
+- shared utilities for barcode, lot numbering, audit, and DB access
+
+Target frontend structure:
+- features/catalog
+- features/inventory
+- features/production
+- features/traceability
+- features/quality
+- features/customers
+- shared components/lib/utils
+
+Required backend rules:
+- routes files should only handle HTTP concerns
+- service files should contain business logic
+- repository files should contain DB access/query logic
+- shared helpers should be centralized, especially barcode generation, lot numbering, and audit helpers
+
+Required frontend rules:
+- feature-specific pages/components/hooks/api should live together
+- avoid one oversized central API file
+- avoid duplicated types drifting away from shared schema
+- keep reusable UI in shared folders
+
+Specific refactor goals:
+1. Split the current backend routes by domain
+2. Extract business logic from any oversized storage/service files into domain services and repositories
+3. Centralize barcode generation, lot number generation, and audit helpers
+4. Reorganize frontend pages/components/api calls by domain
+5. Clean up duplicate or stale frontend types and align with shared schema/types
+6. Preserve existing functionality while improving maintainability
+
+Future-proofing requirement:
+Structure the code so it is easy to add later:
+- CRM
+- sales pipeline
+- quotes
+- customer/account history
+- purchasing
+- reporting
+
+What to deliver:
+- a proposed folder/module structure applied to the codebase
+- backend domain split with thin routes
+- frontend feature split
+- cleanup of obvious duplicated/stale types
+- explanation of what was moved and why
+- notes about any follow-up tasks still needed
+
+Important:
+Do this as a staged refactor that preserves behavior.
+Prefer moving and reorganizing existing logic over rewriting working logic.
+If some large file must temporarily remain, reduce its responsibility and leave clear structure for further extraction.
