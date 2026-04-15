@@ -8,13 +8,14 @@ import { Separator } from '@/components/ui/separator';
 import {
   ArrowLeft, ChevronRight, Loader2, AlertCircle, Package, Factory,
   Tag, Truck, ArrowRight, ArrowUpRight, ClipboardList, Calendar,
-  Hash, Barcode, ExternalLink
+  Hash, Barcode, ExternalLink, Printer
 } from 'lucide-react';
 import {
   useLotById, useLotUsage, useLotLineage, useMaterials, useProducts, useBatch,
   type LotUsageEntry, type OutputLot
 } from '@/lib/api';
 import { format } from 'date-fns';
+import { printBarcodeLabel } from '@/lib/barcodePrint';
 
 const lotStatusColors: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
@@ -252,6 +253,27 @@ export default function LotDetail() {
               Full Trace
             </Button>
           </Link>
+          {lot.barcodeValue && (
+            <Button
+              variant="outline"
+              className="w-full"
+              data-testid="button-print-label"
+              onClick={() => printBarcodeLabel({
+                lotNumber: lot.lotNumber,
+                barcodeValue: lot.barcodeValue,
+                itemName,
+                quantity: lot.quantity,
+                unit,
+                sourceLabel: lot.supplierName || lot.sourceName || undefined,
+                receivedDate: lot.receivedDate,
+                expiryDate: lot.expiryDate,
+                supplierLot: lot.supplierLot,
+              })}
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              {lot.barcodePrintedAt ? 'Reprint Label' : 'Print Label'}
+            </Button>
+          )}
         </div>
       </div>
 

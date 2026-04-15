@@ -160,3 +160,26 @@ export function useStockMovements(batchId?: string) {
     },
   });
 }
+
+export interface AuditLog {
+  id: string;
+  userId: string | null;
+  entityType: string;
+  entityId: string;
+  action: string;
+  changes: string | null;
+  createdAt: string;
+}
+
+export function useAuditLogs(entityType?: string, entityId?: string) {
+  return useQuery<AuditLog[]>({
+    queryKey: ["auditLogs", entityType ?? "", entityId ?? ""],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (entityType) params.set("entityType", entityType);
+      if (entityId) params.set("entityId", entityId);
+      return fetchApi<AuditLog[]>(`/audit-logs?${params.toString()}`);
+    },
+    enabled: !!entityType,
+  });
+}

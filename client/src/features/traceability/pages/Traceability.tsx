@@ -4,9 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, ArrowRight, ArrowLeft, Box, Factory, Loader2, AlertCircle, Barcode } from 'lucide-react';
+import { Search, ArrowRight, ArrowLeft, Box, Factory, Loader2, AlertCircle, Barcode, Printer } from 'lucide-react';
 import { useLots, useBatches, useMaterials, useProducts, useTraceabilityForward, useTraceabilityBackward, fetchLotByBarcode } from '@/lib/api';
 import type { ForwardTraceResponse, BackwardTraceResponse } from '@/features/traceability/api';
+import { printBarcodeLabel } from '@/lib/barcodePrint';
+
+type Candidate =
+  | { type: 'lot'; id: string; label: string; sublabel?: string }
+  | { type: 'batch'; id: string; label: string; sublabel?: string };
 
 export default function Traceability() {
   const search = useSearch();
@@ -18,6 +23,7 @@ export default function Traceability() {
   const [searchId, setSearchId] = useState<{ type: 'lot' | 'batch'; id: string } | null>(null);
   const [barcodeError, setBarcodeError] = useState('');
   const [isBarcodeLookup, setIsBarcodeLookup] = useState(false);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
 
   const { data: lots = [] } = useLots();
   const { data: batches = [] } = useBatches();
@@ -37,15 +43,41 @@ export default function Traceability() {
     if (!trimmed) return;
     setBarcodeError('');
     setActiveQuery(trimmed);
+    setCandidates([]);
+    setSearchId(null);
 
-    const lot = lots.find(l =>
-      l.lotNumber.toLowerCase() === trimmed.toLowerCase() ||
-      l.supplierLot?.toLowerCase() === trimmed.toLowerCase()
+    const lower = trimmed.toLowerCase();
+
+    const matchingLots = lots.filter(l =>
+      l.lotNumber.toLowerCase().includes(lower) ||
+      (l.supplierLot?.toLowerCase().includes(lower))
     );
-    if (lot) { setSearchId({ type: 'lot', id: lot.id }); return; }
+    const matchingBatches = batches.filter(b => b.batchNumber.toLowerCase().includes(lower));
 
-    const batch = batches.find(b => b.batchNumber.toLowerCase() === trimmed.toLowerCase());
-    if (batch) { setSearchId({ type: 'batch', id: batch.id }); return; }
+    const allCandidates: Candidate[] = [
+      ...matchingLots.map(l => ({
+        type: 'lot' as const,
+        id: l.id,
+        label: l.lotNumber,
+        sublabel: l.supplierLot ? `Supplier lot: ${l.supplierLot}` : undefined,
+      })),
+      ...matchingBatches.map(b => ({
+        type: 'batch' as const,
+        id: b.id,
+        label: b.batchNumber,
+        sublabel: `Batch · ${b.status.replace('_', ' ')}`,
+      })),
+    ];
+
+    if (allCandidates.length === 1) {
+      setSearchId({ type: allCandidates[0].type, id: allCandidates[0].id });
+      return;
+    }
+
+    if (allCandidates.length > 1) {
+      setCandidates(allCandidates);
+      return;
+    }
 
     setIsBarcodeLookup(true);
     try {
@@ -57,6 +89,11 @@ export default function Traceability() {
     } finally {
       setIsBarcodeLookup(false);
     }
+  };
+
+  const selectCandidate = (c: Candidate) => {
+    setCandidates([]);
+    setSearchId({ type: c.type, id: c.id });
   };
 
   useEffect(() => {
@@ -130,19 +167,56 @@ export default function Traceability() {
           <AlertCircle className="h-12 w-12 text-destructive mb-4" />
           <h2 className="text-xl font-semibold mb-2">Failed to load traceability data</h2>
           <p className="text-muted-foreground mb-4">There was an error retrieving the trace data. Please try again.</p>
-          <Button onClick={() => { setSearchId(null); setActiveQuery(''); setBarcodeError(''); }}>Clear and Try Again</Button>
+          <Button onClick={() => { setSearchId(null); setActiveQuery(''); setBarcodeError(''); setCandidates([]); }}>Clear and Try Again</Button>
         </div>
       )}
 
-      {forwardTrace && searchId?.type === 'lot' && !hasError && (
+      {candidates.length > 1 && !isLoading && !hasError && (
+        <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Multiple matches found</CardTitle>
+              <CardDescription>
+                Your search <span className="font-mono font-medium">"{activeQuery}"</span> matches {candidates.length} records.
+                Select one to view its trace.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {candidates.map((c) => (
+                  <button
+                    key={`${c.type}-${c.id}`}
+                    className="w-full flex items-center justify-between p-3 border rounded-lg hover:bg-accent text-left transition-colors"
+                    data-testid={`candidate-${c.type}-${c.id}`}
+                    onClick={() => selectCandidate(c)}
+                  >
+                    <div className="flex items-center gap-3">
+                      {c.type === 'lot' ? <Box className="h-4 w-4 text-muted-foreground shrink-0" /> : <Factory className="h-4 w-4 text-muted-foreground shrink-0" />}
+                      <div>
+                        <div className="font-mono font-medium text-sm">{c.label}</div>
+                        {c.sublabel && <div className="text-xs text-muted-foreground">{c.sublabel}</div>}
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      {c.type === 'lot' ? 'Lot' : 'Batch'}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {forwardTrace && searchId?.type === 'lot' && !hasError && candidates.length === 0 && (
         <ForwardTraceView trace={forwardTrace} materials={materials} products={products} />
       )}
 
-      {backwardTrace && searchId?.type === 'batch' && !hasError && (
+      {backwardTrace && searchId?.type === 'batch' && !hasError && candidates.length === 0 && (
         <BackwardTraceView trace={backwardTrace} />
       )}
 
-      {!isLoading && !hasError && searchId === null && barcodeError && (
+      {!isLoading && !hasError && searchId === null && barcodeError && candidates.length === 0 && (
         <div className="text-center py-8 space-y-2">
           <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto" />
           <p className="text-muted-foreground">No lot or batch found matching <span className="font-mono font-medium">"{barcodeError}"</span></p>
@@ -187,9 +261,32 @@ function ForwardTraceView({ trace, materials, products }: {
                 <Badge variant={lot.status === 'active' ? 'default' : 'secondary'} className="text-xs">{lot.status}</Badge>
               </CardDescription>
             </div>
-            <Link href={`/lots/${lot.id}`}>
-              <Button variant="outline" size="sm">View Lot Detail</Button>
-            </Link>
+            <div className="flex gap-2 flex-wrap">
+              {lot.barcodeValue && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-print-label-trace"
+                  onClick={() => printBarcodeLabel({
+                    lotNumber: lot.lotNumber,
+                    barcodeValue: lot.barcodeValue,
+                    itemName,
+                    quantity: lot.quantity,
+                    unit: 'KG',
+                    sourceLabel: lot.supplierName || lot.sourceName || undefined,
+                    receivedDate: lot.receivedDate,
+                    expiryDate: lot.expiryDate,
+                    supplierLot: lot.supplierLot,
+                  })}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Label
+                </Button>
+              )}
+              <Link href={`/lots/${lot.id}`}>
+                <Button variant="outline" size="sm">View Lot Detail</Button>
+              </Link>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pt-0">

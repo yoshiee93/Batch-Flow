@@ -6,13 +6,15 @@ import { Separator } from '@/components/ui/separator';
 import {
   ArrowLeft, Package, Factory, Box, ChevronRight, Loader2,
   ClipboardList, Calendar, AlertCircle, CheckCircle, Scale,
-  TrendingDown, ArrowRightLeft, ExternalLink
+  TrendingDown, ArrowRightLeft, ExternalLink, Printer, History, User
 } from 'lucide-react';
 import {
   useBatch, useProducts, useBatchInputLots, useBatchOutputLots, useStockMovements, useRecipes,
-  type InputLot, type OutputLot, type StockMovement
+  useAuditLogs,
+  type InputLot, type OutputLot, type StockMovement, type AuditLog
 } from '@/lib/api';
 import { format } from 'date-fns';
+import { printBarcodeLabel } from '@/lib/barcodePrint';
 
 const batchStatusColors: Record<string, string> = {
   planned: 'bg-gray-100 text-gray-700',
@@ -60,6 +62,7 @@ export default function BatchDetail() {
   const { data: inputLots = [], isLoading: inputsLoading } = useBatchInputLots(id!);
   const { data: outputLots = [], isLoading: outputsLoading } = useBatchOutputLots(id!);
   const { data: movements = [], isLoading: movementsLoading } = useStockMovements(id!);
+  const { data: auditLogs = [], isLoading: auditLoading } = useAuditLogs('batch', id!);
 
   if (batchLoading) {
     return (
@@ -307,10 +310,29 @@ export default function BatchDetail() {
                       {ol.status}
                     </Badge>
                   </div>
-                  <div className="text-right shrink-0">
+                  <div className="text-right shrink-0 space-y-1">
                     <div className="font-mono font-medium text-sm">{fmtQty(ol.quantity)}</div>
                     {ol.remainingQuantity && (
                       <div className="text-xs text-muted-foreground font-mono">{fmtQty(ol.remainingQuantity)} left</div>
+                    )}
+                    {ol.barcodeValue && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-7 px-2"
+                        data-testid={`button-reprint-${ol.lotId}`}
+                        onClick={() => printBarcodeLabel({
+                          lotNumber: ol.lotNumber,
+                          barcodeValue: ol.barcodeValue,
+                          itemName: ol.productName || 'Output',
+                          quantity: ol.quantity,
+                          unit: 'KG',
+                          expiryDate: ol.expiryDate,
+                        })}
+                      >
+                        <Printer className="h-3 w-3 mr-1" />
+                        Reprint
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -361,6 +383,44 @@ export default function BatchDetail() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <History className="h-4 w-4" />
+            Audit History
+          </CardTitle>
+          <CardDescription>All recorded actions for this batch.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {auditLoading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : auditLogs.length === 0 ? (
+            <div className="text-center text-muted-foreground py-6 text-sm">
+              No audit records found for this batch.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {auditLogs.map((log: AuditLog) => (
+                <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 text-sm" data-testid={`row-audit-${log.id}`}>
+                  <div className="space-y-0.5">
+                    <div className="font-medium capitalize">{log.action.replace(/_/g, ' ')}</div>
+                    {log.userId && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <User className="h-3 w-3" />
+                        {log.userId}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground shrink-0 text-right">
+                    {fmtDate(log.createdAt, 'dd MMM yyyy, h:mm a')}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
