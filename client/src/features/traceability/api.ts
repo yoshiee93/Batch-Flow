@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/fetchApi";
-import type { Lot } from "@/features/inventory/api";
-import type { InputLot, OutputLot } from "@/features/production/api";
+import type { Lot, InputLot, OutputLot } from "@/features/inventory/api";
 
 export interface LotUsageEntry {
   batchId: string;
@@ -21,18 +20,74 @@ export interface LotLineageResponse {
   outputLots: Array<OutputLot & { fromBatchId?: string; fromBatchNumber?: string }>;
 }
 
+export interface ForwardTraceBatchUsage {
+  batch: {
+    id: string;
+    batchNumber: string;
+    status: string;
+    plannedQuantity: string;
+    actualQuantity: string | null;
+  };
+  product: {
+    id: string;
+    name: string;
+    unit: string;
+  };
+  quantityUsed: string;
+}
+
+export interface ForwardTraceResponse {
+  lot: Lot;
+  usedInBatches: ForwardTraceBatchUsage[];
+  outputLots: Lot[];
+}
+
+export interface BackwardTraceMaterialUsed {
+  material: {
+    id: string;
+    name: string;
+    unit: string;
+  };
+  lot: Lot;
+  quantityUsed: string;
+}
+
+export interface BackwardTraceResponse {
+  batch: {
+    id: string;
+    batchNumber: string;
+    status: string;
+    plannedQuantity: string;
+    actualQuantity: string | null;
+    startDate: string | null;
+    endDate: string | null;
+  };
+  product?: {
+    id: string;
+    name: string;
+    unit: string;
+  };
+  recipe: {
+    id: string;
+    name: string;
+    version: number;
+    outputQuantity: string;
+  } | null;
+  materialsUsed: BackwardTraceMaterialUsed[];
+}
+
 export function useTraceabilityForward(lotId: string) {
-  return useQuery<Record<string, unknown>>({
+  return useQuery<ForwardTraceResponse>({
     queryKey: ["traceability", "forward", lotId],
-    queryFn: () => fetchApi<Record<string, unknown>>(`/traceability/forward/${lotId}`),
+    queryFn: () => fetchApi<ForwardTraceResponse>(`/traceability/forward/${lotId}`),
     enabled: !!lotId,
   });
 }
 
 export function useTraceabilityBackward(batchId: string) {
-  return useQuery<Record<string, unknown>>({
+  return useQuery<BackwardTraceResponse>({
     queryKey: ["traceability", "backward", batchId],
-    queryFn: () => fetchApi<Record<string, unknown>>(`/traceability/backward/${batchId}`),
+    queryFn: () => fetchApi<BackwardTraceResponse>(`/traceability/backward/${batchId}`),
     enabled: !!batchId,
   });
 }

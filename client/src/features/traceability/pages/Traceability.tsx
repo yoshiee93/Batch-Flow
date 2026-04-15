@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Search, ArrowRight, ArrowLeft, Box, Factory, Loader2, AlertCircle, Barcode } from 'lucide-react';
 import { useLots, useBatches, useMaterials, useProducts, useTraceabilityForward, useTraceabilityBackward, fetchLotByBarcode } from '@/lib/api';
+import type { ForwardTraceResponse, BackwardTraceResponse } from '@/features/traceability/api';
 
 export default function Traceability() {
   const search = useSearch();
@@ -158,17 +159,17 @@ const lotTypeLabels: Record<string, string> = {
   finished_good: 'Finished Good',
 };
 
-function ForwardTraceView({ trace, materials, products }: { trace: Record<string, unknown>; materials: Array<{ id: string; name: string }>; products: Array<{ id: string; name: string }> }) {
-  const lot = trace.lot as Record<string, unknown> | undefined;
-  if (!lot) return null;
-
-  const usedInBatches = (trace.usedInBatches as Array<Record<string, unknown>>) ?? [];
-  const outputLots = (trace.outputLots as Array<Record<string, unknown>>) ?? [];
-  const lotType = (lot.lotType as string) ?? '';
-  const sourceDesc = (lot.supplierName as string) || (lot.sourceName as string) || ((lot.sourceBatchId as string) ? 'Internally produced' : 'External receipt');
-  const material = (lot.materialId as string) ? materials.find(m => m.id === lot.materialId) : null;
-  const product = (lot.productId as string) ? products.find(p => p.id === lot.productId) : null;
-  const itemName = material?.name || product?.name || (lot.lotNumber as string);
+function ForwardTraceView({ trace, materials, products }: {
+  trace: ForwardTraceResponse;
+  materials: Array<{ id: string; name: string }>;
+  products: Array<{ id: string; name: string }>;
+}) {
+  const { lot, usedInBatches, outputLots } = trace;
+  const lotType = lot.lotType ?? '';
+  const sourceDesc = lot.supplierName || lot.sourceName || (lot.sourceBatchId ? 'Internally produced' : 'External receipt');
+  const material = lot.materialId ? materials.find(m => m.id === lot.materialId) : null;
+  const product = lot.productId ? products.find(p => p.id === lot.productId) : null;
+  const itemName = material?.name || product?.name || lot.lotNumber;
 
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
@@ -178,12 +179,12 @@ function ForwardTraceView({ trace, materials, products }: { trace: Record<string
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Box className="h-5 w-5" />
-                Lot: {lot.lotNumber as string}
+                Lot: {lot.lotNumber}
               </CardTitle>
               <CardDescription className="font-mono flex gap-3 flex-wrap mt-1">
-                {(lot.barcodeValue as string) && <Badge variant="outline" className="font-mono text-xs">{lot.barcodeValue as string}</Badge>}
+                {lot.barcodeValue && <Badge variant="outline" className="font-mono text-xs">{lot.barcodeValue}</Badge>}
                 {lotType && <Badge variant="secondary" className="text-xs">{lotTypeLabels[lotType] ?? lotType}</Badge>}
-                <Badge variant={lot.status === 'active' ? 'default' : 'secondary'} className="text-xs">{lot.status as string}</Badge>
+                <Badge variant={lot.status === 'active' ? 'default' : 'secondary'} className="text-xs">{lot.status}</Badge>
               </CardDescription>
             </div>
             <Link href={`/lots/${lot.id}`}>
@@ -199,11 +200,11 @@ function ForwardTraceView({ trace, materials, products }: { trace: Record<string
             </div>
             <div>
               <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Quantity</div>
-              <div className="font-mono">{parseFloat(lot.quantity as string).toFixed(2)} KG</div>
+              <div className="font-mono">{parseFloat(lot.quantity).toFixed(2)} KG</div>
             </div>
             <div>
               <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Remaining</div>
-              <div className="font-mono">{parseFloat(lot.remainingQuantity as string).toFixed(2)} KG</div>
+              <div className="font-mono">{parseFloat(lot.remainingQuantity).toFixed(2)} KG</div>
             </div>
             <div>
               <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Source</div>
@@ -217,10 +218,10 @@ function ForwardTraceView({ trace, materials, products }: { trace: Record<string
               <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Contributed to</div>
               <div>{outputLots.length} output lot{outputLots.length !== 1 ? 's' : ''}</div>
             </div>
-            {(lot.supplierLot as string) && (
+            {lot.supplierLot && (
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Supplier Lot</div>
-                <div className="font-mono">{lot.supplierLot as string}</div>
+                <div className="font-mono">{lot.supplierLot}</div>
               </div>
             )}
           </div>
@@ -228,56 +229,52 @@ function ForwardTraceView({ trace, materials, products }: { trace: Record<string
         <CardContent>
           <div className="relative border-l-2 border-dashed border-border ml-6 pl-8 py-2 space-y-8">
 
-            {Array.isArray(trace.usedInBatches) && trace.usedInBatches.length > 0 && (
+            {usedInBatches.length > 0 && (
               <div className="relative">
                 <div className="absolute -left-[41px] top-1 bg-background p-1 border rounded-full">
                   <ArrowRight size={16} />
                 </div>
                 <h4 className="font-bold text-sm uppercase text-muted-foreground mb-2">Used In Production Batches</h4>
                 <div className="grid gap-2">
-                  {(trace.usedInBatches as Array<Record<string, unknown>>).map((usage, i) => {
-                    const batch = usage.batch as Record<string, unknown>;
-                    const product = usage.product as Record<string, unknown>;
-                    return (
-                      <div key={i} className="flex justify-between items-center p-3 border rounded bg-card" data-testid={`trace-batch-${batch.id}`}>
-                        <div className="flex flex-col">
-                          <Link href={`/batches/${batch.id}`} className="font-mono font-bold text-sm hover:underline text-primary">
-                            {batch.batchNumber as string}
-                          </Link>
-                          <span className="text-xs text-muted-foreground">{product.name as string}</span>
-                          <span className="text-xs text-muted-foreground">Status: {(batch.status as string).replace('_', ' ')}</span>
-                        </div>
-                        <span className="font-mono text-sm">{parseFloat(usage.quantityUsed as string).toFixed(2)} KG used</span>
+                  {usedInBatches.map((usage, i) => (
+                    <div key={i} className="flex justify-between items-center p-3 border rounded bg-card" data-testid={`trace-batch-${usage.batch.id}`}>
+                      <div className="flex flex-col">
+                        <Link href={`/batches/${usage.batch.id}`} className="font-mono font-bold text-sm hover:underline text-primary">
+                          {usage.batch.batchNumber}
+                        </Link>
+                        <span className="text-xs text-muted-foreground">{usage.product.name}</span>
+                        <span className="text-xs text-muted-foreground">Status: {usage.batch.status.replace('_', ' ')}</span>
                       </div>
-                    );
-                  })}
+                      <span className="font-mono text-sm">{parseFloat(usage.quantityUsed).toFixed(2)} KG used</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {Array.isArray(trace.usedInBatches) && trace.usedInBatches.length === 0 && (
+            {usedInBatches.length === 0 && (
               <div className="text-muted-foreground text-sm">
                 This lot has not been used in any production batches yet.
               </div>
             )}
 
-            {Array.isArray(trace.outputLots) && trace.outputLots.length > 0 && (
+            {outputLots.length > 0 && (
               <div className="relative">
                 <div className="absolute -left-[41px] top-1 bg-background p-1 border rounded-full">
                   <Factory size={16} />
                 </div>
                 <h4 className="font-bold text-sm uppercase text-muted-foreground mb-2">Produced Output Lots</h4>
                 <div className="grid gap-2">
-                  {(trace.outputLots as Array<Record<string, unknown>>).map((outputLot, i) => (
+                  {outputLots.map((outputLot, i) => (
                     <Link key={i} href={`/lots/${outputLot.id}`}>
                       <div className="flex justify-between items-center p-3 border rounded bg-card hover:bg-accent cursor-pointer">
                         <div className="flex flex-col">
-                          <span className="font-mono font-bold text-sm">{outputLot.lotNumber as string}</span>
-                          {(outputLot.barcodeValue as string) && (
-                            <span className="text-xs text-muted-foreground font-mono">{outputLot.barcodeValue as string}</span>
+                          <span className="font-mono font-bold text-sm">{outputLot.lotNumber}</span>
+                          {outputLot.barcodeValue && (
+                            <span className="text-xs text-muted-foreground font-mono">{outputLot.barcodeValue}</span>
                           )}
                         </div>
-                        <span className="font-mono text-sm">{parseFloat(outputLot.quantity as string).toFixed(2)} KG</span>
+                        <span className="font-mono text-sm">{parseFloat(outputLot.quantity).toFixed(2)} KG</span>
                       </div>
                     </Link>
                   ))}
@@ -291,11 +288,8 @@ function ForwardTraceView({ trace, materials, products }: { trace: Record<string
   );
 }
 
-function BackwardTraceView({ trace }: { trace: Record<string, unknown> }) {
-  const batch = trace.batch as Record<string, unknown> | undefined;
-  if (!batch) return null;
-  const product = trace.product as Record<string, unknown> | undefined;
-  const recipe = trace.recipe as Record<string, unknown> | undefined;
+function BackwardTraceView({ trace }: { trace: BackwardTraceResponse }) {
+  const { batch, product, recipe, materialsUsed } = trace;
 
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -305,12 +299,12 @@ function BackwardTraceView({ trace }: { trace: Record<string, unknown> }) {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Factory className="h-5 w-5" />
-                Batch: {batch.batchNumber as string}
+                Batch: {batch.batchNumber}
               </CardTitle>
               <CardDescription className="font-mono flex gap-3 flex-wrap mt-1">
-                {product && <span>Product: {product.name as string}</span>}
-                <span>Status: {(batch.status as string).replace('_', ' ')}</span>
-                <span>Planned: {parseFloat(batch.plannedQuantity as string).toFixed(0)} KG</span>
+                {product && <span>Product: {product.name}</span>}
+                <span>Status: {batch.status.replace('_', ' ')}</span>
+                <span>Planned: {parseFloat(batch.plannedQuantity).toFixed(0)} KG</span>
               </CardDescription>
             </div>
             <Link href={`/batches/${batch.id}`}>
@@ -328,49 +322,45 @@ function BackwardTraceView({ trace }: { trace: Record<string, unknown> }) {
                 </div>
                 <h4 className="font-bold text-sm uppercase text-muted-foreground mb-2">Recipe Used</h4>
                 <Card className="p-3 bg-muted/30">
-                  <div className="font-mono font-bold">{recipe.name as string}</div>
-                  <div className="text-xs text-muted-foreground">Version {recipe.version as number} | Output: {parseFloat(recipe.outputQuantity as string).toFixed(0)} KG</div>
+                  <div className="font-mono font-bold">{recipe.name}</div>
+                  <div className="text-xs text-muted-foreground">Version {recipe.version} | Output: {parseFloat(recipe.outputQuantity).toFixed(0)} KG</div>
                 </Card>
               </div>
             )}
 
-            {Array.isArray(trace.materialsUsed) && trace.materialsUsed.length > 0 && (
+            {materialsUsed.length > 0 && (
               <div className="relative">
                 <div className="absolute -left-[41px] top-1 bg-background p-1 border rounded-full">
                   <ArrowLeft size={16} />
                 </div>
                 <h4 className="font-bold text-sm uppercase text-muted-foreground mb-2">Input Material Lots</h4>
                 <div className="grid gap-2">
-                  {(trace.materialsUsed as Array<Record<string, unknown>>).map((item, i) => {
-                    const lot = item.lot as Record<string, unknown>;
-                    const material = item.material as Record<string, unknown> | undefined;
-                    return (
-                      <div key={i} className="flex justify-between items-center p-3 border rounded bg-card" data-testid={`trace-material-${lot.id}`}>
-                        <div className="flex flex-col">
-                          <span className="font-medium text-sm">{material ? (material.name as string) : 'Material'}</span>
-                          <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                            <Link href={`/lots/${lot.id}`}>
-                              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded hover:bg-accent cursor-pointer">
-                                {lot.lotNumber as string}
-                              </span>
-                            </Link>
-                            {(lot.supplierLot as string) && (
-                              <span className="text-xs text-muted-foreground">Supplier: {lot.supplierLot as string}</span>
-                            )}
-                            {(lot.barcodeValue as string) && (
-                              <Badge variant="outline" className="text-xs font-mono">{lot.barcodeValue as string}</Badge>
-                            )}
-                          </div>
+                  {materialsUsed.map((item, i) => (
+                    <div key={i} className="flex justify-between items-center p-3 border rounded bg-card" data-testid={`trace-material-${item.lot.id}`}>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm">{item.material.name}</span>
+                        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                          <Link href={`/lots/${item.lot.id}`}>
+                            <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded hover:bg-accent cursor-pointer">
+                              {item.lot.lotNumber}
+                            </span>
+                          </Link>
+                          {item.lot.supplierLot && (
+                            <span className="text-xs text-muted-foreground">Supplier: {item.lot.supplierLot}</span>
+                          )}
+                          {item.lot.barcodeValue && (
+                            <Badge variant="outline" className="text-xs font-mono">{item.lot.barcodeValue}</Badge>
+                          )}
                         </div>
-                        <span className="font-mono text-sm">{parseFloat(item.quantityUsed as string).toFixed(2)} KG</span>
                       </div>
-                    );
-                  })}
+                      <span className="font-mono text-sm">{parseFloat(item.quantityUsed).toFixed(2)} KG</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {Array.isArray(trace.materialsUsed) && trace.materialsUsed.length === 0 && (
+            {materialsUsed.length === 0 && (
               <div className="text-muted-foreground text-sm">
                 No material lots have been recorded for this batch yet.
               </div>

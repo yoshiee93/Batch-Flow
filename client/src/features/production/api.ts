@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/fetchApi";
+import type { InputLot, OutputLot } from "@/features/inventory/api";
 
 export interface Batch {
   id: string;
@@ -25,54 +26,19 @@ export interface BatchMaterial {
   materialId: string | null;
   productId: string | null;
   lotId: string | null;
+  sourceLotId: string | null;
   quantity: string;
+  addedAt: string;
+  addedBy: string | null;
 }
 
 export interface BatchOutput {
   id: string;
   batchId: string;
-  productId: string | null;
+  productId: string;
   quantity: string;
-  actualQuantity: string | null;
-  lotId: string | null;
-  notes: string | null;
   addedAt: string;
-}
-
-export interface InputLot {
-  batchMaterialId: string;
-  lotId: string;
-  lotNumber: string;
-  barcodeValue: string | null;
-  lotType: string;
-  status: string;
-  materialId: string | null;
-  materialName: string | null;
-  productId: string | null;
-  productName: string | null;
-  supplierName: string | null;
-  supplierLot: string | null;
-  sourceType: string | null;
-  receivedDate: string | null;
-  expiryDate: string | null;
-  quantityConsumed: string;
-  remainingQuantity: string | null;
-  addedAt: string | null;
-}
-
-export interface OutputLot {
-  lotId: string;
-  lotNumber: string;
-  barcodeValue: string | null;
-  lotType: string;
-  status: string;
-  productId: string | null;
-  productName: string | null;
-  quantity: string | null;
-  remainingQuantity: string | null;
-  producedDate: string | null;
-  expiryDate: string | null;
-  barcodePrintedAt: string | null;
+  addedBy: string | null;
 }
 
 export function useBatches() {

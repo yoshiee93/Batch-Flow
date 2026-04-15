@@ -1,18 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/fetchApi";
+import type { LotType, LotStatus, SourceType } from "@shared/schema";
+
+export type { LotType, LotStatus, SourceType };
 
 export interface Lot {
   id: string;
   lotNumber: string;
-  lotType: string | null;
-  status: string | null;
+  lotType: LotType;
+  status: LotStatus;
   barcodeValue: string | null;
   materialId: string | null;
   productId: string | null;
   supplierLot: string | null;
   supplierName: string | null;
   sourceName: string | null;
-  sourceType: string | null;
+  sourceType: SourceType | null;
   originalQuantity: string | null;
   quantity: string;
   remainingQuantity: string;
@@ -30,6 +33,42 @@ export interface LotWithDetails extends Lot {
   materialUnit?: string;
   productName?: string;
   productUnit?: string;
+}
+
+export interface InputLot {
+  batchMaterialId: string;
+  lotId: string;
+  lotNumber: string;
+  barcodeValue: string | null;
+  lotType: string;
+  status: string;
+  materialId: string | null;
+  materialName: string | null;
+  productId: string | null;
+  productName: string | null;
+  supplierName: string | null;
+  supplierLot: string | null;
+  sourceType: string | null;
+  receivedDate: string | null;
+  expiryDate: string | null;
+  quantityConsumed: string;
+  remainingQuantity: string | null;
+  addedAt: string | null;
+}
+
+export interface OutputLot {
+  lotId: string;
+  lotNumber: string;
+  barcodeValue: string | null;
+  lotType: string;
+  status: string;
+  productId: string | null;
+  productName: string | null;
+  quantity: string;
+  remainingQuantity: string | null;
+  producedDate: string | null;
+  expiryDate: string | null;
+  barcodePrintedAt: string | null;
 }
 
 export interface StockMovement {
