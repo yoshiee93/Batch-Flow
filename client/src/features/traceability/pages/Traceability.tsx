@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Search, ArrowRight, ArrowLeft, Box, Factory, Loader2, AlertCircle, Barcode, Printer } from 'lucide-react';
-import { useLots, useBatches, useMaterials, useProducts, useTraceabilityForward, useTraceabilityBackward, fetchLotByBarcode } from '@/lib/api';
+import { useLots, useBatches, useMaterials, useProducts, useTraceabilityForward, useTraceabilityBackward, fetchLotByBarcode, fetchBatchByBarcode } from '@/lib/api';
 import type { ForwardTraceResponse, BackwardTraceResponse } from '@/features/traceability/api';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
 
@@ -84,8 +84,13 @@ export default function Traceability() {
       const foundLot = await fetchLotByBarcode(trimmed);
       setSearchId({ type: 'lot', id: foundLot.id });
     } catch {
-      setSearchId(null);
-      setBarcodeError(trimmed);
+      try {
+        const foundBatch = await fetchBatchByBarcode(trimmed);
+        setSearchId({ type: 'batch', id: foundBatch.id });
+      } catch {
+        setSearchId(null);
+        setBarcodeError(trimmed);
+      }
     } finally {
       setIsBarcodeLookup(false);
     }

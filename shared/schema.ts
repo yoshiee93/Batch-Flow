@@ -131,6 +131,8 @@ export const batches = pgTable("batches", {
   endDate: timestamp("end_date"),
   assignedTo: varchar("assigned_to").references(() => users.id),
   notes: text("notes"),
+  barcodeValue: varchar("barcode_value", { length: 100 }).unique(),
+  barcodePrintedAt: timestamp("barcode_printed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

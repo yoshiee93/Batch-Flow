@@ -18,6 +18,16 @@ export const productionRepository = {
     return row;
   },
 
+  async getBatchByBarcode(barcodeValue: string): Promise<Batch | undefined> {
+    const [row] = await db.select().from(batches).where(eq(batches.barcodeValue, barcodeValue));
+    return row;
+  },
+
+  async updateBatchBarcodePrinted(id: string): Promise<Batch | undefined> {
+    const [updated] = await db.update(batches).set({ barcodePrintedAt: new Date() }).where(eq(batches.id, id)).returning();
+    return updated;
+  },
+
   async createBatchRaw(data: InsertBatch): Promise<Batch> {
     const [created] = await db.insert(batches).values(data).returning();
     return created;

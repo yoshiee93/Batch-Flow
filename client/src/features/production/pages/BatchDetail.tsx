@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import {
   useBatch, useProducts, useBatchInputLots, useBatchOutputLots, useStockMovements, useRecipes,
-  useAuditLogs,
+  useAuditLogs, useMarkBatchBarcodePrinted,
   type InputLot, type OutputLot, type StockMovement, type AuditLog
 } from '@/lib/api';
 import { format } from 'date-fns';
@@ -63,6 +63,7 @@ export default function BatchDetail() {
   const { data: outputLots = [], isLoading: outputsLoading } = useBatchOutputLots(id!);
   const { data: movements = [], isLoading: movementsLoading } = useStockMovements(id!);
   const { data: auditLogs = [], isLoading: auditLoading } = useAuditLogs('batch', id!);
+  const markBatchBarcodePrinted = useMarkBatchBarcodePrinted();
 
   if (batchLoading) {
     return (
@@ -171,6 +172,42 @@ export default function BatchDetail() {
                 </div>
               )}
             </div>
+            {batch.barcodeValue && (
+              <>
+                <Separator className="my-4" />
+                <div className="flex items-center gap-3">
+                  <Printer className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Batch Barcode</div>
+                    <div className="font-mono text-sm" data-testid="text-batch-barcode">{batch.barcodeValue}</div>
+                  </div>
+                  <div className="ml-auto flex items-center gap-2">
+                    {batch.barcodePrintedAt && (
+                      <span className="text-xs text-green-600">Label printed {fmtDate(batch.barcodePrintedAt)}</span>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs"
+                      data-testid="button-print-batch-barcode"
+                      onClick={() => {
+                        printBarcodeLabel({
+                          lotNumber: batch.batchNumber,
+                          barcodeValue: batch.barcodeValue,
+                          itemName: product?.name || 'Batch',
+                          quantity: batch.plannedQuantity,
+                          unit: 'KG',
+                        });
+                        markBatchBarcodePrinted.mutate(batch.id);
+                      }}
+                    >
+                      <Printer className="h-3 w-3 mr-1" />
+                      {batch.barcodePrintedAt ? 'Reprint Label' : 'Print Label'}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
             {batch.notes && (
               <>
                 <Separator className="my-4" />

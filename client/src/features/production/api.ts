@@ -18,6 +18,8 @@ export interface Batch {
   endDate: string | null;
   assignedTo: string | null;
   notes: string | null;
+  barcodeValue: string | null;
+  barcodePrintedAt: string | null;
   createdAt: string;
 }
 
@@ -54,6 +56,21 @@ export function useBatch(batchId: string) {
     queryKey: ["batch", batchId],
     queryFn: () => fetchApi(`/batches/${batchId}`),
     enabled: !!batchId,
+  });
+}
+
+export function fetchBatchByBarcode(value: string): Promise<Batch> {
+  return fetchApi<Batch>(`/batches/barcode/${encodeURIComponent(value)}`);
+}
+
+export function useMarkBatchBarcodePrinted() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (batchId: string) => fetchApi<Batch>(`/batches/${batchId}/barcode-printed`, { method: "PATCH" }),
+    onSuccess: (_, batchId) => {
+      queryClient.invalidateQueries({ queryKey: ["batch", batchId] });
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+    },
   });
 }
 

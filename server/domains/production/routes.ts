@@ -27,8 +27,20 @@ productionRouter.get("/batches/:id/output-lots", asyncHandler(async (req, res) =
   res.json(await svc.getBatchOutputLots(req.params.id));
 }));
 
+productionRouter.get("/batches/barcode/:value", asyncHandler(async (req, res) => {
+  const batch = await svc.getBatchByBarcode(req.params.value);
+  if (!batch) return res.status(404).json({ error: "Batch not found for barcode" });
+  res.json(batch);
+}));
+
 productionRouter.get("/batches/:id", asyncHandler(async (req, res) => {
   const batch = await svc.getBatch(req.params.id);
+  if (!batch) return res.status(404).json({ error: "Batch not found" });
+  res.json(batch);
+}));
+
+productionRouter.patch("/batches/:id/barcode-printed", asyncHandler(async (req, res) => {
+  const batch = await svc.updateBatchBarcodePrinted(req.params.id);
   if (!batch) return res.status(404).json({ error: "Batch not found" });
   res.json(batch);
 }));

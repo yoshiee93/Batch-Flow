@@ -19,6 +19,8 @@ async function createStockMovement(data: InsertStockMovement) {
 export const productionService = {
   getBatches: repo.getBatches.bind(repo),
   getBatch: repo.getBatch.bind(repo),
+  getBatchByBarcode: repo.getBatchByBarcode.bind(repo),
+  updateBatchBarcodePrinted: repo.updateBatchBarcodePrinted.bind(repo),
   getBatchMaterials: repo.getBatchMaterials.bind(repo),
   getBatchOutputs: repo.getBatchOutputs.bind(repo),
 
@@ -33,8 +35,9 @@ export const productionService = {
   },
 
   async createBatch(data: InsertBatch): Promise<Batch> {
-    const created = await repo.createBatchRaw(data);
-    await createAuditLog({ entityType: "batch", entityId: created.id, action: "create", changes: JSON.stringify(data) });
+    const barcodeValue = await generateBarcodeValue();
+    const created = await repo.createBatchRaw({ ...data, barcodeValue });
+    await createAuditLog({ entityType: "batch", entityId: created.id, action: "create", changes: JSON.stringify({ ...data, barcodeValue }) });
     return created;
   },
 

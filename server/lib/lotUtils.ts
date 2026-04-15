@@ -29,11 +29,13 @@ export async function generateBarcodeValue(): Promise<string> {
       .toString()
       .padStart(4, "0");
     const candidate = `BC${timestamp}${rand}`;
-    const existing = await db.execute(
-      sql`SELECT id FROM lots WHERE barcode_value = ${candidate} LIMIT 1`
-    );
-    const rows = existing.rows as IdRow[];
-    if (rows.length === 0) return candidate;
+    const [lotCheck, batchCheck] = await Promise.all([
+      db.execute(sql`SELECT id FROM lots WHERE barcode_value = ${candidate} LIMIT 1`),
+      db.execute(sql`SELECT id FROM batches WHERE barcode_value = ${candidate} LIMIT 1`),
+    ]);
+    const lotRows = lotCheck.rows as IdRow[];
+    const batchRows = batchCheck.rows as IdRow[];
+    if (lotRows.length === 0 && batchRows.length === 0) return candidate;
   }
   throw new Error("Unable to generate unique barcode value after retries");
 }
