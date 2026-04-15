@@ -2,7 +2,7 @@ import { db } from "../../db";
 import { customersRepository as repo } from "./repository";
 import { createAuditLog } from "../../lib/auditLog";
 import { inventoryRepository } from "../inventory/repository";
-import { orderItems, orders, auditLogs } from "@shared/schema";
+import { orderItems, orders, auditLogs, products } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import type { Customer, InsertCustomer, Order, InsertOrder, OrderItem, InsertOrderItem, StockMovement } from "@shared/schema";
 
@@ -112,7 +112,7 @@ export const customersService = {
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
       });
 
-      const allProducts = await repo.getAllProducts();
+      const allProducts = await tx.select().from(products);
       const productStock: Record<string, number> = {};
       for (const p of allProducts) {
         productStock[p.id] = parseFloat(p.currentStock);
