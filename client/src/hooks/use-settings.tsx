@@ -15,7 +15,7 @@ interface SettingsContextType {
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
 
-const STORAGE_KEY = 'batchmaster-settings';
+const STORAGE_KEY = 'cleartrace-settings';
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(() => {

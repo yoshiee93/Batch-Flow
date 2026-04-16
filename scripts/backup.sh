@@ -5,8 +5,8 @@ set -e
 # Set these env vars in your deployment environment
 # DB_HOST=db
 # DB_USER=postgres
-# DB_NAME=batchmaster
-# S3_BUCKET=my-batchmaster-backups
+# DB_NAME=cleartrace
+# S3_BUCKET=my-cleartrace-backups
 # AWS_ACCESS_KEY_ID=...
 # AWS_SECRET_ACCESS_KEY=...
 
@@ -17,7 +17,7 @@ echo "Starting backup for ${DB_NAME} at ${TIMESTAMP}..."
 
 # Dump database
 # Note: PGPASSWORD should be set in env or .pgpass
-pg_dump -h "${DB_HOST:-db}" -U "${DB_USER:-postgres}" "${DB_NAME:-batchmaster}" | gzip > "$BACKUP_FILE"
+pg_dump -h "${DB_HOST:-db}" -U "${DB_USER:-postgres}" "${DB_NAME:-cleartrace}" | gzip > "$BACKUP_FILE"
 
 echo "Backup created at ${BACKUP_FILE}. Size: $(du -h $BACKUP_FILE | cut -f1)"
 
