@@ -43,6 +43,7 @@ export const categories = pgTable("categories", {
   showInTabs: boolean("show_in_tabs").notNull().default(true),
   isDefault: boolean("is_default").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
+  processCode: varchar("process_code", { length: 10 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -55,6 +56,7 @@ export const products = pgTable("products", {
   minStock: decimal("min_stock", { precision: 12, scale: 3 }).notNull().default("0"),
   currentStock: decimal("current_stock", { precision: 12, scale: 3 }).notNull().default("0"),
   categoryId: varchar("category_id").references(() => categories.id),
+  fruitCode: varchar("fruit_code", { length: 10 }),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -133,6 +135,7 @@ export const batches = pgTable("batches", {
   notes: text("notes"),
   barcodeValue: varchar("barcode_value", { length: 100 }).unique(),
   barcodePrintedAt: timestamp("barcode_printed_at"),
+  batchCode: varchar("batch_code", { length: 20 }).unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

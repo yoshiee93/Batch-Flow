@@ -23,6 +23,7 @@ import {
   type Material, type Product, type Category, type Lot, type LotWithDetails,
 } from '@/lib/api';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
+import { FRUIT_CODE_MAP } from '@shared/batchCodeConfig';
 import { useToast } from '@/hooks/use-toast';
 
 const EMPTY_RECEIVE_FORM = {
@@ -72,7 +73,7 @@ export default function Inventory() {
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState({
-    sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: '' as string | null,
+    sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: '' as string | null, fruitCode: '',
   });
 
   const [isReceiveStockOpen, setIsReceiveStockOpen] = useState(false);
@@ -171,7 +172,7 @@ export default function Inventory() {
   }
 
   const resetMaterialForm = () => setMaterialForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null });
-  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null });
+  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null, fruitCode: '' });
 
   const handleEditMaterialClick = (material: Material) => {
     setSelectedMaterial(material);
@@ -216,6 +217,7 @@ export default function Inventory() {
         sku: productForm.sku, name: productForm.name, description: productForm.description || null,
         unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock,
         categoryId: productForm.categoryId || null,
+        fruitCode: productForm.fruitCode || null,
       });
       toast({ title: "Product created", description: `${productForm.name} added to inventory` });
       setIsCreateProductOpen(false);
@@ -231,6 +233,7 @@ export default function Inventory() {
       sku: product.sku, name: product.name, description: product.description || '',
       unit: product.unit || 'KG', minStock: product.minStock, currentStock: product.currentStock,
       categoryId: product.categoryId,
+      fruitCode: product.fruitCode || '',
     });
     setIsEditProductOpen(true);
   };
@@ -242,6 +245,7 @@ export default function Inventory() {
         id: selectedProduct.id, sku: productForm.sku, name: productForm.name, description: productForm.description || null,
         unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock,
         categoryId: productForm.categoryId || null,
+        fruitCode: productForm.fruitCode || null,
       });
       toast({ title: "Product updated", description: `${productForm.name} updated successfully` });
       setIsEditProductOpen(false);
@@ -915,6 +919,19 @@ export default function Inventory() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Fruit Code</Label>
+              <Input
+                placeholder="e.g. SW, BW, PP"
+                value={productForm.fruitCode}
+                onChange={(e) => setProductForm({ ...productForm, fruitCode: e.target.value.toUpperCase() })}
+                maxLength={10}
+                data-testid="input-product-fruit-code"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used in SOP batch codes. e.g. SW = Strawberry Whole, BW = Blueberry Whole
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateProductOpen(false)}>Cancel</Button>
@@ -1036,6 +1053,19 @@ export default function Inventory() {
                   {categories.map((cat) => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Fruit Code</Label>
+              <Input
+                placeholder="e.g. SW, BW, PP"
+                value={productForm.fruitCode}
+                onChange={(e) => setProductForm({ ...productForm, fruitCode: e.target.value.toUpperCase() })}
+                maxLength={10}
+                data-testid="input-edit-product-fruit-code"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used in SOP batch codes. e.g. SW = Strawberry Whole, BW = Blueberry Whole
+              </p>
             </div>
           </div>
           <DialogFooter>

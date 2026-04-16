@@ -1,8 +1,10 @@
 import { db } from "../../db";
 import { productionRepository as repo } from "./repository";
 import { inventoryRepository, type BatchInputLotEntry, type BatchOutputLotEntry } from "../inventory/repository";
+import { catalogRepository } from "../catalog/repository";
 import { createAuditLog } from "../../lib/auditLog";
 import { generateLotNumber, generateBarcodeValue } from "../../lib/lotUtils";
+import { buildBatchCode } from "@shared/batchCodeConfig";
 import {
   batchMaterials, batchOutputs, lots, stockMovements, qualityChecks, auditLogs,
   batches as batchesTable, products as productsTable, materials as materialsTable,
@@ -35,9 +37,29 @@ export const productionService = {
   },
 
   async createBatch(data: InsertBatch): Promise<Batch> {
-    const barcodeValue = await generateBarcodeValue();
-    const created = await repo.createBatchRaw({ ...data, barcodeValue });
-    await createAuditLog({ entityType: "batch", entityId: created.id, action: "create", changes: JSON.stringify({ ...data, barcodeValue }) });
+    let barcodeValue: string;
+    let batchCode: string | null = null;
+
+    try {
+      const product = await catalogRepository.getProduct(data.productId);
+      if (product?.fruitCode && product.categoryId) {
+        const category = await catalogRepository.getCategory(product.categoryId);
+        if (category?.processCode) {
+          const batchDate = data.startDate ? new Date(data.startDate as any) : new Date();
+          batchCode = buildBatchCode(product.fruitCode, category.processCode, batchDate);
+          barcodeValue = batchCode;
+        } else {
+          barcodeValue = await generateBarcodeValue();
+        }
+      } else {
+        barcodeValue = await generateBarcodeValue();
+      }
+    } catch {
+      barcodeValue = await generateBarcodeValue();
+    }
+
+    const created = await repo.createBatchRaw({ ...data, barcodeValue, batchCode });
+    await createAuditLog({ entityType: "batch", entityId: created.id, action: "create", changes: JSON.stringify({ ...data, barcodeValue, batchCode }) });
     return created;
   },
 

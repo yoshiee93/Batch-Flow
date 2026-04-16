@@ -33,6 +33,7 @@ import {
 } from '@/lib/api';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
 import { useToast } from '@/hooks/use-toast';
+import { buildBatchCode } from '@shared/batchCodeConfig';
 
 export default function Production() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -101,44 +102,17 @@ export default function Production() {
   // Add uncategorized products
   const uncategorizedProducts = products.filter(p => !p.categoryId);
   
-  // Helper to get product initials (first letter of each word, alphanumeric only)
-  const getProductInitials = (productName: string): string => {
-    return productName
-      .split(/\s+/)
-      .map(word => {
-        // Remove non-alphanumeric characters and get first letter
-        const cleaned = word.replace(/[^a-zA-Z0-9]/g, '');
-        return cleaned.charAt(0).toUpperCase();
-      })
-      .filter(char => char) // Remove empty strings
-      .join('');
-  };
-  
-  // Helper to get type code from category (6=Frozen, 4=Freeze Dried)
-  const getTypeCodeFromCategory = (categoryId: string | null): string => {
-    if (!categoryId) return '0';
-    const category = categories.find(c => c.id === categoryId);
-    if (!category) return '0';
-    const name = category.name.toLowerCase();
-    if (name.includes('frozen')) return '6';
-    if (name.includes('freeze') && name.includes('dried')) return '4';
-    if (name.includes('freeze-dried')) return '4';
-    return '0';
-  };
-  
-  // Helper to get Julian date (day of year 1-366)
-  const getJulianDate = (date: Date): number => {
-    const start = new Date(date.getFullYear(), 0, 0);
-    const diff = date.getTime() - start.getTime();
-    const oneDay = 1000 * 60 * 60 * 24;
-    return Math.floor(diff / oneDay);
-  };
-  
-  // Helper to get weekday (1-7, Monday=1, Sunday=7)
-  const getWeekday = (date: Date): number => {
-    const day = date.getDay();
-    return day === 0 ? 7 : day; // Sunday is 0 in JS, we want it as 7
-  };
+  // Auto-fill batchNumber with SOP batch code when product + date are set and codes are available
+  useEffect(() => {
+    if (!newBatch.productId || !newBatch.startDate) return;
+    const product = products.find(p => p.id === newBatch.productId);
+    if (!product?.fruitCode) return;
+    const category = categories.find(c => c.id === product.categoryId);
+    if (!category?.processCode) return;
+    const date = new Date(newBatch.startDate + 'T12:00:00');
+    const code = buildBatchCode(product.fruitCode, category.processCode, date);
+    setNewBatch(prev => ({ ...prev, batchNumber: code }));
+  }, [newBatch.productId, newBatch.startDate, products, categories]);
 
   const handleCreateBatch = async () => {
     if (!newBatch.batchNumber || !newBatch.productId) {
@@ -361,38 +335,16 @@ export default function Production() {
     }
   };
 
-  const generateBatchNumber = () => {
-    // Requires product to be selected first
-    if (!newBatch.productId) {
-      toast({ title: "Select product first", description: "Please select a product before generating the batch number", variant: "destructive" });
-      return newBatch.batchNumber;
-    }
-    
+  // Compute SOP batch code preview for the create dialog
+  const batchCodePreview = (() => {
+    if (!newBatch.productId || !newBatch.startDate) return null;
     const product = products.find(p => p.id === newBatch.productId);
-    if (!product) return newBatch.batchNumber;
-    
-    // Parse the date from the form (or use today)
-    const batchDate = newBatch.startDate ? new Date(newBatch.startDate + 'T12:00:00') : new Date();
-    
-    // Get product initials (first letter of each word)
-    const initials = getProductInitials(product.name);
-    
-    // Get type code from category (6=Frozen, 4=Freeze Dried)
-    const typeCode = getTypeCodeFromCategory(product.categoryId || null);
-    
-    // Last 2 digits of year
-    const year = String(batchDate.getFullYear()).slice(-2);
-    
-    // Julian date (day of year, padded to 3 digits)
-    const julianDate = String(getJulianDate(batchDate)).padStart(3, '0');
-    
-    // Weekday (1-7, Monday=1)
-    const weekday = getWeekday(batchDate);
-    
-    // Format: InitialsTypeCodeYearJulianDateWeekday
-    // Example: BW4260152 = Blueberry Whole, Freeze Dried (4), 2026, Day 15, Tuesday (2)
-    return `${initials}${typeCode}${year}${julianDate}${weekday}`;
-  };
+    if (!product?.fruitCode) return null;
+    const category = categories.find(c => c.id === product.categoryId);
+    if (!category?.processCode) return null;
+    const date = new Date(newBatch.startDate + 'T12:00:00');
+    return buildBatchCode(product.fruitCode, category.processCode, date);
+  })();
 
   if (isLoading) {
     return (
@@ -434,23 +386,24 @@ export default function Production() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="batchNumber">Batch Number *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="batchNumber"
-                    placeholder="e.g. BATCH-20260108-001"
-                    value={newBatch.batchNumber}
-                    onChange={(e) => setNewBatch({ ...newBatch, batchNumber: e.target.value })}
-                    data-testid="input-batch-number"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setNewBatch({ ...newBatch, batchNumber: generateBatchNumber() })}
-                    data-testid="button-generate-batch-number"
-                  >
-                    Generate
-                  </Button>
-                </div>
+                <Input
+                  id="batchNumber"
+                  placeholder="e.g. SW3260132 or BATCH-001"
+                  value={newBatch.batchNumber}
+                  onChange={(e) => setNewBatch({ ...newBatch, batchNumber: e.target.value })}
+                  data-testid="input-batch-number"
+                />
+                {batchCodePreview ? (
+                  <div className="rounded-md bg-primary/5 border border-primary/20 px-3 py-2 text-xs">
+                    <span className="text-muted-foreground">SOP Batch Code: </span>
+                    <span className="font-mono font-bold text-primary" data-testid="text-batch-code-preview">{batchCodePreview}</span>
+                    <span className="text-muted-foreground ml-1">(auto-filled)</span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Set a Fruit Code on the product and a Process Code on its category to auto-generate SOP codes.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="product">Product *</Label>

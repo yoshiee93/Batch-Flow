@@ -172,40 +172,59 @@ export default function BatchDetail() {
                 </div>
               )}
             </div>
-            {batch.barcodeValue && (
+            {(batch.barcodeValue || batch.batchCode) && (
               <>
                 <Separator className="my-4" />
-                <div className="flex items-center gap-3">
-                  <Printer className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Batch Barcode</div>
-                    <div className="font-mono text-sm" data-testid="text-batch-barcode">{batch.barcodeValue}</div>
+                {batch.batchCode && (
+                  <div className="mb-3 rounded-md bg-primary/5 border border-primary/20 px-4 py-3 flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">
+                        {batch.batchCode === batch.barcodeValue ? 'Batch Code / Barcode' : 'Batch Code (SOP)'}
+                      </div>
+                      <div className="font-mono text-lg font-bold tracking-wider text-primary" data-testid="text-batch-code">
+                        {batch.batchCode}
+                      </div>
+                    </div>
                   </div>
-                  <div className="ml-auto flex items-center gap-2">
-                    {batch.barcodePrintedAt && (
-                      <span className="text-xs text-green-600">Label printed {fmtDate(batch.barcodePrintedAt)}</span>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs"
-                      data-testid="button-print-batch-barcode"
-                      onClick={() => {
-                        printBarcodeLabel({
-                          lotNumber: batch.batchNumber,
-                          barcodeValue: batch.barcodeValue,
-                          itemName: product?.name || 'Batch',
-                          quantity: batch.plannedQuantity,
-                          unit: 'KG',
-                        });
-                        markBatchBarcodePrinted.mutate(batch.id);
-                      }}
-                    >
-                      <Printer className="h-3 w-3 mr-1" />
-                      {batch.barcodePrintedAt ? 'Reprint Label' : 'Print Label'}
-                    </Button>
+                )}
+                {batch.barcodeValue && batch.barcodeValue !== batch.batchCode && (
+                  <div className="flex items-center gap-3">
+                    <Printer className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Batch Barcode</div>
+                      <div className="font-mono text-sm" data-testid="text-batch-barcode">{batch.barcodeValue}</div>
+                    </div>
                   </div>
-                </div>
+                )}
+                {batch.barcodeValue && (
+                  <div className="flex items-center gap-3 mt-3">
+                    <div className="flex-1" />
+                    <div className="flex items-center gap-2">
+                      {batch.barcodePrintedAt && (
+                        <span className="text-xs text-green-600">Label printed {fmtDate(batch.barcodePrintedAt)}</span>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs"
+                        data-testid="button-print-batch-barcode"
+                        onClick={() => {
+                          printBarcodeLabel({
+                            lotNumber: batch.batchCode || batch.batchNumber,
+                            barcodeValue: batch.barcodeValue,
+                            itemName: product?.name || 'Batch',
+                            quantity: batch.plannedQuantity,
+                            unit: 'KG',
+                          });
+                          markBatchBarcodePrinted.mutate(batch.id);
+                        }}
+                      >
+                        <Printer className="h-3 w-3 mr-1" />
+                        {batch.barcodePrintedAt ? 'Reprint Label' : 'Print Label'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
             {batch.notes && (

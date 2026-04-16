@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList } from 'lucide-react';
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, type Category } from '@/features/catalog/api';
+import { PROCESS_CODE_MAP } from '@shared/batchCodeConfig';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
 
@@ -21,6 +22,7 @@ export default function Settings() {
     excludeFromYield: false,
     showInTabs: true,
     sortOrder: 0,
+    processCode: '',
   });
 
   const { data: categories = [], isLoading, isError } = useCategories();
@@ -31,7 +33,7 @@ export default function Settings() {
   const { settings, updateSetting } = useSettings();
 
   const resetForm = () => {
-    setFormData({ name: '', excludeFromYield: false, showInTabs: true, sortOrder: 0 });
+    setFormData({ name: '', excludeFromYield: false, showInTabs: true, sortOrder: 0, processCode: '' });
   };
 
   const handleCreate = async () => {
@@ -46,6 +48,7 @@ export default function Settings() {
         showInTabs: formData.showInTabs,
         isDefault: false,
         sortOrder: formData.sortOrder,
+        processCode: formData.processCode || null,
       });
       toast({ title: "Category created", description: `Category "${formData.name}" created successfully` });
       setIsCreateDialogOpen(false);
@@ -62,6 +65,7 @@ export default function Settings() {
       excludeFromYield: category.excludeFromYield,
       showInTabs: category.showInTabs,
       sortOrder: category.sortOrder,
+      processCode: category.processCode || '',
     });
     setIsEditDialogOpen(true);
   };
@@ -78,6 +82,7 @@ export default function Settings() {
         excludeFromYield: formData.excludeFromYield,
         showInTabs: formData.showInTabs,
         sortOrder: formData.sortOrder,
+        processCode: formData.processCode || null,
       });
       toast({ title: "Category updated", description: `Category "${formData.name}" updated successfully` });
       setIsEditDialogOpen(false);
@@ -185,6 +190,7 @@ export default function Settings() {
                   <TableRow>
                     <TableHead className="min-w-[120px]">Name</TableHead>
                     <TableHead className="text-center min-w-[80px]">Sort Order</TableHead>
+                    <TableHead className="text-center min-w-[100px]">Process Code</TableHead>
                     <TableHead className="text-center min-w-[100px]">Show in Tabs</TableHead>
                     <TableHead className="text-center min-w-[120px]">Exclude from Yield</TableHead>
                     <TableHead className="text-center min-w-[70px]">Default</TableHead>
@@ -198,6 +204,18 @@ export default function Settings() {
                       {category.name}
                     </TableCell>
                     <TableCell className="text-center">{category.sortOrder}</TableCell>
+                    <TableCell className="text-center">
+                      {category.processCode ? (
+                        <span className="font-mono font-medium text-primary">
+                          {category.processCode}
+                          <span className="text-muted-foreground font-normal text-xs ml-1">
+                            — {PROCESS_CODE_MAP[category.processCode] || ''}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-center">
                       {category.showInTabs ? (
                         <span className="text-green-600">Yes</span>
@@ -281,6 +299,20 @@ export default function Settings() {
               />
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="create-processCode">Process Code</Label>
+              <Input
+                id="create-processCode"
+                value={formData.processCode}
+                onChange={(e) => setFormData({ ...formData, processCode: e.target.value.toUpperCase() })}
+                placeholder="e.g., 3, 4, 6"
+                maxLength={10}
+                data-testid="input-category-process-code"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used in SOP batch codes. Known codes: 3 = Fresh/IQF, 4 = Freeze Dried, 6 = Frozen
+              </p>
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="create-sortOrder">Sort Order</Label>
               <Input
                 id="create-sortOrder"
@@ -347,6 +379,20 @@ export default function Settings() {
                 placeholder="e.g., Powders"
                 data-testid="input-edit-category-name"
               />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-processCode">Process Code</Label>
+              <Input
+                id="edit-processCode"
+                value={formData.processCode}
+                onChange={(e) => setFormData({ ...formData, processCode: e.target.value.toUpperCase() })}
+                placeholder="e.g., 3, 4, 6"
+                maxLength={10}
+                data-testid="input-edit-category-process-code"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used in SOP batch codes. Known codes: 3 = Fresh/IQF, 4 = Freeze Dried, 6 = Frozen
+              </p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-sortOrder">Sort Order</Label>

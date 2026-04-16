@@ -8,6 +8,7 @@ export interface Category {
   showInTabs: boolean;
   isDefault: boolean;
   sortOrder: number;
+  processCode: string | null;
   createdAt: string;
 }
 
@@ -20,6 +21,7 @@ export interface Product {
   minStock: string;
   currentStock: string;
   categoryId: string | null;
+  fruitCode: string | null;
   active: boolean;
   createdAt: string;
 }

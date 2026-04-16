@@ -20,6 +20,7 @@ export interface Batch {
   notes: string | null;
   barcodeValue: string | null;
   barcodePrintedAt: string | null;
+  batchCode: string | null;
   createdAt: string;
 }
 
