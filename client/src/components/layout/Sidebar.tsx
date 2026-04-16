@@ -8,7 +8,8 @@ import {
   Menu,
   ShoppingCart,
   Users,
-  Calculator
+  Calculator,
+  ScanSearch,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ const navItems = [
   { label: 'Customers', icon: Users, href: '/customers' },
   { label: 'Production', icon: Factory, href: '/production' },
   { label: 'Inventory', icon: Box, href: '/inventory' },
+  { label: 'Tracking', icon: ScanSearch, href: '/traceability' },
   { label: 'Calculator', icon: Calculator, href: '/calculator' },
 ];
 

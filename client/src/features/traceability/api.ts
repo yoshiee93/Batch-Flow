@@ -61,6 +61,8 @@ export interface BackwardTraceResponse {
     actualQuantity: string | null;
     startDate: string | null;
     endDate: string | null;
+    barcodeValue: string | null;
+    barcodePrintedAt: string | null;
   };
   product?: {
     id: string;
