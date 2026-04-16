@@ -1,0 +1,137 @@
+Task: Build a dedicated Tracking / Traceability area for lot and batch investigation
+
+Before making changes:
+- Inspect the existing traceability page, lot detail page, batch detail page, barcode lookup/search logic, and related backend routes
+- Reuse the current lot, batch, stock movement, audit, and traceability logic
+- Extend the existing implementation instead of creating a second disconnected tracking system
+
+Business goal:
+Create a clear tracking area where staff can search a lot number, barcode, supplier lot, or batch number and quickly see where the stock came from and where it was used.
+
+Primary user outcomes:
+1. Search a raw lot and see its source and usage history
+2. Search a finished lot and see which batch created it and which inputs were used
+3. Search a batch and see all inputs and outputs
+4. Move easily between related lots and batches
+5. Reprint barcode labels from the tracking workflow where appropriate
+
+Required scope:
+
+1. Create or upgrade a dedicated Tracking area
+Add a clear Tracking / Traceability section in the app navigation.
+This should be the main place users go to investigate lots, barcodes, supplier lots, and batches.
+
+The search area must support:
+- internal lot number
+- barcode
+- supplier lot
+- batch number
+
+Behavior:
+- one search field should accept scanned or typed values
+- if there is an exact match, show the result immediately
+- if there are multiple matches, show a selectable result list
+- support both lot-based and batch-based results
+
+2. Lot tracking view
+When a lot is opened from the tracking area, show a clear lot detail and lineage screen.
+
+Required information:
+- lot number
+- barcode value
+- item/material/product name
+- lot type
+- status
+- source type
+- supplier/source/farmer name
+- supplier lot
+- received date or produced date
+- original quantity
+- remaining quantity
+- expiry date if available
+- notes
+
+Backward traceability:
+- where the lot came from
+- if externally received, show supplier/source details
+- if internally produced, show source batch
+
+Forward traceability:
+- which batch or batches used this lot
+- what output lots were created from those batches
+- allow navigation to related records
+
+Actions:
+- print/reprint barcode
+- open related batch
+- open related lots
+
+3. Batch tracking view
+When a batch is opened from the tracking area, show a clear batch tracking screen.
+
+Required information:
+- batch number
+- status
+- product being produced
+- recipe/version if available
+- created/started/completed timestamps if available
+- notes/waste/yield if available
+
+Inputs section:
+- all input lots used
+- lot number
+- barcode
+- item/material name
+- supplier/source
+- supplier lot
+- quantity consumed
+
+Outputs section:
+- all output lots created
+- lot number
+- barcode
+- quantity
+- produced date
+- status
+- print/reprint barcode action
+
+Additional sections:
+- stock movements
+- audit history if available
+
+4. Navigation between related records
+Make it easy to move between:
+- lot -> source batch
+- lot -> consuming batch
+- batch -> input lot
+- batch -> output lot
+
+The user should be able to follow the full chain with minimal clicks.
+
+5. Keep the UI simple and operational
+This should be a practical tracking screen, not a developer/debug page.
+
+Requirements:
+- clear headings like Source, Inputs, Outputs, Used In, Produced From, Movements, Actions
+- readable tables/cards
+- obvious empty states and not-found states
+- good support for scanner-style input
+
+6. Reprint support from tracking
+Users should be able to reprint barcode labels directly from the tracking area.
+Use the existing barcode print system and always reuse the stored barcode value.
+
+Implementation notes:
+- do not create a second lineage model
+- extend the current traceability and detail page logic
+- prefer one main tracking area that links into lot and batch detail views
+- keep existing routes working
+- if current pages already do part of this, improve and unify them rather than duplicating them
+
+Acceptance criteria:
+- user can search by lot number, barcode, supplier lot, or batch number
+- user can see where a lot came from
+- user can see where a lot was used
+- user can see which outputs came from a batch
+- user can move between related lot and batch records easily
+- user can reprint labels from the tracking workflow
