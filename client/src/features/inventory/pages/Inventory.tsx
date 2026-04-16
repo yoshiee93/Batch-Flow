@@ -925,7 +925,7 @@ export default function Inventory() {
                 placeholder="e.g. SW, BW, PP"
                 value={productForm.fruitCode}
                 onChange={(e) => setProductForm({ ...productForm, fruitCode: e.target.value.toUpperCase() })}
-                maxLength={10}
+                maxLength={5}
                 data-testid="input-product-fruit-code"
               />
               <p className="text-xs text-muted-foreground">
@@ -1060,7 +1060,7 @@ export default function Inventory() {
                 placeholder="e.g. SW, BW, PP"
                 value={productForm.fruitCode}
                 onChange={(e) => setProductForm({ ...productForm, fruitCode: e.target.value.toUpperCase() })}
-                maxLength={10}
+                maxLength={5}
                 data-testid="input-edit-product-fruit-code"
               />
               <p className="text-xs text-muted-foreground">

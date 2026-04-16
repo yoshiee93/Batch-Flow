@@ -40,21 +40,22 @@ export const productionService = {
     let barcodeValue: string;
     let batchCode: string | null = null;
 
-    try {
-      const product = await catalogRepository.getProduct(data.productId);
-      if (product?.fruitCode && product.categoryId) {
-        const category = await catalogRepository.getCategory(product.categoryId);
-        if (category?.processCode) {
-          const batchDate = data.startDate ? new Date(data.startDate as any) : new Date();
+    const product = await catalogRepository.getProduct(data.productId);
+    if (product?.fruitCode && product.categoryId) {
+      const category = await catalogRepository.getCategory(product.categoryId);
+      if (category?.processCode) {
+        const batchDate: Date = data.startDate ?? new Date();
+        try {
           batchCode = buildBatchCode(product.fruitCode, category.processCode, batchDate);
           barcodeValue = batchCode;
-        } else {
+        } catch (err) {
+          console.warn("[createBatch] SOP code generation skipped:", (err as Error).message);
           barcodeValue = await generateBarcodeValue();
         }
       } else {
         barcodeValue = await generateBarcodeValue();
       }
-    } catch {
+    } else {
       barcodeValue = await generateBarcodeValue();
     }
 

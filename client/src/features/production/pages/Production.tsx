@@ -109,9 +109,12 @@ export default function Production() {
     if (!product?.fruitCode) return;
     const category = categories.find(c => c.id === product.categoryId);
     if (!category?.processCode) return;
-    const date = new Date(newBatch.startDate + 'T12:00:00');
-    const code = buildBatchCode(product.fruitCode, category.processCode, date);
-    setNewBatch(prev => ({ ...prev, batchNumber: code }));
+    try {
+      const date = new Date(newBatch.startDate + 'T00:00:00Z');
+      const code = buildBatchCode(product.fruitCode, category.processCode, date);
+      setNewBatch(prev => ({ ...prev, batchNumber: code }));
+    } catch {
+    }
   }, [newBatch.productId, newBatch.startDate, products, categories]);
 
   const handleCreateBatch = async () => {
@@ -120,7 +123,7 @@ export default function Production() {
       return;
     }
     try {
-      await createBatch.mutateAsync({
+      const created = await createBatch.mutateAsync({
         batchNumber: newBatch.batchNumber,
         productId: newBatch.productId,
         recipeId: newBatch.recipeId || undefined,
@@ -128,7 +131,12 @@ export default function Production() {
         status: 'in_progress',
         startDate: newBatch.startDate,
       } as any);
-      toast({ title: "Batch created", description: `Batch ${newBatch.batchNumber} created successfully` });
+      toast({
+        title: "Batch created",
+        description: created.batchCode
+          ? `Batch Code: ${created.batchCode}`
+          : `Batch ${created.batchNumber} created successfully`,
+      });
       setIsCreateDialogOpen(false);
       setNewBatch({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
     } catch (error) {
@@ -342,8 +350,12 @@ export default function Production() {
     if (!product?.fruitCode) return null;
     const category = categories.find(c => c.id === product.categoryId);
     if (!category?.processCode) return null;
-    const date = new Date(newBatch.startDate + 'T12:00:00');
-    return buildBatchCode(product.fruitCode, category.processCode, date);
+    try {
+      const date = new Date(newBatch.startDate + 'T00:00:00Z');
+      return buildBatchCode(product.fruitCode, category.processCode, date);
+    } catch {
+      return null;
+    }
   })();
 
   if (isLoading) {

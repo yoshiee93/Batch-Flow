@@ -305,7 +305,7 @@ export default function Settings() {
                 value={formData.processCode}
                 onChange={(e) => setFormData({ ...formData, processCode: e.target.value.toUpperCase() })}
                 placeholder="e.g., 3, 4, 6"
-                maxLength={10}
+                maxLength={1}
                 data-testid="input-category-process-code"
               />
               <p className="text-xs text-muted-foreground">
@@ -387,7 +387,7 @@ export default function Settings() {
                 value={formData.processCode}
                 onChange={(e) => setFormData({ ...formData, processCode: e.target.value.toUpperCase() })}
                 placeholder="e.g., 3, 4, 6"
-                maxLength={10}
+                maxLength={1}
                 data-testid="input-edit-category-process-code"
               />
               <p className="text-xs text-muted-foreground">
