@@ -1,0 +1,102 @@
+Task: Implement SOP batch coding in ClearTrace using format FF P YY DDD D and integrate it into the system
+
+Before making changes:
+- Inspect the current batch model, batch creation flow, batch finalization logic, barcode system, and batch detail page
+- Reuse existing batch, lot, and barcode structures
+- Do not create a separate system — extend the current one
+
+Business goal:
+Batch codes must follow the company SOP and be generated automatically in this format:
+
+[FruitCode][ProcessCode][YY][DDD][DayOfWeek]
+
+Example:
+SW3260132
+
+Meaning:
+- SW = Fruit Code (Strawberry Whole)
+- 3 = Process Code
+- 26 = Year (2026)
+- 013 = Julian Day
+- 2 = Day of week (Tuesday)
+
+Day mapping:
+1 = Monday
+2 = Tuesday
+3 = Wednesday
+4 = Thursday
+5 = Friday
+6 = Saturday
+7 = Sunday
+
+Requirements:
+
+1. Add batchCode field
+- Add a new field "batchCode" to the batch model if it does not exist
+- Store it as a string
+- Ensure it is unique
+
+2. Implement batch code generator
+- Create a centralized helper to generate batch codes
+- Inputs:
+  - fruitCode (string)
+  - processCode (number/string)
+  - production date (Date)
+- Logic:
+  - YY = last 2 digits of year
+  - DDD = Julian day (001–365)
+  - DayOfWeek = 1–7 (Mon–Sun, convert from JS getDay)
+
+- Final output:
+  `${fruitCode}${processCode}${YY}${DDD}${day}`
+
+3. Integrate into batch workflow
+- Automatically generate batchCode when:
+  - batch is created OR
+  - batch is finalized (choose the point that fits current flow best)
+- Do not rely on manual user input
+- Optionally allow admin override
+
+4. Keep barcode and batchCode aligned
+- Set batch barcode value = batchCode
+- Do not generate a separate value unless required
+- Scanning the barcode should open the batch
+
+5. Update UI
+- Show batchCode clearly on:
+  - batch detail page
+  - tracking/traceability page
+  - production completion screen
+- Ensure batchCode is visible and readable
+
+6. Support search
+- Allow searching by:
+  - batchCode
+  - barcode (same value)
+- Searching should open the correct batch
+
+7. Validation
+- Ensure generated codes:
+  - follow correct format
+  - include valid day (1–7)
+  - include valid Julian day (001–365)
+
+8. Centralize config
+- Create a central mapping for:
+  - fruit codes
+  - process codes
+- Do not hardcode these in multiple places
+
+Implementation rules:
+- Do not break existing batch, lot, or barcode functionality
+- Do not duplicate logic across files
+- Keep the implementation clean and reusable
+- Prefer helper/service functions over inline logic
+
+Acceptance criteria:
+- Batch code is generated automatically and correctly
+- Example: SW3260132 generates correctly for 13 Jan 2026 (Tuesday)
+- Batch barcode uses the same value
+- Users can search and scan batch codes
+- Batch code is visible in UI and tracking
+- No manual batch code entry required in normal workflow
