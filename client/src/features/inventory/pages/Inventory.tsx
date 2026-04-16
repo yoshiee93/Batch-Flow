@@ -23,7 +23,6 @@ import {
   type Material, type Product, type Category, type Lot, type LotWithDetails,
 } from '@/lib/api';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
-import { FRUIT_CODE_MAP } from '@shared/batchCodeConfig';
 import { useToast } from '@/hooks/use-toast';
 
 const EMPTY_RECEIVE_FORM = {
