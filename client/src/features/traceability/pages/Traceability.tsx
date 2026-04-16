@@ -381,6 +381,12 @@ function ForwardTraceView({ trace, materials, products }: {
               <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Source</div>
               <div>{sourceDesc}</div>
             </div>
+            {lot.notes && (
+              <div className="col-span-2 sm:col-span-4">
+                <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Notes</div>
+                <div className="text-sm">{lot.notes}</div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -503,7 +509,7 @@ function ForwardTraceView({ trace, materials, products }: {
                         size="sm"
                         variant="outline"
                         className="text-xs h-7 px-2"
-                        data-testid={`button-reprint-outlot-${outputLot.id}`}
+                        data-testid={`button-print-outlot-${outputLot.id}`}
                         onClick={(e) => {
                           e.preventDefault();
                           printBarcodeLabel({
@@ -517,7 +523,7 @@ function ForwardTraceView({ trace, materials, products }: {
                         }}
                       >
                         <Printer className="h-3 w-3 mr-1" />
-                        Reprint
+                        {outputLot.barcodePrintedAt ? 'Reprint' : 'Print'}
                       </Button>
                     )}
                   </div>
