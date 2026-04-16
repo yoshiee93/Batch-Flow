@@ -1,6 +1,6 @@
 {
-  "name": "rest-express",
-  "version": "1.0.0",
+  "name": "cleartrace",
+  "version": "2.5",
   "type": "module",
   "license": "MIT",
   "scripts": {

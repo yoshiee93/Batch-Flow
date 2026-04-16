@@ -3,12 +3,12 @@ version: '3.8'
 services:
   app:
     build: .
-    image: batchmaster-app:latest
+    image: cleartrace-app:latest
     restart: always
     ports:
       - "5000:5000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/batchmaster
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/cleartrace
       - NODE_ENV=production
     depends_on:
       - db
@@ -21,7 +21,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=batchmaster
+      - POSTGRES_DB=cleartrace
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -29,7 +29,7 @@ services:
     # Backups can be handled by a sidecar or a cron job on the host
     # For a sidecar approach:
     # labels:
-    #   - "com.batchmaster.backup=true"
+    #   - "com.cleartrace.backup=true"
 
 networks:
   app-network:
