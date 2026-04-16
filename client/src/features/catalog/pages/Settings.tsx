@@ -7,9 +7,9 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList } from 'lucide-react';
-import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, type Category } from '@/features/catalog/api';
-import { PROCESS_CODE_MAP } from '@shared/batchCodeConfig';
+import { Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList, Leaf } from 'lucide-react';
+import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useProducts, useUpdateProduct, type Category, type Product } from '@/features/catalog/api';
+import { PROCESS_CODE_MAP, FRUIT_CODE_MAP } from '@shared/batchCodeConfig';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
 
@@ -25,12 +25,36 @@ export default function Settings() {
     processCode: '',
   });
 
+  const [isFruitCodeDialogOpen, setIsFruitCodeDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [fruitCodeInput, setFruitCodeInput] = useState('');
+
   const { data: categories = [], isLoading, isError } = useCategories();
+  const { data: products = [] } = useProducts();
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const deleteCategory = useDeleteCategory();
+  const updateProduct = useUpdateProduct();
   const { toast } = useToast();
   const { settings, updateSetting } = useSettings();
+
+  const handleFruitCodeEdit = (product: Product) => {
+    setSelectedProduct(product);
+    setFruitCodeInput(product.fruitCode || '');
+    setIsFruitCodeDialogOpen(true);
+  };
+
+  const handleFruitCodeSave = async () => {
+    if (!selectedProduct) return;
+    try {
+      await updateProduct.mutateAsync({ id: selectedProduct.id, fruitCode: fruitCodeInput.toUpperCase() || null });
+      toast({ title: "Fruit code updated", description: `Fruit code for "${selectedProduct.name}" updated` });
+      setIsFruitCodeDialogOpen(false);
+      setSelectedProduct(null);
+    } catch {
+      toast({ title: "Error", description: "Failed to update fruit code", variant: "destructive" });
+    }
+  };
 
   const resetForm = () => {
     setFormData({ name: '', excludeFromYield: false, showInTabs: true, sortOrder: 0, processCode: '' });
@@ -278,6 +302,105 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Leaf className="h-5 w-5" />
+              SOP Fruit Codes
+            </CardTitle>
+            <CardDescription>
+              Assign a fruit code to each product for SOP batch code generation. Codes must be 1–5 alphanumeric characters (e.g. SW = Strawberry Whole).
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {products.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Leaf className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No products defined yet</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[160px]">Product</TableHead>
+                    <TableHead className="min-w-[80px]">SKU</TableHead>
+                    <TableHead className="text-center min-w-[120px]">Fruit Code</TableHead>
+                    <TableHead className="text-right min-w-[80px]">Edit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {products.map((product) => (
+                    <TableRow key={product.id} data-testid={`row-product-fruitcode-${product.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-product-name-fruitcode-${product.id}`}>{product.name}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{product.sku}</TableCell>
+                      <TableCell className="text-center">
+                        {product.fruitCode ? (
+                          <span className="font-mono font-medium text-primary">
+                            {product.fruitCode}
+                            <span className="text-muted-foreground font-normal text-xs ml-1">
+                              — {FRUIT_CODE_MAP[product.fruitCode] || ''}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleFruitCodeEdit(product)}
+                          data-testid={`button-edit-fruitcode-${product.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isFruitCodeDialogOpen} onOpenChange={setIsFruitCodeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Fruit Code</DialogTitle>
+            <DialogDescription>
+              Set the SOP fruit code for "{selectedProduct?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="fruit-code-input">Fruit Code</Label>
+              <Input
+                id="fruit-code-input"
+                value={fruitCodeInput}
+                onChange={(e) => setFruitCodeInput(e.target.value.toUpperCase())}
+                placeholder="e.g. SW, BW, PP"
+                maxLength={5}
+                data-testid="input-fruitcode-edit"
+              />
+              <p className="text-xs text-muted-foreground">1–5 alphanumeric characters. Leave blank to clear. Known codes: SW = Strawberry Whole, BW = Blueberry Whole, PP = Passion Fruit Puree.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsFruitCodeDialogOpen(false); setSelectedProduct(null); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleFruitCodeSave} disabled={updateProduct.isPending} data-testid="button-confirm-fruitcode">
+              {updateProduct.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>

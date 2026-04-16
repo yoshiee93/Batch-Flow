@@ -123,14 +123,15 @@ export default function Production() {
       return;
     }
     try {
-      const created = await createBatch.mutateAsync({
+      const payload: Partial<Batch> = {
         batchNumber: newBatch.batchNumber,
         productId: newBatch.productId,
-        recipeId: newBatch.recipeId || undefined,
         plannedQuantity: "0",
         status: 'in_progress',
-        startDate: newBatch.startDate,
-      } as any);
+        startDate: newBatch.startDate || null,
+      };
+      if (newBatch.recipeId) payload.recipeId = newBatch.recipeId;
+      const created = await createBatch.mutateAsync(payload);
       toast({
         title: "Batch created",
         description: created.batchCode
