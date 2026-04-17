@@ -1,3 +1,4 @@
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -71,10 +72,9 @@ export default function Dashboard() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
             {QUICK_ACTIONS.map((action, i) => (
-              <>
-                {i === 1 && <DropdownMenuSeparator key="sep" />}
+              <React.Fragment key={action.href}>
+                {i === 1 && <DropdownMenuSeparator />}
                 <DropdownMenuItem
-                  key={action.href}
                   onSelect={() => navigate(action.href)}
                   className="cursor-pointer"
                   data-testid={`quick-action-${action.label.toLowerCase().replace(/\s+/g, '-')}`}
@@ -82,7 +82,7 @@ export default function Dashboard() {
                   <action.icon size={15} className="shrink-0" />
                   <span>{action.label}</span>
                 </DropdownMenuItem>
-              </>
+              </React.Fragment>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
