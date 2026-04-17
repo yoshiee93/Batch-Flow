@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useSearch } from 'wouter';
 import { format } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -80,13 +79,6 @@ export default function Inventory() {
   const [receiveForm, setReceiveForm] = useState(EMPTY_RECEIVE_FORM);
   const [receivedLot, setReceivedLot] = useState<LotWithDetails | null>(null);
   const [materialSearchOpen, setMaterialSearchOpen] = useState(false);
-
-  const search = useSearch();
-  useEffect(() => {
-    if (new URLSearchParams(search).get('action') === 'receive') {
-      setIsReceiveStockOpen(true);
-    }
-  }, [search]);
 
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
