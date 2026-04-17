@@ -35,7 +35,7 @@ export function Sidebar({ className }: { className?: string }) {
           <div className="w-8 h-8 rounded bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground">
             <Factory size={18} />
           </div>
-          CLEAR<span className="text-sidebar-primary">TRACE</span>
+          Clear<span className="text-sidebar-primary">trace</span>
         </h1>
         <p className="text-xs text-sidebar-foreground/60 mt-1 font-mono">v2.5</p>
       </div>

@@ -12,7 +12,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Mobile Header */}
         <header className="lg:hidden h-14 border-b bg-card flex items-center px-4 justify-between">
-          <div className="font-mono font-bold text-lg">CLEAR<span className="text-primary">TRACE</span></div>
+          <div className="font-mono font-bold text-lg">Clear<span className="text-primary">trace</span></div>
           <MobileNav />
         </header>
 
