@@ -113,6 +113,14 @@ export default function Inventory() {
     }
   }, [visibleCategories, activeTab]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'receive') {
+      setIsReceiveStockOpen(true);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
   const filteredMaterials = materials.filter(m =>
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (m.sku && m.sku.toLowerCase().includes(searchTerm.toLowerCase()))

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useSearch } from 'wouter';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +29,18 @@ import { useSettings } from '@/hooks/use-settings';
 
 export default function Orders() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('action') === 'create';
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'create') {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -59,13 +69,6 @@ export default function Orders() {
   const completeOrder = useCompleteOrder();
   const { toast } = useToast();
   const { settings } = useSettings();
-
-  const search = useSearch();
-  useEffect(() => {
-    if (new URLSearchParams(search).get('action') === 'new-order') {
-      setIsCreateDialogOpen(true);
-    }
-  }, [search]);
 
   const handleCompleteOrder = async (orderId: string) => {
     try {
