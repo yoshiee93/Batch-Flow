@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearch } from 'wouter';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 import { buildBatchCode } from '@shared/batchCodeConfig';
 
 export default function Production() {
+  const search = useSearch();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isRecordInputOpen, setIsRecordInputOpen] = useState(false);
@@ -102,6 +104,13 @@ export default function Production() {
   // Add uncategorized products
   const uncategorizedProducts = products.filter(p => !p.categoryId);
   
+  // Open Create Batch dialog when navigated with ?action=new-batch
+  useEffect(() => {
+    if (new URLSearchParams(search).get('action') === 'new-batch') {
+      setIsCreateDialogOpen(true);
+    }
+  }, [search]);
+
   // Auto-fill batchNumber with SOP batch code when product + date are set and codes are available
   useEffect(() => {
     if (!newBatch.productId || !newBatch.startDate) return;

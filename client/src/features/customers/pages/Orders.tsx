@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearch } from 'wouter';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +59,13 @@ export default function Orders() {
   const completeOrder = useCompleteOrder();
   const { toast } = useToast();
   const { settings } = useSettings();
+
+  const search = useSearch();
+  useEffect(() => {
+    if (new URLSearchParams(search).get('action') === 'new-order') {
+      setIsCreateDialogOpen(true);
+    }
+  }, [search]);
 
   const handleCompleteOrder = async (orderId: string) => {
     try {

@@ -13,9 +13,9 @@ import { useProducts, useMaterials, useDashboardStats, useOrdersWithAllocation, 
 import { useSettings } from '@/hooks/use-settings';
 
 const QUICK_ACTIONS = [
-  { label: 'New Order', icon: ShoppingCart, href: '/orders', description: 'Create a customer order' },
-  { label: 'Receive Stock', icon: Package, href: '/inventory', description: 'Record incoming materials' },
-  { label: 'New Batch', icon: FlaskConical, href: '/production', description: 'Start a production batch' },
+  { label: 'New Order', icon: ShoppingCart, href: '/orders?action=new-order', description: 'Create a customer order' },
+  { label: 'Receive Stock', icon: Package, href: '/inventory?action=receive', description: 'Record incoming materials' },
+  { label: 'New Batch', icon: FlaskConical, href: '/production?action=new-batch', description: 'Start a production batch' },
   { label: 'Tracking', icon: ScanSearch, href: '/traceability', description: 'Trace lots and batches' },
   { label: 'Customers', icon: Users, href: '/customers', description: 'View customer accounts' },
 ] as const;
