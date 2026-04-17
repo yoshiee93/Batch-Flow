@@ -3,14 +3,24 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { AlertTriangle, CheckCircle2, Package, ShoppingCart, TrendingUp, AlertCircle, Loader2, Clock, ChevronDown } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertTriangle, CheckCircle2, Package, ShoppingCart, TrendingUp, AlertCircle, Loader2, Clock, ChevronDown, FlaskConical, ScanSearch, Users, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Link } from 'wouter';
+import { useLocation } from 'wouter';
 import { format } from 'date-fns';
 import { useProducts, useMaterials, useDashboardStats, useOrdersWithAllocation, useBatches, type OrderWithAllocation } from '@/lib/api';
 import { useSettings } from '@/hooks/use-settings';
 
+const QUICK_ACTIONS = [
+  { label: 'New Order', icon: ShoppingCart, href: '/orders', description: 'Create a customer order' },
+  { label: 'Receive Stock', icon: Package, href: '/inventory', description: 'Record incoming materials' },
+  { label: 'New Batch', icon: FlaskConical, href: '/production', description: 'Start a production batch' },
+  { label: 'Tracking', icon: ScanSearch, href: '/traceability', description: 'Trace lots and batches' },
+  { label: 'Customers', icon: Users, href: '/customers', description: 'View customer accounts' },
+] as const;
+
 export default function Dashboard() {
+  const [, navigate] = useLocation();
   const { data: ordersWithAllocation = [], isLoading: ordersLoading, isError: ordersError } = useOrdersWithAllocation();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
   const { settings } = useSettings();
@@ -51,11 +61,31 @@ export default function Dashboard() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono" data-testid="text-dashboard-title">Factory Overview</h1>
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">Real-time orders and stock status.</p>
         </div>
-        <Link href="/orders">
-          <Button className="font-mono w-full sm:w-auto" data-testid="button-new-order">
-            <ShoppingCart size={16} className="mr-2" /> New Order
-          </Button>
-        </Link>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="font-mono w-full sm:w-auto" data-testid="button-quick-actions">
+              <Zap size={16} className="mr-2" />
+              Quick Actions
+              <ChevronDown size={14} className="ml-2 opacity-70" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            {QUICK_ACTIONS.map((action, i) => (
+              <>
+                {i === 1 && <DropdownMenuSeparator key="sep" />}
+                <DropdownMenuItem
+                  key={action.href}
+                  onSelect={() => navigate(action.href)}
+                  className="cursor-pointer"
+                  data-testid={`quick-action-${action.label.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <action.icon size={15} className="shrink-0" />
+                  <span>{action.label}</span>
+                </DropdownMenuItem>
+              </>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -96,6 +126,36 @@ export default function Dashboard() {
           testId="card-total-products"
         />
       </div>
+
+      <Card data-testid="card-quick-actions">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Zap className="h-4 w-4 text-primary" />
+            Quick Actions
+          </CardTitle>
+          <CardDescription>Jump to common workflows</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {QUICK_ACTIONS.map((action) => (
+              <button
+                key={action.href}
+                onClick={() => navigate(action.href)}
+                className="flex flex-col items-center gap-2 p-3 rounded-lg border border-border hover:bg-accent hover:text-accent-foreground transition-colors text-center group cursor-pointer"
+                data-testid={`quick-action-card-${action.label.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                  <action.icon size={18} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium font-mono leading-tight">{action.label}</p>
+                  <p className="text-xs text-muted-foreground leading-tight mt-0.5 hidden sm:block">{action.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-1 overflow-hidden flex flex-col max-h-[500px]">
