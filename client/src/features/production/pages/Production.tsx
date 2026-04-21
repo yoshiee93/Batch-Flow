@@ -1407,16 +1407,10 @@ function BatchOutputsEditor({
         wetQuantity: wetQuantity || "0",
         markCompleted,
       });
-      if (markCompleted && result.outputLots.length > 0) {
+      if (markCompleted) {
         setFinalizeResult(result);
-        toast({ title: "Batch completed", description: "Batch finalized. Print labels for output lots below." });
       } else {
-        toast({ 
-          title: markCompleted ? "Batch completed" : "Batch updated", 
-          description: markCompleted 
-            ? "Batch has been finalized and marked as complete" 
-            : "Batch quantities updated"
-        });
+        toast({ title: "Batch updated", description: "Batch quantities updated" });
         onClose();
       }
     } catch (error) {
@@ -1427,15 +1421,32 @@ function BatchOutputsEditor({
   const totalOutputQuantity = outputs.reduce((sum, o) => sum + parseFloat(o.quantity), 0);
 
   if (finalizeResult) {
+    const completedAt = finalizeResult.batch.endDate
+      ? format(new Date(finalizeResult.batch.endDate), 'dd MMM yyyy, h:mm a')
+      : format(new Date(), 'dd MMM yyyy, h:mm a');
     return (
       <div className="space-y-4 py-2" data-testid="finalize-completion-summary">
         <div className="flex items-center gap-2 text-green-700">
           <CheckCircle className="h-5 w-5" />
           <span className="font-semibold">Batch completed successfully</span>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Print barcode labels for the finished-good lots produced in this batch.
-        </p>
+        <div className="bg-muted rounded-lg px-4 py-3 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Batch</span>
+            <span className="font-mono font-bold" data-testid="text-finalize-batch-number">{finalizeResult.batch.batchNumber}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Completed</span>
+            <span className="font-mono" data-testid="text-finalize-completed-at">{completedAt}</span>
+          </div>
+        </div>
+        {finalizeResult.outputLots.length > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Print barcode labels for the finished-good lots produced in this batch.
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">No output lots were generated for this batch.</p>
+        )}
         <div className="space-y-2">
           {finalizeResult.outputLots.map((ol: OutputLot) => (
             <div key={ol.lotId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 gap-2" data-testid={`summary-output-lot-${ol.lotId}`}>

@@ -14,6 +14,11 @@ import type {
   Batch, InsertBatch, BatchMaterial, InsertBatchMaterial, BatchOutput, InsertStockMovement,
 } from "@shared/schema";
 
+export interface FinalizeBatchResult {
+  batch: Batch;
+  outputLots: BatchOutputLotEntry[];
+}
+
 async function createStockMovement(data: InsertStockMovement) {
   return inventoryRepository.createStockMovement(data);
 }
@@ -319,7 +324,7 @@ export const productionService = {
     await customersService.runStockAllocation();
   },
 
-  async finalizeBatch(batchId: string, wasteQuantity: string, millingQuantity: string, wetQuantity: string, markCompleted: boolean): Promise<Batch> {
+  async finalizeBatch(batchId: string, wasteQuantity: string, millingQuantity: string, wetQuantity: string, markCompleted: boolean): Promise<FinalizeBatchResult> {
     const batch = await repo.getBatch(batchId);
     if (!batch) throw new Error("Batch not found");
 
