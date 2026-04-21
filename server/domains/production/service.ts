@@ -373,7 +373,8 @@ export const productionService = {
 
     await createAuditLog({ entityType: "batch", entityId: batchId, action: markCompleted ? "completed" : "updated", changes: JSON.stringify({ totalOutput, wasteQuantity, millingQuantity, wetQuantity, markCompleted }) });
 
-    return updated;
+    const outputLots = await inventoryRepository.getBatchOutputLots(batchId);
+    return { batch: updated, outputLots };
   },
 
   async recordBatchOutput(batchId: string, actualQuantity: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch> {

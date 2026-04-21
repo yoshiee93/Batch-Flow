@@ -747,7 +747,15 @@ export default function Inventory() {
               >
                 <Printer className="h-4 w-4" /> Print Label
               </Button>
-              <Button variant="outline" className="w-full" onClick={handleCloseReceive} data-testid="button-close-receive">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => { setReceiveForm(EMPTY_RECEIVE_FORM); setReceivedLot(null); }}
+                data-testid="button-receive-another"
+              >
+                Receive Another
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={handleCloseReceive} data-testid="button-close-receive">
                 Done
               </Button>
             </div>

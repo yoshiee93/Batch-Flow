@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import {
   useBatch, useProducts, useBatchInputLots, useBatchOutputLots, useStockMovements, useRecipes,
-  useAuditLogs, useMarkBatchBarcodePrinted,
+  useAuditLogs, useMarkBatchBarcodePrinted, useMarkBarcodePrinted,
   type InputLot, type OutputLot, type StockMovement, type AuditLog
 } from '@/lib/api';
 import { format } from 'date-fns';
@@ -64,6 +64,7 @@ export default function BatchDetail() {
   const { data: movements = [], isLoading: movementsLoading } = useStockMovements(id!);
   const { data: auditLogs = [], isLoading: auditLoading } = useAuditLogs('batch', id!);
   const markBatchBarcodePrinted = useMarkBatchBarcodePrinted();
+  const markLotBarcodePrinted = useMarkBarcodePrinted();
 
   if (batchLoading) {
     return (
@@ -377,17 +378,20 @@ export default function BatchDetail() {
                         variant="outline"
                         className="text-xs h-7 px-2"
                         data-testid={`button-reprint-${ol.lotId}`}
-                        onClick={() => printBarcodeLabel({
-                          lotNumber: ol.lotNumber,
-                          barcodeValue: ol.barcodeValue,
-                          itemName: ol.productName || 'Output',
-                          quantity: ol.quantity,
-                          unit: 'KG',
-                          expiryDate: ol.expiryDate,
-                        })}
+                        onClick={() => {
+                          printBarcodeLabel({
+                            lotNumber: ol.lotNumber,
+                            barcodeValue: ol.barcodeValue,
+                            itemName: ol.productName || 'Output',
+                            quantity: ol.quantity,
+                            unit: 'KG',
+                            expiryDate: ol.expiryDate,
+                          });
+                          markLotBarcodePrinted.mutate(ol.lotId);
+                        }}
                       >
                         <Printer className="h-3 w-3 mr-1" />
-                        Reprint
+                        {ol.barcodePrintedAt ? 'Reprint' : 'Print Label'}
                       </Button>
                     )}
                   </div>

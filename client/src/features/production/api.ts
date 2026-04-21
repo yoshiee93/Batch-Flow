@@ -45,6 +45,11 @@ export interface BatchOutput {
   addedBy: string | null;
 }
 
+export interface FinalizeResult {
+  batch: Batch;
+  outputLots: OutputLot[];
+}
+
 export function useBatches() {
   return useQuery<Batch[]>({
     queryKey: ["batches"],
@@ -237,13 +242,15 @@ export function useFinalizeBatch() {
       wetQuantity: string;
       markCompleted: boolean;
     }) =>
-      fetchApi<Batch>(`/batches/${batchId}/finalize`, {
+      fetchApi<FinalizeResult>(`/batches/${batchId}/finalize`, {
         method: "POST",
         body: JSON.stringify({ wasteQuantity, millingQuantity, wetQuantity, markCompleted })
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batchOutputLots"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
   });

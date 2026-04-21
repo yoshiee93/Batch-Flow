@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle, ChevronDown, ChevronRight, ChevronsUpDown, Check, ExternalLink } from 'lucide-react';
+import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle, ChevronDown, ChevronRight, ChevronsUpDown, Check, ExternalLink, Printer } from 'lucide-react';
 import { Link } from 'wouter';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -27,9 +27,9 @@ import {
   useBatches, useProducts, useRecipes, useMaterials, useLots, useCategories,
   useUpdateBatch, useCreateBatch, useDeleteBatch,
   useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useUpdateBatchMaterial, useRecordBatchOutput,
-  useBatchOutputs, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch,
+  useBatchOutputs, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch, useMarkBarcodePrinted,
   fetchLotByBarcode,
-  type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput, type Category, type LotWithDetails
+  type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput, type Category, type LotWithDetails, type FinalizeResult, type OutputLot
 } from '@/lib/api';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
 import { useToast } from '@/hooks/use-toast';
@@ -1344,6 +1344,8 @@ function BatchOutputsEditor({
   const [millingQuantity, setMillingQuantity] = useState(initialMilling);
   const [wetQuantity, setWetQuantity] = useState(initialWet);
   const [markCompleted, setMarkCompleted] = useState(false);
+  const [finalizeResult, setFinalizeResult] = useState<FinalizeResult | null>(null);
+  const markLotPrinted = useMarkBarcodePrinted();
   
   useEffect(() => {
     setWasteQuantity(initialWaste);
@@ -1398,26 +1400,84 @@ function BatchOutputsEditor({
   
   const handleFinalize = async () => {
     try {
-      await finalizeBatch.mutateAsync({
+      const result = await finalizeBatch.mutateAsync({
         batchId,
         wasteQuantity: wasteQuantity || "0",
         millingQuantity: millingQuantity || "0",
         wetQuantity: wetQuantity || "0",
         markCompleted,
       });
-      toast({ 
-        title: markCompleted ? "Batch completed" : "Batch updated", 
-        description: markCompleted 
-          ? "Batch has been finalized and marked as complete" 
-          : "Batch quantities updated"
-      });
-      onClose();
+      if (markCompleted && result.outputLots.length > 0) {
+        setFinalizeResult(result);
+        toast({ title: "Batch completed", description: "Batch finalized. Print labels for output lots below." });
+      } else {
+        toast({ 
+          title: markCompleted ? "Batch completed" : "Batch updated", 
+          description: markCompleted 
+            ? "Batch has been finalized and marked as complete" 
+            : "Batch quantities updated"
+        });
+        onClose();
+      }
     } catch (error) {
       toast({ title: "Error", description: "Failed to finalize batch", variant: "destructive" });
     }
   };
   
   const totalOutputQuantity = outputs.reduce((sum, o) => sum + parseFloat(o.quantity), 0);
+
+  if (finalizeResult) {
+    return (
+      <div className="space-y-4 py-2" data-testid="finalize-completion-summary">
+        <div className="flex items-center gap-2 text-green-700">
+          <CheckCircle className="h-5 w-5" />
+          <span className="font-semibold">Batch completed successfully</span>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Print barcode labels for the finished-good lots produced in this batch.
+        </p>
+        <div className="space-y-2">
+          {finalizeResult.outputLots.map((ol: OutputLot) => (
+            <div key={ol.lotId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 gap-2" data-testid={`summary-output-lot-${ol.lotId}`}>
+              <div className="space-y-0.5 min-w-0">
+                <div className="font-medium text-sm">{ol.productName || 'Output Lot'}</div>
+                <div className="text-xs text-muted-foreground font-mono">{ol.lotNumber}</div>
+                {ol.barcodeValue && <div className="text-xs text-muted-foreground font-mono">{ol.barcodeValue}</div>}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-mono text-sm">{parseFloat(ol.quantity).toFixed(2)} KG</span>
+                {ol.barcodeValue && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs h-7 px-2"
+                    data-testid={`button-print-final-lot-${ol.lotId}`}
+                    onClick={() => {
+                      printBarcodeLabel({
+                        lotNumber: ol.lotNumber,
+                        barcodeValue: ol.barcodeValue,
+                        itemName: ol.productName || 'Output',
+                        quantity: ol.quantity,
+                        unit: 'KG',
+                        expiryDate: ol.expiryDate,
+                      });
+                      markLotPrinted.mutate(ol.lotId);
+                    }}
+                  >
+                    <Printer className="h-3 w-3 mr-1" />
+                    {ol.barcodePrintedAt ? 'Reprint' : 'Print Label'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end pt-2 border-t">
+          <Button onClick={onClose} data-testid="button-close-finalize-summary">Done</Button>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-4 py-2">
