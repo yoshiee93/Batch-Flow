@@ -147,7 +147,11 @@ export function useMarkBarcodePrinted() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (lotId: string) => fetchApi<Lot>(`/lots/${lotId}/barcode-printed`, { method: "PATCH" }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["lots"] }),
+    onSuccess: (_, lotId) => {
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
+      queryClient.invalidateQueries({ queryKey: ["lot", lotId] });
+      queryClient.invalidateQueries({ queryKey: ["batchOutputLots"] });
+    },
   });
 }
 
