@@ -8,6 +8,7 @@ import { asyncHandler } from "../../lib/asyncHandler";
 declare module "express-session" {
   interface SessionData {
     userId: string;
+    userRole: string;
   }
 }
 
@@ -30,6 +31,7 @@ authRouter.post("/auth/login", asyncHandler(async (req, res) => {
   }
 
   req.session.userId = user.id;
+  req.session.userRole = user.role;
   await new Promise<void>((resolve, reject) => req.session.save(err => err ? reject(err) : resolve()));
 
   const { password: _pw, ...safeUser } = user;

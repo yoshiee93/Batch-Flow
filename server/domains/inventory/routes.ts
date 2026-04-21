@@ -2,7 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { insertLotSchema, insertStockMovementSchema } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
+import { requireRole } from "../../lib/authMiddleware";
 import { inventoryService as svc } from "./service";
+
+const inventoryOrAdmin = requireRole("inventory", "admin");
 
 export const inventoryRouter = Router();
 
@@ -52,7 +55,7 @@ inventoryRouter.get("/lots/:id/lineage", asyncHandler(async (req, res) => {
   res.json(lineage);
 }));
 
-inventoryRouter.patch("/lots/:id/barcode-printed", asyncHandler(async (req, res) => {
+inventoryRouter.patch("/lots/:id/barcode-printed", inventoryOrAdmin, asyncHandler(async (req, res) => {
   const lot = await svc.updateLotBarcodePrinted(req.params.id);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
   res.json(lot);
@@ -68,19 +71,19 @@ inventoryRouter.get("/lots", asyncHandler(async (_req, res) => {
   res.json(await svc.getLots());
 }));
 
-inventoryRouter.post("/lots", asyncHandler(async (req, res) => {
+inventoryRouter.post("/lots", inventoryOrAdmin, asyncHandler(async (req, res) => {
   const data = insertLotSchema.parse(req.body);
   res.status(201).json(await svc.createLot(data));
 }));
 
-inventoryRouter.patch("/lots/:id", asyncHandler(async (req, res) => {
+inventoryRouter.patch("/lots/:id", inventoryOrAdmin, asyncHandler(async (req, res) => {
   const data = insertLotSchema.partial().parse(req.body);
   const lot = await svc.updateLot(req.params.id, data);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
   res.json(lot);
 }));
 
-inventoryRouter.delete("/lots/:id", asyncHandler(async (req, res) => {
+inventoryRouter.delete("/lots/:id", inventoryOrAdmin, asyncHandler(async (req, res) => {
   await svc.deleteLot(req.params.id);
   res.status(204).send();
 }));
@@ -93,7 +96,7 @@ inventoryRouter.get("/products/:id/lots", asyncHandler(async (req, res) => {
   res.json(await svc.getLotsByProduct(req.params.id));
 }));
 
-inventoryRouter.post("/receive-stock", asyncHandler(async (req, res) => {
+inventoryRouter.post("/receive-stock", inventoryOrAdmin, asyncHandler(async (req, res) => {
   const data = receiveStockSchema.parse(req.body);
   const qty = parseFloat(data.quantity);
   if (isNaN(qty) || qty <= 0) {
@@ -108,7 +111,7 @@ inventoryRouter.get("/stock-movements", asyncHandler(async (req, res) => {
   res.json(await svc.getStockMovements(limit, batchId));
 }));
 
-inventoryRouter.post("/stock-movements", asyncHandler(async (req, res) => {
+inventoryRouter.post("/stock-movements", inventoryOrAdmin, asyncHandler(async (req, res) => {
   const data = insertStockMovementSchema.parse(req.body);
   res.status(201).json(await svc.createStockMovement(data));
 }));

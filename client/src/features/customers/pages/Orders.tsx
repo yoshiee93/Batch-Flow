@@ -550,41 +550,45 @@ export default function Orders() {
           )}
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>Close</Button>
-            <Button variant="outline" onClick={() => {
-              setIsViewDialogOpen(false);
-              if (viewingOrder) handleEditClick(viewingOrder);
-            }}>
-              <Pencil className="mr-2 h-4 w-4" /> Edit Order
-            </Button>
-            {viewingOrder && viewingOrder.status !== 'shipped' && viewingOrder.status !== 'cancelled' && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button className="bg-green-600 hover:bg-green-700">
-                    <Truck size={14} className="mr-2" /> Complete Order
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Complete Order</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will mark the order as shipped and deduct the reserved stock from inventory.
-                      This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-green-600 hover:bg-green-700"
-                      onClick={() => {
-                        handleCompleteOrder(viewingOrder.id);
-                        setIsViewDialogOpen(false);
-                      }}
-                    >
-                      Complete Order
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+            {canManageOrders && (
+              <>
+                <Button variant="outline" onClick={() => {
+                  setIsViewDialogOpen(false);
+                  if (viewingOrder) handleEditClick(viewingOrder);
+                }}>
+                  <Pencil className="mr-2 h-4 w-4" /> Edit Order
+                </Button>
+                {viewingOrder && viewingOrder.status !== 'shipped' && viewingOrder.status !== 'cancelled' && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button className="bg-green-600 hover:bg-green-700">
+                        <Truck size={14} className="mr-2" /> Complete Order
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Complete Order</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will mark the order as shipped and deduct the reserved stock from inventory.
+                          This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={() => {
+                            handleCompleteOrder(viewingOrder.id);
+                            setIsViewDialogOpen(false);
+                          }}
+                        >
+                          Complete Order
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </>
             )}
           </DialogFooter>
         </DialogContent>
@@ -614,6 +618,7 @@ function EditOrderContent({
   isPending: boolean;
   onClose: () => void;
 }) {
+  const { canManageOrders } = useRole();
   const { data: orderItems = [], isLoading: itemsLoading } = useOrderItems(order.id);
   const createOrderItem = useCreateOrderItem();
   const deleteOrderItem = useDeleteOrderItem();
@@ -758,15 +763,17 @@ function EditOrderContent({
                             {product ? parseFloat(product.currentStock).toFixed(2) : '-'}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoveItem(item.id)}
-                              disabled={deleteOrderItem.isPending}
-                              data-testid={`button-remove-item-${item.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            {canManageOrders && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveItem(item.id)}
+                                disabled={deleteOrderItem.isPending}
+                                data-testid={`button-remove-item-${item.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -776,7 +783,7 @@ function EditOrderContent({
               </Table>
             </div>
 
-            <div className="flex gap-2 items-end">
+            {canManageOrders && <div className="flex gap-2 items-end">
               <div className="flex-1 space-y-2">
                 <Label>Add Product</Label>
                 <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
@@ -844,17 +851,17 @@ function EditOrderContent({
               >
                 {createOrderItem.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               </Button>
-            </div>
+            </div>}
           </>
         )}
       </div>
 
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button onClick={onSave} disabled={isPending} data-testid="button-save-order">
+        {canManageOrders && <Button onClick={onSave} disabled={isPending} data-testid="button-save-order">
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Save Changes
-        </Button>
+        </Button>}
       </DialogFooter>
     </div>
   );

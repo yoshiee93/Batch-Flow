@@ -3,7 +3,10 @@ import {
   insertBatchSchema, insertBatchMaterialSchema,
 } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
+import { requireRole } from "../../lib/authMiddleware";
 import { productionService as svc } from "./service";
+
+const productionOrAdmin = requireRole("production", "admin");
 
 export const productionRouter = Router();
 
@@ -39,40 +42,40 @@ productionRouter.get("/batches/:id", asyncHandler(async (req, res) => {
   res.json(batch);
 }));
 
-productionRouter.patch("/batches/:id/barcode-printed", asyncHandler(async (req, res) => {
+productionRouter.patch("/batches/:id/barcode-printed", productionOrAdmin, asyncHandler(async (req, res) => {
   const batch = await svc.updateBatchBarcodePrinted(req.params.id);
   if (!batch) return res.status(404).json({ error: "Batch not found" });
   res.json(batch);
 }));
 
-productionRouter.post("/batches", asyncHandler(async (req, res) => {
+productionRouter.post("/batches", productionOrAdmin, asyncHandler(async (req, res) => {
   const data = insertBatchSchema.parse(req.body);
   res.status(201).json(await svc.createBatch(data));
 }));
 
-productionRouter.patch("/batches/:id", asyncHandler(async (req, res) => {
+productionRouter.patch("/batches/:id", productionOrAdmin, asyncHandler(async (req, res) => {
   const data = insertBatchSchema.partial().parse(req.body);
   const batch = await svc.updateBatch(req.params.id, data);
   if (!batch) return res.status(404).json({ error: "Batch not found" });
   res.json(batch);
 }));
 
-productionRouter.delete("/batches/:id", asyncHandler(async (req, res) => {
+productionRouter.delete("/batches/:id", productionOrAdmin, asyncHandler(async (req, res) => {
   await svc.deleteBatch(req.params.id);
   res.status(204).send();
 }));
 
-productionRouter.post("/batches/:id/materials", asyncHandler(async (req, res) => {
+productionRouter.post("/batches/:id/materials", productionOrAdmin, asyncHandler(async (req, res) => {
   const data = insertBatchMaterialSchema.parse({ ...req.body, batchId: req.params.id });
   res.status(201).json(await svc.addBatchMaterial(data));
 }));
 
-productionRouter.delete("/batch-materials/:id", asyncHandler(async (req, res) => {
+productionRouter.delete("/batch-materials/:id", productionOrAdmin, asyncHandler(async (req, res) => {
   await svc.removeBatchMaterial(req.params.id);
   res.status(204).send();
 }));
 
-productionRouter.patch("/batch-materials/:id", asyncHandler(async (req, res) => {
+productionRouter.patch("/batch-materials/:id", productionOrAdmin, asyncHandler(async (req, res) => {
   const { quantity } = req.body;
   if (!quantity) return res.status(400).json({ error: "quantity is required" });
   const qty = parseFloat(quantity);
@@ -82,7 +85,7 @@ productionRouter.patch("/batch-materials/:id", asyncHandler(async (req, res) => 
   res.json(await svc.updateBatchMaterial(req.params.id, quantity));
 }));
 
-productionRouter.post("/batches/:id/input", asyncHandler(async (req, res) => {
+productionRouter.post("/batches/:id/input", productionOrAdmin, asyncHandler(async (req, res) => {
   const { materialId, productId, quantity, sourceLotId, lotId } = req.body;
 
   if (!quantity) return res.status(400).json({ error: "quantity is required" });
@@ -121,7 +124,7 @@ productionRouter.post("/batches/:id/input", asyncHandler(async (req, res) => {
   res.status(201).json(batchMaterial);
 }));
 
-productionRouter.post("/batches/:id/output", asyncHandler(async (req, res) => {
+productionRouter.post("/batches/:id/output", productionOrAdmin, asyncHandler(async (req, res) => {
   const { actualQuantity, wasteQuantity, millingQuantity, markCompleted } = req.body;
   res.json(await svc.recordBatchOutput(
     req.params.id,
@@ -132,7 +135,7 @@ productionRouter.post("/batches/:id/output", asyncHandler(async (req, res) => {
   ));
 }));
 
-productionRouter.post("/batches/:id/outputs", asyncHandler(async (req, res) => {
+productionRouter.post("/batches/:id/outputs", productionOrAdmin, asyncHandler(async (req, res) => {
   const { productId, quantity } = req.body;
   if (!productId || !quantity) {
     return res.status(400).json({ error: "productId and quantity are required" });
@@ -144,12 +147,12 @@ productionRouter.post("/batches/:id/outputs", asyncHandler(async (req, res) => {
   res.status(201).json(await svc.addBatchOutput(req.params.id, productId, quantity));
 }));
 
-productionRouter.delete("/batch-outputs/:id", asyncHandler(async (req, res) => {
+productionRouter.delete("/batch-outputs/:id", productionOrAdmin, asyncHandler(async (req, res) => {
   await svc.removeBatchOutput(req.params.id);
   res.status(204).send();
 }));
 
-productionRouter.post("/batches/:id/finalize", asyncHandler(async (req, res) => {
+productionRouter.post("/batches/:id/finalize", productionOrAdmin, asyncHandler(async (req, res) => {
   const { wasteQuantity, millingQuantity, wetQuantity, markCompleted } = req.body;
   res.json(await svc.finalizeBatch(
     req.params.id,
@@ -160,7 +163,7 @@ productionRouter.post("/batches/:id/finalize", asyncHandler(async (req, res) => 
   ));
 }));
 
-productionRouter.post("/batches/:id/lot-input", asyncHandler(async (req, res) => {
+productionRouter.post("/batches/:id/lot-input", productionOrAdmin, asyncHandler(async (req, res) => {
   const { lotId, quantity } = req.body;
   if (!lotId || !quantity) {
     return res.status(400).json({ error: "lotId and quantity are required" });
