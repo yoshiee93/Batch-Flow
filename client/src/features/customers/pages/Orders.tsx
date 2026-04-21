@@ -26,6 +26,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem, useDeleteOrderItem, useDeleteOrder, useCustomers, useOrdersWithAllocation, useCompleteOrder, type Order, type OrderItem, type Product, type Customer, type OrderWithAllocation } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
+import { useRole } from '@/contexts/AuthContext';
 
 export default function Orders() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,6 +61,8 @@ export default function Orders() {
     notes: '',
   });
   
+  const { canManageOrders } = useRole();
+
   const { data: ordersWithAllocation = [], isLoading, isError } = useOrdersWithAllocation();
   const { data: products = [] } = useProducts();
   const { data: customers = [] } = useCustomers();
@@ -228,12 +231,14 @@ export default function Orders() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono" data-testid="text-orders-title">Orders</h1>
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">Manage customer orders and fulfillment.</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="lg" className="font-mono" data-testid="button-create-order">
-              <Plus size={16} className="mr-2" /> Create Order
-            </Button>
-          </DialogTrigger>
+        <Dialog open={isCreateDialogOpen} onOpenChange={canManageOrders ? setIsCreateDialogOpen : undefined}>
+          {canManageOrders && (
+            <DialogTrigger asChild>
+              <Button size="lg" className="font-mono" data-testid="button-create-order">
+                <Plus size={16} className="mr-2" /> Create Order
+              </Button>
+            </DialogTrigger>
+          )}
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Order</DialogTitle>
@@ -866,6 +871,7 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
 }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const { canManageOrders } = useRole();
 
   const allocationBadge = () => {
     if (order.items.length === 0) {
@@ -937,36 +943,40 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onEditClick(order)} data-testid={`button-edit-order-${order.id}`}>
-              <Pencil size={14} className="mr-2" /> Edit Order
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onStatusChange(order.id, 'in_production')}>
-              <Clock size={14} className="mr-2" /> Start Production
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onStatusChange(order.id, 'ready')}>
-              <CheckCircle2 size={14} className="mr-2" /> Mark Ready
-            </DropdownMenuItem>
-            {order.status !== 'shipped' && order.status !== 'cancelled' && (
-              <DropdownMenuItem 
-                onClick={() => setIsCompleteDialogOpen(true)}
-                className="text-green-600"
-                data-testid={`button-complete-order-${order.id}`}
-              >
-                <Truck size={14} className="mr-2" /> Complete Order
-              </DropdownMenuItem>
+            {canManageOrders && (
+              <>
+                <DropdownMenuItem onClick={() => onEditClick(order)} data-testid={`button-edit-order-${order.id}`}>
+                  <Pencil size={14} className="mr-2" /> Edit Order
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onStatusChange(order.id, 'in_production')}>
+                  <Clock size={14} className="mr-2" /> Start Production
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onStatusChange(order.id, 'ready')}>
+                  <CheckCircle2 size={14} className="mr-2" /> Mark Ready
+                </DropdownMenuItem>
+                {order.status !== 'shipped' && order.status !== 'cancelled' && (
+                  <DropdownMenuItem 
+                    onClick={() => setIsCompleteDialogOpen(true)}
+                    className="text-green-600"
+                    data-testid={`button-complete-order-${order.id}`}
+                  >
+                    <Truck size={14} className="mr-2" /> Complete Order
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={() => onStatusChange(order.id, 'cancelled')}>
+                  Cancel Order
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="text-destructive" 
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  data-testid={`button-delete-order-${order.id}`}
+                >
+                  <Trash2 size={14} className="mr-2" /> Delete Order
+                </DropdownMenuItem>
+              </>
             )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={() => onStatusChange(order.id, 'cancelled')}>
-              Cancel Order
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              className="text-destructive" 
-              onClick={() => setIsDeleteDialogOpen(true)}
-              data-testid={`button-delete-order-${order.id}`}
-            >
-              <Trash2 size={14} className="mr-2" /> Delete Order
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -1024,6 +1034,7 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products }: {
   products: Product[];
 }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const { canManageOrders } = useRole();
 
   const statusBadge = () => {
     if (order.status === 'shipped') {
@@ -1083,14 +1094,18 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products }: {
             <DropdownMenuItem onClick={() => onViewClick(order)}>
               <Package size={14} className="mr-2" /> View Details
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="text-destructive" 
-              onClick={() => setIsDeleteDialogOpen(true)}
-              data-testid={`button-delete-archived-order-${order.id}`}
-            >
-              <Trash2 size={14} className="mr-2" /> Delete Order
-            </DropdownMenuItem>
+            {canManageOrders && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  className="text-destructive" 
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  data-testid={`button-delete-archived-order-${order.id}`}
+                >
+                  <Trash2 size={14} className="mr-2" /> Delete Order
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

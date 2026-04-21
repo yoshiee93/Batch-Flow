@@ -10,10 +10,12 @@ import {
   Users,
   Calculator,
   ScanSearch,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
@@ -25,8 +27,25 @@ const navItems = [
   { label: 'Calculator', icon: Calculator, href: '/calculator' },
 ];
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  production: 'Production',
+  inventory: 'Inventory',
+  readonly: 'View Only',
+};
+
 export function Sidebar({ className }: { className?: string }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const { user, logout } = useAuth();
+
+  const initials = user
+    ? user.fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    : '??';
+
+  async function handleLogout() {
+    await logout();
+    setLocation('/login');
+  }
 
   return (
     <div className={cn("flex flex-col h-full bg-sidebar text-sidebar-foreground border-r border-sidebar-border", className)}>
@@ -61,18 +80,32 @@ export function Sidebar({ className }: { className?: string }) {
 
       <div className="p-4 border-t border-sidebar-border">
         <div className="flex items-center gap-3 px-3 py-2">
-          <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
-            <span className="text-xs font-bold">JD</span>
+          <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-bold">{initials}</span>
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">John Doe</span>
-            <span className="text-xs text-sidebar-foreground/60">Prod. Manager</span>
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-sm font-medium truncate" data-testid="text-user-name">{user?.fullName ?? '—'}</span>
+            <span className="text-xs text-sidebar-foreground/60" data-testid="text-user-role">
+              {ROLE_LABELS[user?.role ?? ''] ?? user?.role ?? ''}
+            </span>
           </div>
-          <Link href="/settings">
-            <Button variant="ghost" size="icon" className="ml-auto text-sidebar-foreground/60 hover:text-sidebar-foreground" data-testid="button-settings">
-              <Settings size={16} />
+          <div className="flex items-center gap-1">
+            <Link href="/settings">
+              <Button variant="ghost" size="icon" className="text-sidebar-foreground/60 hover:text-sidebar-foreground" data-testid="button-settings">
+                <Settings size={16} />
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-sidebar-foreground/60 hover:text-sidebar-foreground"
+              onClick={handleLogout}
+              data-testid="button-logout"
+              title="Sign out"
+            >
+              <LogOut size={16} />
             </Button>
-          </Link>
+          </div>
         </div>
       </div>
     </div>

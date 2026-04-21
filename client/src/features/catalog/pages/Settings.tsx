@@ -12,6 +12,7 @@ import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory,
 import { PROCESS_CODE_MAP, FRUIT_CODE_MAP } from '@shared/batchCodeConfig';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
+import { useRole } from '@/contexts/AuthContext';
 
 export default function Settings() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -28,6 +29,8 @@ export default function Settings() {
   const [isFruitCodeDialogOpen, setIsFruitCodeDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [fruitCodeInput, setFruitCodeInput] = useState('');
+
+  const { canManageSettings } = useRole();
 
   const { data: categories = [], isLoading, isError } = useCategories();
   const { data: products = [] } = useProducts();
@@ -195,10 +198,12 @@ export default function Settings() {
               Manage categories used to organize products. Categories control inventory tabs and yield calculations.
             </CardDescription>
           </div>
-          <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-category">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Category
-          </Button>
+          {canManageSettings && (
+            <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-category">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Category
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {categories.length === 0 ? (
@@ -262,37 +267,39 @@ export default function Settings() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditClick(category)}
-                          data-testid={`button-edit-category-${category.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        {!category.isDefault && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" data-testid={`button-delete-category-${category.id}`}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Category</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete "{category.name}"? Products using this category will need to be reassigned.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(category)}>Delete</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
+                      {canManageSettings && (
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditClick(category)}
+                            data-testid={`button-edit-category-${category.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          {!category.isDefault && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" data-testid={`button-delete-category-${category.id}`}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Category</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete "{category.name}"? Products using this category will need to be reassigned.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDelete(category)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -350,14 +357,16 @@ export default function Settings() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleFruitCodeEdit(product)}
-                          data-testid={`button-edit-fruitcode-${product.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        {canManageSettings && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleFruitCodeEdit(product)}
+                            data-testid={`button-edit-fruitcode-${product.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

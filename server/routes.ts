@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { z } from "zod";
 
+import { authRouter } from "./domains/auth/routes";
 import { catalogRouter } from "./domains/catalog/routes";
 import { inventoryRouter } from "./domains/inventory/routes";
 import { productionRouter } from "./domains/production/routes";
@@ -9,11 +10,16 @@ import { traceabilityRouter } from "./domains/traceability/routes";
 import { qualityRouter } from "./domains/quality/routes";
 import { customersRouter } from "./domains/customers/routes";
 import { dashboardRouter } from "./domains/dashboard/routes";
+import { requireAuth } from "./lib/authMiddleware";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.use("/api", authRouter);
+
+  app.use("/api", requireAuth);
+
   app.use("/api", catalogRouter);
   app.use("/api", inventoryRouter);
   app.use("/api", productionRouter);

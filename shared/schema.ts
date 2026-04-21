@@ -3,7 +3,7 @@ import { pgTable, text, varchar, integer, decimal, timestamp, boolean, pgEnum } 
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const userRoleEnum = pgEnum("user_role", ["admin", "manager", "operator", "viewer"]);
+export const userRoleEnum = pgEnum("user_role", ["admin", "production", "inventory", "readonly"]);
 export const batchStatusEnum = pgEnum("batch_status", ["planned", "in_progress", "quality_check", "completed", "released", "quarantined"]);
 export const orderStatusEnum = pgEnum("order_status", ["pending", "in_production", "ready", "shipped", "cancelled"]);
 export const orderPriorityEnum = pgEnum("order_priority", ["low", "normal", "high", "urgent"]);
@@ -18,7 +18,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   fullName: text("full_name").notNull(),
-  role: userRoleEnum("role").notNull().default("operator"),
+  role: userRoleEnum("role").notNull().default("readonly"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

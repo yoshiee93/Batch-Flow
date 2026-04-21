@@ -34,6 +34,7 @@ import {
 import { printBarcodeLabel } from '@/lib/barcodePrint';
 import { useToast } from '@/hooks/use-toast';
 import { buildBatchCode } from '@shared/batchCodeConfig';
+import { useRole } from '@/contexts/AuthContext';
 
 export default function Production() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(() => {
@@ -89,6 +90,8 @@ export default function Production() {
     millingQuantity: '',
     markCompleted: false,
   });
+
+  const { canManageBatches } = useRole();
 
   const { data: batches = [], isLoading, isError } = useBatches();
   const { data: products = [] } = useProducts();
@@ -395,12 +398,14 @@ export default function Production() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono" data-testid="text-production-title">Production Control</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage batches, record inputs and outputs.</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="lg" className="font-mono" data-testid="button-create-batch">
-              <Plus size={16} className="mr-2" /> Create New Batch
-            </Button>
-          </DialogTrigger>
+        <Dialog open={isCreateDialogOpen} onOpenChange={canManageBatches ? setIsCreateDialogOpen : undefined}>
+          {canManageBatches && (
+            <DialogTrigger asChild>
+              <Button size="lg" className="font-mono" data-testid="button-create-batch">
+                <Plus size={16} className="mr-2" /> Create New Batch
+              </Button>
+            </DialogTrigger>
+          )}
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Batch</DialogTitle>
@@ -1067,6 +1072,7 @@ function BatchCard({
   const [isOpen, setIsOpen] = useState(false);
   const product = products.find(p => p.id === batch.productId);
   const isCompleted = batch.status === 'completed';
+  const { canManageBatches } = useRole();
   
   const { data: batchMaterials = [] } = useBatchMaterials(batch.id);
   const { data: batchOutputs = [] } = useBatchOutputs(batch.id);
@@ -1150,7 +1156,7 @@ function BatchCard({
                 </div>
               </div>
               <div className="flex items-center gap-1 ml-4" onClick={(e) => e.stopPropagation()}>
-                {!isCompleted && (
+                {!isCompleted && canManageBatches && (
                   <>
                     <Button size="icon" variant="ghost" onClick={() => onRecordInputClick(batch)} title="Record Input" data-testid={`button-input-${batch.id}`}>
                       <Package size={16} />
@@ -1176,20 +1182,24 @@ function BatchCard({
                         <ExternalLink size={14} className="mr-2" /> View Detail
                       </DropdownMenuItem>
                     </Link>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => onEditClick(batch)} data-testid={`button-edit-batch-${batch.id}`}>
-                      <Pencil size={14} className="mr-2" /> Edit Batch
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onRecordInputClick(batch)} data-testid={`menu-record-input-${batch.id}`}>
-                      <Package size={14} className="mr-2" /> Record Input
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onRecordOutputClick(batch)} data-testid={`button-record-${batch.id}`}>
-                      <Scale size={14} className="mr-2" /> Manage Outputs
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={() => onDeleteClick(batch)} data-testid={`button-delete-batch-${batch.id}`}>
-                      <Trash2 size={14} className="mr-2" /> Delete Batch
-                    </DropdownMenuItem>
+                    {canManageBatches && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onEditClick(batch)} data-testid={`button-edit-batch-${batch.id}`}>
+                          <Pencil size={14} className="mr-2" /> Edit Batch
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onRecordInputClick(batch)} data-testid={`menu-record-input-${batch.id}`}>
+                          <Package size={14} className="mr-2" /> Record Input
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onRecordOutputClick(batch)} data-testid={`button-record-${batch.id}`}>
+                          <Scale size={14} className="mr-2" /> Manage Outputs
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-destructive" onClick={() => onDeleteClick(batch)} data-testid={`button-delete-batch-${batch.id}`}>
+                          <Trash2 size={14} className="mr-2" /> Delete Batch
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

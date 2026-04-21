@@ -24,6 +24,7 @@ import {
 } from '@/lib/api';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
 import { useToast } from '@/hooks/use-toast';
+import { useRole } from '@/contexts/AuthContext';
 
 const EMPTY_RECEIVE_FORM = {
   materialId: '',
@@ -79,6 +80,8 @@ export default function Inventory() {
   const [receiveForm, setReceiveForm] = useState(EMPTY_RECEIVE_FORM);
   const [receivedLot, setReceivedLot] = useState<LotWithDetails | null>(null);
   const [materialSearchOpen, setMaterialSearchOpen] = useState(false);
+
+  const { canReceiveStock, canManageSettings } = useRole();
 
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
@@ -369,28 +372,30 @@ export default function Inventory() {
           {isLow ? <Badge variant="destructive">Low</Badge> : <Badge variant="outline" className="text-green-600 border-green-200">OK</Badge>}
         </TableCell>
         <TableCell className="text-right">
-          <div className="flex justify-end gap-1">
-            <Button variant="ghost" size="icon" onClick={() => handleEditMaterialClick(material)} data-testid={`button-edit-material-${material.id}`}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" data-testid={`button-delete-material-${material.id}`}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Material</AlertDialogTitle>
-                  <AlertDialogDescription>Are you sure you want to delete {material.name}?</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleDeleteMaterial(material)}>Delete</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+          {canManageSettings && (
+            <div className="flex justify-end gap-1">
+              <Button variant="ghost" size="icon" onClick={() => handleEditMaterialClick(material)} data-testid={`button-edit-material-${material.id}`}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" data-testid={`button-delete-material-${material.id}`}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Material</AlertDialogTitle>
+                    <AlertDialogDescription>Are you sure you want to delete {material.name}?</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDeleteMaterial(material)}>Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </TableCell>
       </TableRow>
     );
@@ -420,28 +425,30 @@ export default function Inventory() {
           {isLow ? <Badge variant="destructive">Low</Badge> : <Badge variant="outline" className="text-green-600 border-green-200">OK</Badge>}
         </TableCell>
         <TableCell className="text-right">
-          <div className="flex justify-end gap-1">
-            <Button variant="ghost" size="icon" onClick={() => handleEditProductClick(product)} data-testid={`button-edit-product-${product.id}`}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" data-testid={`button-delete-product-${product.id}`}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Product</AlertDialogTitle>
-                  <AlertDialogDescription>Are you sure you want to delete {product.name}?</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleDeleteProduct(product)}>Delete</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+          {canManageSettings && (
+            <div className="flex justify-end gap-1">
+              <Button variant="ghost" size="icon" onClick={() => handleEditProductClick(product)} data-testid={`button-edit-product-${product.id}`}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" data-testid={`button-delete-product-${product.id}`}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Product</AlertDialogTitle>
+                    <AlertDialogDescription>Are you sure you want to delete {product.name}?</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDeleteProduct(product)}>Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </TableCell>
       </TableRow>
     );
@@ -502,9 +509,11 @@ export default function Inventory() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono" data-testid="text-inventory-title">Inventory</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage raw materials and finished goods.</p>
         </div>
-        <Button onClick={handleOpenReceive} className="gap-2" data-testid="button-receive-stock">
-          <Download className="h-4 w-4" /> Receive Stock
-        </Button>
+        {canReceiveStock && (
+          <Button onClick={handleOpenReceive} className="gap-2" data-testid="button-receive-stock">
+            <Download className="h-4 w-4" /> Receive Stock
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -570,11 +579,13 @@ export default function Inventory() {
           ];
           return (
             <TabsContent key={category.id} value={`cat-${category.id}`} className="space-y-4">
-              <div className="flex justify-end gap-2">
-                <Button onClick={() => { setProductForm(prev => ({ ...prev, categoryId: category.id })); setIsCreateProductOpen(true); }} data-testid={`button-new-product-cat-${category.id}`}>
-                  <Plus size={16} className="mr-2" /> New Product
-                </Button>
-              </div>
+              {canManageSettings && (
+                <div className="flex justify-end gap-2">
+                  <Button onClick={() => { setProductForm(prev => ({ ...prev, categoryId: category.id })); setIsCreateProductOpen(true); }} data-testid={`button-new-product-cat-${category.id}`}>
+                    <Plus size={16} className="mr-2" /> New Product
+                  </Button>
+                </div>
+              )}
               <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                   <Table>
@@ -611,11 +622,13 @@ export default function Inventory() {
         })}
 
         <TabsContent value="all" className="space-y-4">
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => setIsCreateProductOpen(true)} data-testid="button-new-product">
-              <Plus size={16} className="mr-2" /> New Product
-            </Button>
-          </div>
+          {canManageSettings && (
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => setIsCreateProductOpen(true)} data-testid="button-new-product">
+                <Plus size={16} className="mr-2" /> New Product
+              </Button>
+            </div>
+          )}
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
               <Table>

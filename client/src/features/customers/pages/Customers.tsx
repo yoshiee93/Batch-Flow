@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Building2, Mail, Phone } from 'lucide-react';
 import { useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, type Customer } from '@/features/customers/api';
 import { useToast } from '@/hooks/use-toast';
+import { useRole } from '@/contexts/AuthContext';
 
 export default function Customers() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,6 +26,8 @@ export default function Customers() {
     address: '',
     notes: '',
   });
+
+  const { canManageCustomers } = useRole();
 
   const { data: customers = [], isLoading, isError } = useCustomers();
   const createCustomer = useCreateCustomer();
@@ -138,13 +141,15 @@ export default function Customers() {
           <h1 className="text-2xl font-mono font-bold" data-testid="page-title">Customers</h1>
           <p className="text-muted-foreground mt-1">Manage customer information and contacts</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-create-customer">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Customer
-            </Button>
-          </DialogTrigger>
+        <Dialog open={isCreateDialogOpen} onOpenChange={canManageCustomers ? setIsCreateDialogOpen : undefined}>
+          {canManageCustomers && (
+            <DialogTrigger asChild>
+              <Button data-testid="button-create-customer">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Customer
+              </Button>
+            </DialogTrigger>
+          )}
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Add New Customer</DialogTitle>
@@ -310,41 +315,43 @@ export default function Customers() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditClick(customer)}
-                          data-testid={`button-edit-customer-${customer.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              data-testid={`button-delete-customer-${customer.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Customer</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete {customer.name}? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(customer)} data-testid="button-confirm-delete">
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+                      {canManageCustomers && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditClick(customer)}
+                            data-testid={`button-edit-customer-${customer.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                data-testid={`button-delete-customer-${customer.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete {customer.name}? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(customer)} data-testid="button-confirm-delete">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

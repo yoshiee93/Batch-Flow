@@ -1,4 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { pool } from "./db";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -11,6 +14,19 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+const PgStore = connectPgSimple(session);
+app.use(session({
+  store: new PgStore({ pool, createTableIfMissing: true }),
+  secret: process.env.SESSION_SECRET || "cleartrace-dev-secret-change-in-prod",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: "lax",
+  },
+}));
 
 app.use(
   express.json({

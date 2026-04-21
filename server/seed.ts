@@ -4,6 +4,7 @@ import {
   batches, batchMaterials, orders, orderItems
 } from "@shared/schema";
 import { sql } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 async function seed() {
   console.log("Seeding database...");
@@ -11,9 +12,10 @@ async function seed() {
   await db.execute(sql`TRUNCATE users, products, materials, lots, recipes, recipe_items, batches, batch_materials, orders, order_items, quality_checks, stock_movements, audit_logs CASCADE`);
 
   const [adminUser] = await db.insert(users).values([
-    { username: "admin", password: "admin123", fullName: "John Doe", role: "admin" },
-    { username: "manager", password: "manager123", fullName: "Jane Smith", role: "manager" },
-    { username: "operator", password: "operator123", fullName: "Bob Wilson", role: "operator" },
+    { username: "admin", password: await bcrypt.hash("admin123", 10), fullName: "Admin User", role: "admin" },
+    { username: "produser", password: await bcrypt.hash("prod123", 10), fullName: "Production User", role: "production" },
+    { username: "invuser", password: await bcrypt.hash("inv123", 10), fullName: "Inventory User", role: "inventory" },
+    { username: "viewer", password: await bcrypt.hash("view123", 10), fullName: "View Only", role: "readonly" },
   ]).returning();
 
   const productData = await db.insert(products).values([
