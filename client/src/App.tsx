@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect, useLocation } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -30,7 +30,6 @@ const Placeholder = ({ title }: { title: string }) => (
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
-  const [, setLocation] = useLocation();
 
   if (loading) {
     return (
@@ -41,8 +40,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    setLocation('/login');
-    return null;
+    return <Redirect to="/login" />;
   }
 
   return <>{children}</>;
