@@ -1,0 +1,111 @@
+Task: Prepare ClearTrace for live environment testing by adding basic authentication, user access roles, and complete barcode workflow coverage for stock inputs and outputs
+
+Before making changes:
+- Inspect the current app structure, route wiring, user model if any, batch workflow, inventory workflow, lot/barcode logic, and tracking pages
+- Reuse the current modular domain structure
+- Extend the current implementation instead of adding a second auth or barcode system
+
+Business goal:
+We need to put ClearTrace into a live environment for real user testing.
+Before that, the system needs:
+1. basic authentication
+2. user access roles
+3. barcode scanning support anywhere stock is input or output
+4. automatic barcode generation for completed batch outputs
+
+Important constraints:
+- keep the implementation simple and production-safe
+- do not build enterprise SSO or overcomplicated permissions
+- do not break current inventory, production, or traceability behavior
+- preserve the lot-based compliance model
+
+Required scope:
+
+1. Basic authentication
+Implement simple app authentication so the live system is not publicly open.
+
+Requirements:
+- add login screen
+- support username or email + password
+- store passwords securely using hashing
+- protect app routes so unauthenticated users cannot access the system
+- support logout
+- persist authenticated session appropriately for the current stack
+
+2. Basic user roles
+Add a simple role-based access model.
+
+Required roles:
+- admin
+- production
+- inventory
+- readonly
+
+Required behavior:
+- admin: full access
+- production: can create/manage batches, scan inputs, complete batches, print output labels
+- inventory: can receive stock, manage lots, print/reprint labels, use tracking
+- readonly: can view batches/lots/tracking but cannot perform write actions
+
+Apply role checks to the main pages and key actions.
+Keep the role system simple and maintainable.
+
+3. Barcode support anywhere stock is input or output
+Review all current stock input/output workflows and ensure barcode support is included where appropriate.
+
+Required areas:
+- receive stock
+- batch input consumption
+- batch completion / output lot creation
+- tracking / lookup
+- lot detail / batch detail print-reprint actions
+
+4. Batch input scanning
+Make sure creating and managing batches supports barcode scanning for all traceable inputs.
+
+Required behavior:
+- user can scan or type a barcode when adding an input
+- system finds the matching lot
+- user confirms quantity consumed
+- the input is linked to the exact lot
+- prevent invalid, inactive, or insufficient-quantity lot usage
+
+5. Output barcode generation on completion
+When a batch is marked completed:
+- generate output lots if not already generated
+- generate barcode value for each output lot
+- display the created output lots and barcode values immediately
+- allow immediate print/reprint of each output label
+- ensure reprints always reuse the stored barcode value
+
+6. Keep barcode support consistent
+Requirements:
+- raw lots must keep barcode support
+- finished output lots must always get barcode support
+- batch workflows must clearly expose scan and print actions
+- tracking pages must support barcode-based lookup
+
+7. Live-environment safety
+Add the minimum safeguards needed for live testing:
+- unauthenticated users blocked
+- role-based UI/action restrictions
+- secure password handling
+- no public write access
+- preserve auditability where possible
+
+Implementation rules:
+- keep auth simple
+- use existing domain structure
+- do not overengineer
+- do not create duplicate barcode logic
+- centralize barcode generation/printing where possible
+- preserve current lot, batch, and traceability flows
+
+Acceptance criteria:
+- app requires login
+- users have working role-based access
+- receiving stock still generates barcodes
+- batch input supports barcode scan/lookup
+- completing a batch generates barcode-supported output lots
+- users can print/reprint output labels after completion
+- tracking still works for barcode-based lookup
