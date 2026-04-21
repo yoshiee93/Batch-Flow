@@ -1473,6 +1473,12 @@ function BatchOutputsEditor({
                         expiryDate: ol.expiryDate,
                       });
                       markLotPrinted.mutate(ol.lotId);
+                      setFinalizeResult(prev => prev ? {
+                        ...prev,
+                        outputLots: prev.outputLots.map(l =>
+                          l.lotId === ol.lotId ? { ...l, barcodePrintedAt: new Date().toISOString() } : l
+                        )
+                      } : null);
                     }}
                   >
                     <Printer className="h-3 w-3 mr-1" />
