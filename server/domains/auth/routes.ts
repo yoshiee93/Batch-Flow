@@ -44,6 +44,20 @@ authRouter.post("/auth/logout", asyncHandler(async (req, res) => {
   return res.json({ ok: true });
 }));
 
+authRouter.get("/users", asyncHandler(async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  const allUsers = await db.select({
+    id: users.id,
+    username: users.username,
+    fullName: users.fullName,
+    role: users.role,
+    active: users.active,
+  }).from(users).where(eq(users.active, true));
+  return res.json(allUsers);
+}));
+
 authRouter.get("/auth/me", asyncHandler(async (req, res) => {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Not authenticated" });

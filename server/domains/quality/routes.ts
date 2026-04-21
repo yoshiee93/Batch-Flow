@@ -13,6 +13,11 @@ qualityRouter.get("/batches/:id/quality-checks", asyncHandler(async (req, res) =
 }));
 
 qualityRouter.post("/batches/:id/quality-checks", productionOrAdmin, asyncHandler(async (req, res) => {
-  const data = insertQualityCheckSchema.parse({ ...req.body, batchId: req.params.id });
+  const userId = req.session.userId ?? null;
+  const data = insertQualityCheckSchema.parse({
+    ...req.body,
+    batchId: req.params.id,
+    checkedBy: userId,
+  });
   res.status(201).json(await svc.createQualityCheck(data));
 }));

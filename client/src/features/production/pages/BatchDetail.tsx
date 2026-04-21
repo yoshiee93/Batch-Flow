@@ -1,18 +1,27 @@
 import { useParams, Link } from 'wouter';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import {
   ArrowLeft, Package, Factory, Box, ChevronRight, Loader2,
   ClipboardList, Calendar, AlertCircle, CheckCircle, Scale,
-  TrendingDown, ArrowRightLeft, ExternalLink, Printer, History, User
+  TrendingDown, ArrowRightLeft, ExternalLink, Printer, History, User,
+  ShieldCheck, Plus, XCircle, FlaskConical,
 } from 'lucide-react';
 import {
   useBatch, useProducts, useBatchInputLots, useBatchOutputLots, useStockMovements, useRecipes,
-  useAuditLogs, useMarkBatchBarcodePrinted, useMarkBarcodePrinted,
-  type InputLot, type OutputLot, type StockMovement, type AuditLog
+  useAuditLogs, useMarkBatchBarcodePrinted, useMarkBarcodePrinted, useUpdateBatch,
+  type Batch, type InputLot, type OutputLot, type StockMovement, type AuditLog
 } from '@/lib/api';
+import { useQualityChecks, useCreateQualityCheck, useUsers, type QualityCheck, type AppUser } from '@/features/quality/api';
 import { format } from 'date-fns';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
 
@@ -54,6 +63,12 @@ function fmtDate(d: string | null | undefined, fmt = 'dd MMM yyyy') {
   try { return format(new Date(d), fmt); } catch { return d; }
 }
 
+const qcResultColors: Record<string, string> = {
+  pass: 'bg-green-100 text-green-800',
+  fail: 'bg-red-100 text-red-800',
+  pending: 'bg-yellow-100 text-yellow-800',
+};
+
 export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: batch, isLoading: batchLoading, isError } = useBatch(id!);
@@ -63,8 +78,45 @@ export default function BatchDetail() {
   const { data: outputLots = [], isLoading: outputsLoading } = useBatchOutputLots(id!);
   const { data: movements = [], isLoading: movementsLoading } = useStockMovements(id!);
   const { data: auditLogs = [], isLoading: auditLoading } = useAuditLogs('batch', id!);
+  const { data: qualityChecks = [], isLoading: qcLoading } = useQualityChecks(id!);
+  const { data: users = [] } = useUsers();
   const markBatchBarcodePrinted = useMarkBatchBarcodePrinted();
   const markLotBarcodePrinted = useMarkBarcodePrinted();
+  const updateBatch = useUpdateBatch();
+  const createQualityCheck = useCreateQualityCheck();
+
+  const [showQcForm, setShowQcForm] = useState(false);
+  const [qcForm, setQcForm] = useState({
+    checkType: '',
+    result: 'pending' as 'pass' | 'fail' | 'pending',
+    value: '',
+    notes: '',
+  });
+
+  function handleQcSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!id || !qcForm.checkType) return;
+    createQualityCheck.mutate(
+      {
+        batchId: id,
+        checkType: qcForm.checkType,
+        result: qcForm.result,
+        value: qcForm.value || undefined,
+        notes: qcForm.notes || undefined,
+      },
+      {
+        onSuccess: () => {
+          setQcForm({ checkType: '', result: 'pending', value: '', notes: '' });
+          setShowQcForm(false);
+        },
+      }
+    );
+  }
+
+  function handleStatusChange(newStatus: Batch['status']) {
+    if (!batch) return;
+    updateBatch.mutate({ id: batch.id, status: newStatus });
+  }
 
   if (batchLoading) {
     return (
@@ -270,6 +322,41 @@ export default function BatchDetail() {
                 View Full Trace
               </Button>
             </Link>
+            {batch.status === 'completed' && (
+              <Button
+                className="w-full"
+                variant="outline"
+                data-testid="button-send-to-qc"
+                disabled={updateBatch.isPending}
+                onClick={() => handleStatusChange('quality_check')}
+              >
+                <FlaskConical className="mr-2 h-4 w-4" />
+                Send to QC
+              </Button>
+            )}
+            {batch.status === 'quality_check' && (
+              <>
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                  data-testid="button-mark-released"
+                  disabled={updateBatch.isPending}
+                  onClick={() => handleStatusChange('released')}
+                >
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Mark Released
+                </Button>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  data-testid="button-quarantine"
+                  disabled={updateBatch.isPending}
+                  onClick={() => handleStatusChange('quarantined')}
+                >
+                  <XCircle className="mr-2 h-4 w-4 text-orange-500" />
+                  Quarantine
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -443,6 +530,143 @@ export default function BatchDetail() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldCheck className="h-4 w-4" />
+                Quality Checks
+                <Badge variant="secondary" className="ml-1">{qualityChecks.length}</Badge>
+              </CardTitle>
+              <CardDescription className="mt-1">QC records for this production batch.</CardDescription>
+            </div>
+            {!showQcForm && (
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="button-add-qc"
+                onClick={() => setShowQcForm(true)}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Record Check
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {showQcForm && (
+            <form onSubmit={handleQcSubmit} className="border rounded-lg p-4 space-y-3 bg-muted/30">
+              <div className="font-medium text-sm">New Quality Check</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="qc-check-type" className="text-xs">Parameter / Check Type <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="qc-check-type"
+                    data-testid="input-qc-check-type"
+                    placeholder="e.g. pH, moisture, appearance"
+                    value={qcForm.checkType}
+                    onChange={e => setQcForm(f => ({ ...f, checkType: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="qc-result" className="text-xs">Result <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={qcForm.result}
+                    onValueChange={v => setQcForm(f => ({ ...f, result: v as 'pass' | 'fail' | 'pending' }))}
+                  >
+                    <SelectTrigger id="qc-result" data-testid="select-qc-result">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pass">Pass</SelectItem>
+                      <SelectItem value="fail">Fail</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="qc-value" className="text-xs">Measured Value</Label>
+                  <Input
+                    id="qc-value"
+                    data-testid="input-qc-value"
+                    placeholder="e.g. 6.5, 12%, OK"
+                    value={qcForm.value}
+                    onChange={e => setQcForm(f => ({ ...f, value: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="qc-notes" className="text-xs">Notes</Label>
+                <Textarea
+                  id="qc-notes"
+                  data-testid="input-qc-notes"
+                  placeholder="Additional observations..."
+                  value={qcForm.notes}
+                  onChange={e => setQcForm(f => ({ ...f, notes: e.target.value }))}
+                  rows={2}
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  data-testid="button-cancel-qc"
+                  onClick={() => {
+                    setShowQcForm(false);
+                    setQcForm({ checkType: '', result: 'pending', value: '', notes: '' });
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  data-testid="button-submit-qc"
+                  disabled={createQualityCheck.isPending || !qcForm.checkType}
+                >
+                  {createQualityCheck.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                  Save Check
+                </Button>
+              </div>
+            </form>
+          )}
+          {qcLoading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : qualityChecks.length === 0 && !showQcForm ? (
+            <div className="text-center text-muted-foreground py-6 text-sm">
+              No quality checks recorded yet.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {qualityChecks.map((qc: QualityCheck) => (
+                <div key={qc.id} className="flex items-start justify-between p-3 border rounded-lg bg-muted/30 text-sm gap-3" data-testid={`row-qc-${qc.id}`}>
+                  <div className="space-y-1 min-w-0">
+                    <div className="font-medium">{qc.checkType}</div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      {qc.value && <span>Value: <span className="font-mono">{qc.value}</span></span>}
+                      {qc.checkedBy && (
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {(users as AppUser[]).find((u: AppUser) => u.id === qc.checkedBy)?.fullName ?? qc.checkedBy}
+                        </span>
+                      )}
+                      <span>{fmtDate(qc.checkedAt, 'dd MMM yyyy, h:mm a')}</span>
+                    </div>
+                    {qc.notes && <div className="text-xs text-muted-foreground">{qc.notes}</div>}
+                  </div>
+                  <Badge className={`shrink-0 capitalize text-xs ${qcResultColors[qc.result] || 'bg-gray-100 text-gray-800'}`} data-testid={`badge-qc-result-${qc.id}`}>
+                    {qc.result}
+                  </Badge>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

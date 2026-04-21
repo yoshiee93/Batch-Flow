@@ -96,8 +96,9 @@ export function useUpdateBatch() {
   return useMutation({
     mutationFn: ({ id, ...data }: { id: string } & Partial<Batch>) =>
       fetchApi<Batch>(`/batches/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batch", variables.id] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
   });

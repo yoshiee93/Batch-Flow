@@ -12,6 +12,14 @@ export const qualityService = {
       entityId: created.id,
       action: "create",
       changes: JSON.stringify(data),
+      userId: data.checkedBy ?? undefined,
+    });
+    await createAuditLog({
+      entityType: "batch",
+      entityId: data.batchId,
+      action: "quality_check_added",
+      changes: JSON.stringify({ checkType: data.checkType, result: data.result, value: data.value }),
+      userId: data.checkedBy ?? undefined,
     });
     return created;
   },
