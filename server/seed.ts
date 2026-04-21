@@ -19,6 +19,11 @@ async function resetToAdminOnly() {
 }
 
 export async function seedIfEmpty() {
+  if (process.env.RESET_DB === "true") {
+    console.log("RESET_DB=true — forcing database reset...");
+    await resetToAdminOnly();
+    return;
+  }
   const existing = await db.select().from(users).limit(1);
   if (existing.length === 0) {
     await resetToAdminOnly();
