@@ -99,4 +99,14 @@ async function seed() {
   console.log(`Created: ${productData.length} products, ${materialData.length} materials, ${lotData.length} lots, ${recipeData.length} recipes, ${batchData.length} batches, ${orderData.length} orders`);
 }
 
-seed().catch(console.error).finally(() => process.exit(0));
+export async function seedIfEmpty() {
+  const existing = await db.select().from(users).limit(1);
+  if (existing.length === 0) {
+    console.log("No users found — seeding database with default accounts...");
+    await seed();
+  }
+}
+
+if (process.argv[1] && process.argv[1].endsWith("seed.ts")) {
+  seed().catch(console.error).finally(() => process.exit(0));
+}
