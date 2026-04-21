@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -82,6 +82,7 @@ export default function Production() {
   const [scannedLot, setScannedLot] = useState<LotWithDetails | null>(null);
   const [barcodeError, setBarcodeError] = useState('');
   const [isLookingUpBarcode, setIsLookingUpBarcode] = useState(false);
+  const barcodeScanRef = useRef<HTMLInputElement>(null);
   const [createProductSearchOpen, setCreateProductSearchOpen] = useState(false);
   
   const [recordOutputForm, setRecordOutputForm] = useState({
@@ -286,6 +287,7 @@ export default function Production() {
       setBarcodeInput('');
       setScannedLot(null);
       setBarcodeError('');
+      setTimeout(() => barcodeScanRef.current?.focus(), 50);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Failed to record input';
       setBarcodeError(msg);
@@ -692,6 +694,7 @@ export default function Production() {
                   <div className="flex gap-2">
                     <Input
                       id="barcode-scan"
+                      ref={barcodeScanRef}
                       autoFocus
                       placeholder="Scan barcode or type lot number..."
                       value={barcodeInput}
