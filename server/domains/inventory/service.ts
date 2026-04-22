@@ -83,6 +83,7 @@ export const inventoryService = {
     if (itemType === "product") {
       const product = await repo.getProductById(itemId);
       if (!product) throw new Error("Product not found");
+      if (!product.active) throw new Error("Product is not active");
       if (!product.isReceivable) throw new Error("Product is not marked as receivable");
       lotType = "finished_good";
       lotPrefix = "FG";
@@ -90,6 +91,7 @@ export const inventoryService = {
     } else {
       const material = await repo.getMaterialById(itemId);
       if (!material) throw new Error("Material not found");
+      if (!material.active) throw new Error("Material is not active");
       if (!material.isReceivable) throw new Error("Material is not marked as receivable");
       lotType = "raw_material";
       lotPrefix = "RM";
