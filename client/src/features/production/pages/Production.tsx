@@ -1502,7 +1502,7 @@ function BatchOutputsEditor({
               }}
             >
               <Printer className="h-3 w-3 mr-1" />
-              {summaryBatchPrintedAt || finalizeResult.batch.barcodePrintedAt ? 'Reprint' : 'Print Batch Label'}
+              {summaryBatchPrintedAt || finalizeResult.batch.barcodePrintedAt ? 'Reprint Batch Label' : 'Print Batch Label'}
             </Button>
           </div>
         )}

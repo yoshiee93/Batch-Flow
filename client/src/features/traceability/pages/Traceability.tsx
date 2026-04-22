@@ -527,6 +527,7 @@ function ForwardTraceView({ trace, materials, products }: {
                         onClick={(e) => {
                           e.preventDefault();
                           const outProduct = outputLot.productId ? products.find(p => p.id === outputLot.productId) : null;
+                          const srcBatchUsage = outputLot.sourceBatchId ? usedInBatches.find(u => u.batch.id === outputLot.sourceBatchId) : null;
                           printBarcodeLabel({
                             template: "finished_output",
                             lotNumber: outputLot.lotNumber,
@@ -535,6 +536,7 @@ function ForwardTraceView({ trace, materials, products }: {
                             quantity: outputLot.quantity,
                             unit: 'KG',
                             producedDate: outputLot.producedDate,
+                            sourceBatch: srcBatchUsage ? (srcBatchUsage.batch.batchCode || srcBatchUsage.batch.batchNumber) : undefined,
                           });
                           markLotPrinted.mutate(outputLot.id);
                         }}

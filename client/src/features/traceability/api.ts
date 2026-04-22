@@ -24,6 +24,7 @@ export interface ForwardTraceBatchUsage {
   batch: {
     id: string;
     batchNumber: string;
+    batchCode: string | null;
     status: string;
     plannedQuantity: string;
     actualQuantity: string | null;
