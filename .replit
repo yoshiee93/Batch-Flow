@@ -48,4 +48,3 @@ timeoutMs = 120000
 [userenv]
 
 [userenv.production]
-RESET_DB = "true"
