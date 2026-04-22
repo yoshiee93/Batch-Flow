@@ -79,6 +79,7 @@ export const inventoryService = {
     let lotPrefix: string;
     let materialId: string | null = null;
     let productId: string | null = null;
+    let currentStock: string;
 
     if (itemType === "product") {
       const product = await repo.getProductById(itemId);
@@ -88,6 +89,7 @@ export const inventoryService = {
       lotType = "finished_good";
       lotPrefix = "FG";
       productId = itemId;
+      currentStock = product.currentStock;
     } else {
       const material = await repo.getMaterialById(itemId);
       if (!material) throw new Error("Material not found");
@@ -96,6 +98,7 @@ export const inventoryService = {
       lotType = "raw_material";
       lotPrefix = "RM";
       materialId = itemId;
+      currentStock = material.currentStock;
     }
 
     const lotNumber = await generateLotNumber(lotPrefix);
@@ -120,13 +123,10 @@ export const inventoryService = {
       notes: notes || null,
     });
 
+    const newStock = (parseFloat(currentStock || "0") + quantityNum).toFixed(3);
     if (itemType === "product") {
-      const product = await repo.getProductById(itemId);
-      const newStock = (parseFloat(product!.currentStock || "0") + quantityNum).toFixed(3);
       await repo.updateProductStock(itemId, newStock);
     } else {
-      const material = await repo.getMaterialById(itemId);
-      const newStock = (parseFloat(material!.currentStock || "0") + quantityNum).toFixed(3);
       await repo.updateMaterialStock(itemId, newStock);
     }
 
