@@ -1167,7 +1167,7 @@ function BatchCard({
                 </div>
               </div>
               <div className="flex items-center gap-1 ml-4" onClick={(e) => e.stopPropagation()}>
-                {isCompleted && (
+                {isCompleted && canManageBatches && (
                   <Button
                     size="icon"
                     variant="ghost"
@@ -1328,11 +1328,11 @@ function BatchCard({
                 {batch.startDate && <span>Batch Date: {format(new Date(batch.startDate), 'MMM d, yyyy')}</span>}
                 {batch.endDate && <span>Completed: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
               </div>
-              {isCompleted ? (
+              {isCompleted && canManageBatches ? (
                 <Button size="sm" variant="outline" className="text-green-600 border-green-200" onClick={() => onRecordOutputClick(batch)} data-testid={`button-print-labels-expanded-${batch.id}`}>
                   <Printer size={14} className="mr-1 sm:mr-2" /> Print Output Labels
                 </Button>
-              ) : (
+              ) : !isCompleted ? (
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => onRecordInputClick(batch)}>
                     <Package size={14} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Add </span>Input
