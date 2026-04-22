@@ -265,10 +265,10 @@ export function useBatchInputLots(batchId: string) {
   });
 }
 
-export function useBatchOutputLots(batchId: string) {
+export function useBatchOutputLots(batchId: string, options?: { enabled?: boolean }) {
   return useQuery<OutputLot[]>({
     queryKey: ["batchOutputLots", batchId],
     queryFn: () => fetchApi<OutputLot[]>(`/batches/${batchId}/output-lots`),
-    enabled: !!batchId,
+    enabled: !!batchId && (options?.enabled ?? true),
   });
 }

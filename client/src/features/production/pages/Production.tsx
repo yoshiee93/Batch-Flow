@@ -1385,7 +1385,7 @@ function BatchOutputsEditor({
   }, [batchId, initialWaste, initialMilling, initialWet]);
   
   const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
-  const { data: outputLots = [], isLoading: outputLotsLoading } = useBatchOutputLots(batchId);
+  const { data: outputLots = [], isLoading: outputLotsLoading } = useBatchOutputLots(batchId, { enabled: isCompleted });
   const { data: allProducts = [] } = useProducts();
   const { data: allCategories = [] } = useCategories();
   const addBatchOutput = useAddBatchOutput();
