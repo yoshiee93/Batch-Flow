@@ -1,0 +1,116 @@
+Task: Add batch barcode printing support and introduce separate barcode label templates for raw product intake and finished product output
+
+Before making changes:
+- Inspect the current barcode generation logic, barcode print utility, batch detail page, batch completion flow, lot detail page, and tracking page
+- Reuse the existing barcode system
+- Extend the current print/reprint functionality instead of creating a second barcode subsystem
+
+Business goal:
+Users must be able to print barcodes for production batches, and the system must support different label templates for raw products received into stock and finished products produced out of batches.
+
+Required scope:
+
+1. Add batch barcode print/reprint support
+Review the current batch workflow and ensure batch barcode printing is available anywhere it is needed.
+
+Required behavior:
+- if a batch has a batchCode or batch barcode value, show it clearly
+- allow print/reprint of the batch barcode from:
+  - batch completion screen
+  - batch detail page
+  - tracking page when viewing a batch
+- reprint must reuse the stored batch barcode value
+- do not generate a new barcode value on reprint
+
+2. Confirm batch barcode source
+Use the existing batch code / batch barcode value already stored in the system.
+If both exist, use the correct barcode field consistently.
+If the system currently uses batchCode as the batch barcode, keep that behavior consistent.
+
+3. Introduce barcode label templates
+Refactor the barcode printing system so it supports template types rather than one generic label layout.
+
+Implement at least these templates:
+
+A. Raw intake label
+Used for stock received from suppliers/farmers.
+Should display:
+- item/material name
+- internal lot number
+- barcode
+- supplier/source name
+- supplier lot
+- received date
+- quantity and unit
+- expiry if available
+
+B. Finished output label
+Used for lots created from completed production batches.
+Should display:
+- finished product name
+- output lot number
+- barcode
+- batch code or source batch reference
+- produced date
+- quantity and unit
+- status if useful
+
+4. Optional batch label template
+If it fits cleanly, also add a dedicated batch label template.
+
+Batch label should display:
+- batch code
+- barcode
+- product name
+- production date
+- status
+
+This is useful for QA paperwork, pallet identification, or operational tracking.
+
+5. Centralize template handling
+Do not hardcode label layout separately in multiple screens.
+
+Refactor the print utility so it supports:
+- template type
+- record data
+- print/reprint action
+
+Suggested template keys:
+- raw_intake
+- finished_output
+- batch
+
+6. Apply correct template automatically
+Required behavior:
+- printing a received raw lot uses the raw intake template
+- printing a finished output lot uses the finished output template
+- printing a batch barcode uses the batch template if implemented
+- reprints should always use the same stored barcode values
+
+7. Keep barcode behavior consistent
+Requirements:
+- raw lots remain printable
+- finished output lots remain printable
+- batches become printable where barcode exists
+- barcode lookup and traceability should still work normally
+
+8. UI updates
+Add clear print/reprint actions to the relevant pages:
+- receive stock success flow
+- lot detail page
+- batch completion flow
+- batch detail page
+- tracking/traceability results
+
+Implementation rules:
+- do not create duplicate barcode generation logic
+- reuse current barcode utilities where possible
+- keep the implementation modular and maintainable
+- preserve existing lot and batch traceability
+
+Acceptance criteria:
+- users can print/reprint batch barcodes
+- users can print raw intake labels with a raw-specific template
+- users can print finished output labels with an output-specific template
+- reprints use stored barcode values
+- print actions are available from the main operational screens
