@@ -117,11 +117,27 @@ export function useDeleteLot() {
   });
 }
 
+export interface ReceivableItem {
+  id: string;
+  name: string;
+  sku: string;
+  unit: string;
+  itemType: "material" | "product";
+}
+
+export function useReceivableItems() {
+  return useQuery<ReceivableItem[]>({
+    queryKey: ["receivableItems"],
+    queryFn: () => fetchApi<ReceivableItem[]>("/receivable-items"),
+  });
+}
+
 export function useReceiveStock() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: {
-      materialId: string;
+      itemId: string;
+      itemType: "material" | "product";
       quantity: string;
       supplierName?: string;
       sourceName?: string;
@@ -134,6 +150,8 @@ export function useReceiveStock() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lots"] });
       queryClient.invalidateQueries({ queryKey: ["materials"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["receivableItems"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
   });

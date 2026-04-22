@@ -105,6 +105,19 @@ export const inventoryRepository = {
     return row;
   },
 
+  async getReceivableItems(): Promise<Array<{ id: string; name: string; sku: string; unit: string; itemType: "material" | "product" }>> {
+    const mats = await db.select({ id: materials.id, name: materials.name, sku: materials.sku, unit: materials.unit })
+      .from(materials)
+      .where(and(eq(materials.isReceivable, true), eq(materials.active, true)));
+    const prods = await db.select({ id: products.id, name: products.name, sku: products.sku, unit: products.unit })
+      .from(products)
+      .where(and(eq(products.isReceivable, true), eq(products.active, true)));
+    return [
+      ...mats.map(m => ({ ...m, itemType: "material" as const })),
+      ...prods.map(p => ({ ...p, itemType: "product" as const })),
+    ];
+  },
+
   async getLotUsage(lotId: string): Promise<LotUsageEntry[]> {
     const directUsage = await db
       .select({ bm: batchMaterials, batch: batches, product: products })

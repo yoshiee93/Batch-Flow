@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Package, Box, Layers, Printer, QrCode, CheckCircle2, Download } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -19,15 +20,16 @@ import {
   useMaterials, useProducts, useCategories, useLots,
   useUpdateMaterial, useDeleteMaterial,
   useCreateProduct, useUpdateProduct, useDeleteProduct,
-  useReceiveStock, useMarkBarcodePrinted,
-  type Material, type Product, type Category, type Lot, type LotWithDetails,
+  useReceiveStock, useReceivableItems, useMarkBarcodePrinted,
+  type Material, type Product, type Category, type Lot, type LotWithDetails, type ReceivableItem,
 } from '@/lib/api';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
 import { useToast } from '@/hooks/use-toast';
 import { useRole } from '@/contexts/AuthContext';
 
 const EMPTY_RECEIVE_FORM = {
-  materialId: '',
+  itemId: '',
+  itemType: '' as '' | 'material' | 'product',
   quantity: '',
   supplierName: '',
   sourceName: '',
@@ -66,20 +68,20 @@ export default function Inventory() {
   const [isEditMaterialOpen, setIsEditMaterialOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [materialForm, setMaterialForm] = useState({
-    sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: '' as string | null,
+    sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: '' as string | null, isReceivable: true,
   });
 
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState({
-    sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: '' as string | null, fruitCode: '',
+    sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: '' as string | null, fruitCode: '', isReceivable: false,
   });
 
   const [isReceiveStockOpen, setIsReceiveStockOpen] = useState(false);
   const [receiveForm, setReceiveForm] = useState(EMPTY_RECEIVE_FORM);
   const [receivedLot, setReceivedLot] = useState<LotWithDetails | null>(null);
-  const [materialSearchOpen, setMaterialSearchOpen] = useState(false);
+  const [itemSearchOpen, setItemSearchOpen] = useState(false);
 
   const { canReceiveStock, canManageSettings } = useRole();
 
@@ -87,6 +89,7 @@ export default function Inventory() {
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
   const { data: lots = [], isLoading: lotsLoading } = useLots();
+  const { data: receivableItems = [] } = useReceivableItems();
 
   const updateMaterial = useUpdateMaterial();
   const deleteMaterial = useDeleteMaterial();
@@ -181,15 +184,15 @@ export default function Inventory() {
     }
   }
 
-  const resetMaterialForm = () => setMaterialForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null });
-  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null, fruitCode: '' });
+  const resetMaterialForm = () => setMaterialForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null, isReceivable: true });
+  const resetProductForm = () => setProductForm({ sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null, fruitCode: '', isReceivable: false });
 
   const handleEditMaterialClick = (material: Material) => {
     setSelectedMaterial(material);
     setMaterialForm({
       sku: material.sku, name: material.name, description: material.description || '',
       unit: material.unit, minStock: material.minStock, currentStock: material.currentStock,
-      categoryId: material.categoryId,
+      categoryId: material.categoryId, isReceivable: material.isReceivable,
     });
     setIsEditMaterialOpen(true);
   };
@@ -200,7 +203,7 @@ export default function Inventory() {
       await updateMaterial.mutateAsync({
         id: selectedMaterial.id, sku: materialForm.sku, name: materialForm.name, description: materialForm.description || null,
         unit: materialForm.unit, minStock: materialForm.minStock, currentStock: materialForm.currentStock,
-        categoryId: materialForm.categoryId || null,
+        categoryId: materialForm.categoryId || null, isReceivable: materialForm.isReceivable,
       });
       toast({ title: "Material updated", description: `${materialForm.name} updated successfully` });
       setIsEditMaterialOpen(false);
@@ -228,6 +231,7 @@ export default function Inventory() {
         unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock,
         categoryId: productForm.categoryId || null,
         fruitCode: productForm.fruitCode || null,
+        isReceivable: productForm.isReceivable,
       });
       toast({ title: "Product created", description: `${productForm.name} added to inventory` });
       setIsCreateProductOpen(false);
@@ -244,6 +248,7 @@ export default function Inventory() {
       unit: product.unit || 'KG', minStock: product.minStock, currentStock: product.currentStock,
       categoryId: product.categoryId,
       fruitCode: product.fruitCode || '',
+      isReceivable: product.isReceivable,
     });
     setIsEditProductOpen(true);
   };
@@ -256,6 +261,7 @@ export default function Inventory() {
         unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock,
         categoryId: productForm.categoryId || null,
         fruitCode: productForm.fruitCode || null,
+        isReceivable: productForm.isReceivable,
       });
       toast({ title: "Product updated", description: `${productForm.name} updated successfully` });
       setIsEditProductOpen(false);
@@ -276,8 +282,8 @@ export default function Inventory() {
   };
 
   const handleReceiveStock = async () => {
-    if (!receiveForm.materialId || !receiveForm.quantity) {
-      toast({ title: "Missing fields", description: "Please select a material and enter quantity", variant: "destructive" });
+    if (!receiveForm.itemId || !receiveForm.itemType || !receiveForm.quantity) {
+      toast({ title: "Missing fields", description: "Please select an item and enter quantity", variant: "destructive" });
       return;
     }
     const qty = parseFloat(receiveForm.quantity);
@@ -287,7 +293,8 @@ export default function Inventory() {
     }
     try {
       const result = await receiveStock.mutateAsync({
-        materialId: receiveForm.materialId,
+        itemId: receiveForm.itemId,
+        itemType: receiveForm.itemType as 'material' | 'product',
         quantity: receiveForm.quantity,
         supplierName: receiveForm.supplierName || undefined,
         sourceName: receiveForm.sourceName || undefined,
@@ -297,8 +304,12 @@ export default function Inventory() {
         expiryDate: receiveForm.expiryDate || undefined,
         notes: receiveForm.notes || undefined,
       });
-      const materialName = getMaterialName(receiveForm.materialId) || 'material';
-      const lotWithDetails: LotWithDetails = { ...result.lot, materialName };
+      const selectedItem = receivableItems.find(i => i.id === receiveForm.itemId);
+      const itemName = selectedItem?.name || 'item';
+      const lotWithDetails: LotWithDetails = {
+        ...result.lot,
+        ...(receiveForm.itemType === 'material' ? { materialName: itemName } : { productName: itemName }),
+      };
       setReceivedLot(lotWithDetails);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Failed to receive stock';
@@ -500,7 +511,7 @@ export default function Inventory() {
     );
   };
 
-  const selectedReceiveMaterial = receiveForm.materialId ? materials.find(m => m.id === receiveForm.materialId) : null;
+  const selectedReceiveItem = receiveForm.itemId ? receivableItems.find(i => i.id === receiveForm.itemId) : null;
 
   return (
     <div className="space-y-6">
@@ -711,7 +722,7 @@ export default function Inventory() {
             <DialogTitle className="flex items-center gap-2">
               <Download className="h-5 w-5" /> Receive Stock
             </DialogTitle>
-            <DialogDescription>Record incoming raw materials. A lot number and barcode will be generated automatically.</DialogDescription>
+            <DialogDescription>Record incoming stock. A lot number and barcode will be generated automatically.</DialogDescription>
           </DialogHeader>
 
           {receivedLot ? (
@@ -722,8 +733,8 @@ export default function Inventory() {
               </div>
               <div className="bg-muted rounded-lg p-4 space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Material</span>
-                  <span className="font-medium">{receivedLot.materialName || getLotItemName(receivedLot as Lot)}</span>
+                  <span className="text-sm text-muted-foreground">Item</span>
+                  <span className="font-medium">{receivedLot.materialName || receivedLot.productName || getLotItemName(receivedLot as Lot)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Quantity</span>
@@ -762,43 +773,59 @@ export default function Inventory() {
           ) : (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Material *</Label>
-                <Popover open={materialSearchOpen} onOpenChange={setMaterialSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between font-normal"
-                      data-testid="select-receive-material"
-                    >
-                      {selectedReceiveMaterial ? selectedReceiveMaterial.name : 'Select material...'}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search materials..." />
-                      <CommandList>
-                        <CommandEmpty>No material found.</CommandEmpty>
-                        <CommandGroup>
-                          {materials.map(material => (
-                            <CommandItem
-                              key={material.id}
-                              value={`${material.sku} ${material.name}`}
-                              onSelect={() => {
-                                setReceiveForm({ ...receiveForm, materialId: material.id });
-                                setMaterialSearchOpen(false);
-                              }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", receiveForm.materialId === material.id ? "opacity-100" : "opacity-0")} />
-                              {material.sku ? `${material.sku} — ` : ''}{material.name} ({material.unit})
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <Label>Item *</Label>
+                {receivableItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+                    No receivable items configured. Mark materials or products as receivable in their settings.
+                  </p>
+                ) : (
+                  <Popover open={itemSearchOpen} onOpenChange={setItemSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between font-normal"
+                        data-testid="select-receive-item"
+                      >
+                        {selectedReceiveItem ? (
+                          <span className="flex items-center gap-2">
+                            {selectedReceiveItem.name}
+                            <Badge variant="outline" className={`text-xs ${selectedReceiveItem.itemType === 'product' ? 'text-blue-600 border-blue-200' : ''}`}>
+                              {selectedReceiveItem.itemType === 'product' ? 'Product' : 'Material'}
+                            </Badge>
+                          </span>
+                        ) : 'Select item...'}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search items..." />
+                        <CommandList>
+                          <CommandEmpty>No item found.</CommandEmpty>
+                          <CommandGroup>
+                            {receivableItems.map((item: ReceivableItem) => (
+                              <CommandItem
+                                key={item.id}
+                                value={`${item.sku} ${item.name} ${item.itemType}`}
+                                onSelect={() => {
+                                  setReceiveForm({ ...receiveForm, itemId: item.id, itemType: item.itemType });
+                                  setItemSearchOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", receiveForm.itemId === item.id ? "opacity-100" : "opacity-0")} />
+                                <span className="flex-1">{item.sku ? `${item.sku} — ` : ''}{item.name} ({item.unit})</span>
+                                <Badge variant="outline" className={`ml-2 text-xs ${item.itemType === 'product' ? 'text-blue-600 border-blue-200' : ''}`}>
+                                  {item.itemType === 'product' ? 'Prod.' : 'Mat.'}
+                                </Badge>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -960,6 +987,17 @@ export default function Inventory() {
                 Used in SOP batch codes. e.g. SW = Strawberry Whole, BW = Blueberry Whole
               </p>
             </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Can be received into stock</Label>
+                <p className="text-xs text-muted-foreground">Allow this product to appear in the Receive Stock form</p>
+              </div>
+              <Switch
+                checked={productForm.isReceivable}
+                onCheckedChange={(checked) => setProductForm({ ...productForm, isReceivable: checked })}
+                data-testid="switch-product-receivable"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateProductOpen(false)}>Cancel</Button>
@@ -1020,6 +1058,17 @@ export default function Inventory() {
                   {categories.map((cat) => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Can be received into stock</Label>
+                <p className="text-xs text-muted-foreground">Allow this material to appear in the Receive Stock form</p>
+              </div>
+              <Switch
+                checked={materialForm.isReceivable}
+                onCheckedChange={(checked) => setMaterialForm({ ...materialForm, isReceivable: checked })}
+                data-testid="switch-material-receivable"
+              />
             </div>
           </div>
           <DialogFooter>
@@ -1094,6 +1143,17 @@ export default function Inventory() {
               <p className="text-xs text-muted-foreground">
                 Used in SOP batch codes. e.g. SW = Strawberry Whole, BW = Blueberry Whole
               </p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Can be received into stock</Label>
+                <p className="text-xs text-muted-foreground">Allow this product to appear in the Receive Stock form</p>
+              </div>
+              <Switch
+                checked={productForm.isReceivable}
+                onCheckedChange={(checked) => setProductForm({ ...productForm, isReceivable: checked })}
+                data-testid="switch-edit-product-receivable"
+              />
             </div>
           </div>
           <DialogFooter>

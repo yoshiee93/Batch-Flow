@@ -10,7 +10,8 @@ const inventoryOrAdmin = requireRole("inventory", "admin");
 export const inventoryRouter = Router();
 
 const receiveStockSchema = z.object({
-  materialId: z.string().min(1),
+  itemId: z.string().min(1),
+  itemType: z.enum(["material", "product"]),
   quantity: z.string().min(1),
   supplierName: z.string().optional(),
   sourceName: z.string().optional(),
@@ -24,6 +25,10 @@ const receiveStockSchema = z.object({
     .optional(),
   notes: z.string().optional(),
 });
+
+inventoryRouter.get("/receivable-items", asyncHandler(async (_req, res) => {
+  res.json(await svc.getReceivableItems());
+}));
 
 inventoryRouter.get("/lots/barcode/:value", asyncHandler(async (req, res) => {
   const lot = await svc.getLotByBarcode(req.params.value);

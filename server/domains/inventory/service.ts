@@ -13,7 +13,8 @@ export type LotLineageNode = {
 } | null;
 
 export type ReceiveStockInput = {
-  materialId: string;
+  itemId: string;
+  itemType: "material" | "product";
   quantity: string;
   supplierName?: string;
   sourceName?: string;
@@ -36,6 +37,7 @@ export const inventoryService = {
   getStockMovements: repo.getStockMovements.bind(repo),
   createStockMovement: repo.createStockMovement.bind(repo),
   getAuditLogs: repo.getAuditLogs.bind(repo),
+  getReceivableItems: repo.getReceivableItems.bind(repo),
 
   async createLot(data: InsertLot): Promise<Lot> {
     const created = await repo.createLotRaw(data);
@@ -70,21 +72,40 @@ export const inventoryService = {
   },
 
   async receiveStock(data: ReceiveStockInput): Promise<{ lot: Lot; movement: StockMovement }> {
-    const { materialId, quantity, supplierName, sourceName, supplierLot, sourceType, receivedDate, expiryDate, notes } = data;
+    const { itemId, itemType, quantity, supplierName, sourceName, supplierLot, sourceType, receivedDate, expiryDate, notes } = data;
     const quantityNum = parseFloat(quantity);
 
-    const material = await repo.getMaterialById(materialId);
-    if (!material) throw new Error("Material not found");
+    let lotType: "raw_material" | "finished_good";
+    let lotPrefix: string;
+    let materialId: string | null = null;
+    let productId: string | null = null;
 
-    const lotNumber = await generateLotNumber("RM");
+    if (itemType === "product") {
+      const product = await repo.getProductById(itemId);
+      if (!product) throw new Error("Product not found");
+      if (!product.isReceivable) throw new Error("Product is not marked as receivable");
+      lotType = "finished_good";
+      lotPrefix = "FG";
+      productId = itemId;
+    } else {
+      const material = await repo.getMaterialById(itemId);
+      if (!material) throw new Error("Material not found");
+      if (!material.isReceivable) throw new Error("Material is not marked as receivable");
+      lotType = "raw_material";
+      lotPrefix = "RM";
+      materialId = itemId;
+    }
+
+    const lotNumber = await generateLotNumber(lotPrefix);
     const barcodeValue = await generateBarcodeValue();
 
     const lot = await repo.createLotRaw({
       lotNumber,
-      lotType: "raw_material",
+      lotType,
       status: "active",
       barcodeValue,
       materialId,
+      productId,
       supplierName: supplierName || null,
       sourceName: sourceName || supplierName || null,
       supplierLot: supplierLot || null,
@@ -97,12 +118,20 @@ export const inventoryService = {
       notes: notes || null,
     });
 
-    const newStock = (parseFloat(material.currentStock || "0") + quantityNum).toFixed(3);
-    await repo.updateMaterialStock(materialId, newStock);
+    if (itemType === "product") {
+      const product = await repo.getProductById(itemId);
+      const newStock = (parseFloat(product!.currentStock || "0") + quantityNum).toFixed(3);
+      await repo.updateProductStock(itemId, newStock);
+    } else {
+      const material = await repo.getMaterialById(itemId);
+      const newStock = (parseFloat(material!.currentStock || "0") + quantityNum).toFixed(3);
+      await repo.updateMaterialStock(itemId, newStock);
+    }
 
     const movement = await repo.createStockMovement({
       movementType: "receipt",
       materialId,
+      productId,
       lotId: lot.id,
       quantity,
       reference: `Goods received: ${lot.lotNumber}`,
@@ -112,7 +141,7 @@ export const inventoryService = {
       entityType: "lot",
       entityId: lot.id,
       action: "received",
-      changes: JSON.stringify({ lotNumber, barcodeValue, materialId, quantity, supplierName, supplierLot }),
+      changes: JSON.stringify({ lotNumber, barcodeValue, itemId, itemType, quantity, supplierName, supplierLot }),
     });
 
     return { lot, movement };

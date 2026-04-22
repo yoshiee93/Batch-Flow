@@ -57,6 +57,7 @@ export const products = pgTable("products", {
   currentStock: decimal("current_stock", { precision: 12, scale: 3 }).notNull().default("0"),
   categoryId: varchar("category_id").references(() => categories.id),
   fruitCode: varchar("fruit_code", { length: 10 }),
+  isReceivable: boolean("is_receivable").notNull().default(false),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -70,6 +71,7 @@ export const materials = pgTable("materials", {
   minStock: decimal("min_stock", { precision: 12, scale: 3 }).notNull().default("0"),
   currentStock: decimal("current_stock", { precision: 12, scale: 3 }).notNull().default("0"),
   categoryId: varchar("category_id").references(() => categories.id),
+  isReceivable: boolean("is_receivable").notNull().default(true),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

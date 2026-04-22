@@ -22,6 +22,7 @@ export interface Product {
   currentStock: string;
   categoryId: string | null;
   fruitCode: string | null;
+  isReceivable: boolean;
   active: boolean;
   createdAt: string;
 }
@@ -35,6 +36,7 @@ export interface Material {
   minStock: string;
   currentStock: string;
   categoryId: string | null;
+  isReceivable: boolean;
   active: boolean;
   createdAt: string;
 }
