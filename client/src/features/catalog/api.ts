@@ -132,6 +132,7 @@ export function useCreateProduct() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["inputItems"] });
       queryClient.invalidateQueries({ queryKey: ["outputItems"] });
+      queryClient.invalidateQueries({ queryKey: ["receivableItems"] });
     },
   });
 }
@@ -145,6 +146,7 @@ export function useUpdateProduct() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["inputItems"] });
       queryClient.invalidateQueries({ queryKey: ["outputItems"] });
+      queryClient.invalidateQueries({ queryKey: ["receivableItems"] });
     },
   });
 }
@@ -157,6 +159,7 @@ export function useDeleteProduct() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["inputItems"] });
       queryClient.invalidateQueries({ queryKey: ["outputItems"] });
+      queryClient.invalidateQueries({ queryKey: ["receivableItems"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
   });
@@ -173,7 +176,10 @@ export function useCreateMaterial() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<Material>) => fetchApi<Material>("/materials", { method: "POST", body: JSON.stringify(data) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["materials"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      queryClient.invalidateQueries({ queryKey: ["receivableItems"] });
+    },
   });
 }
 
@@ -182,7 +188,10 @@ export function useUpdateMaterial() {
   return useMutation({
     mutationFn: ({ id, ...data }: { id: string } & Partial<Material>) =>
       fetchApi<Material>(`/materials/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["materials"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      queryClient.invalidateQueries({ queryKey: ["receivableItems"] });
+    },
   });
 }
 
@@ -192,6 +201,7 @@ export function useDeleteMaterial() {
     mutationFn: (id: string) => fetchApi(`/materials/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["materials"] });
+      queryClient.invalidateQueries({ queryKey: ["receivableItems"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
   });

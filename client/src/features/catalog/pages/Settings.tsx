@@ -29,6 +29,7 @@ export default function Settings() {
   const [isFruitCodeDialogOpen, setIsFruitCodeDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [fruitCodeInput, setFruitCodeInput] = useState('');
+  const [fruitCodeIsReceivable, setFruitCodeIsReceivable] = useState(false);
 
   const { canManageSettings } = useRole();
 
@@ -44,18 +45,23 @@ export default function Settings() {
   const handleFruitCodeEdit = (product: Product) => {
     setSelectedProduct(product);
     setFruitCodeInput(product.fruitCode || '');
+    setFruitCodeIsReceivable(product.isReceivable);
     setIsFruitCodeDialogOpen(true);
   };
 
   const handleFruitCodeSave = async () => {
     if (!selectedProduct) return;
     try {
-      await updateProduct.mutateAsync({ id: selectedProduct.id, fruitCode: fruitCodeInput.toUpperCase() || null });
-      toast({ title: "Fruit code updated", description: `Fruit code for "${selectedProduct.name}" updated` });
+      await updateProduct.mutateAsync({
+        id: selectedProduct.id,
+        fruitCode: fruitCodeInput.toUpperCase() || null,
+        isReceivable: fruitCodeIsReceivable,
+      });
+      toast({ title: "Product updated", description: `Settings for "${selectedProduct.name}" updated` });
       setIsFruitCodeDialogOpen(false);
       setSelectedProduct(null);
     } catch {
-      toast({ title: "Error", description: "Failed to update fruit code", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update product", variant: "destructive" });
     }
   };
 
@@ -380,9 +386,9 @@ export default function Settings() {
       <Dialog open={isFruitCodeDialogOpen} onOpenChange={setIsFruitCodeDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Fruit Code</DialogTitle>
+            <DialogTitle>Edit Product Settings</DialogTitle>
             <DialogDescription>
-              Set the SOP fruit code for "{selectedProduct?.name}"
+              Configure SOP fruit code and stock receiving for "{selectedProduct?.name}"
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -397,6 +403,17 @@ export default function Settings() {
                 data-testid="input-fruitcode-edit"
               />
               <p className="text-xs text-muted-foreground">1–5 alphanumeric characters. Leave blank to clear. Known codes: SW = Strawberry Whole, BW = Blueberry Whole, PP = Passion Fruit Puree.</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Can be received into stock</Label>
+                <p className="text-xs text-muted-foreground">Allow this product to appear in the Receive Stock form</p>
+              </div>
+              <Switch
+                checked={fruitCodeIsReceivable}
+                onCheckedChange={setFruitCodeIsReceivable}
+                data-testid="switch-settings-product-receivable"
+              />
             </div>
           </div>
           <DialogFooter>
