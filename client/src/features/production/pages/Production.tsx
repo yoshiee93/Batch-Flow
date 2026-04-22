@@ -1344,7 +1344,7 @@ function BatchCard({
                     <CheckCircle size={14} className="mr-1 sm:mr-2" /> Complete
                   </Button>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </CollapsibleContent>
