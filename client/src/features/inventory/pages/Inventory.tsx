@@ -169,6 +169,7 @@ export default function Inventory() {
     const unit = getLotUnit(lot);
     const sourceLabel = lot.supplierName || lot.sourceName || undefined;
     printBarcodeLabel({
+      template: "raw_intake",
       lotNumber: lot.lotNumber,
       barcodeValue: lot.barcodeValue,
       itemName,

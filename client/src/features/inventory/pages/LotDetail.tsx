@@ -82,6 +82,7 @@ export default function LotDetail() {
   const { data: products = [] } = useProducts();
   const { data: usage = [], isLoading: usageLoading } = useLotUsage(id!);
   const { data: lineage, isLoading: lineageLoading } = useLotLineage(id!);
+  const { data: sourceBatch } = useBatch(lot?.sourceBatchId || '');
 
   if (lotLoading) {
     return (
@@ -258,17 +259,34 @@ export default function LotDetail() {
               variant="outline"
               className="w-full"
               data-testid="button-print-label"
-              onClick={() => printBarcodeLabel({
-                lotNumber: lot.lotNumber,
-                barcodeValue: lot.barcodeValue,
-                itemName,
-                quantity: lot.quantity,
-                unit,
-                sourceLabel: lot.supplierName || lot.sourceName || undefined,
-                receivedDate: lot.receivedDate,
-                expiryDate: lot.expiryDate,
-                supplierLot: lot.supplierLot,
-              })}
+              onClick={() => {
+                if (lot.lotType === 'finished_good' || lot.lotType === 'intermediate') {
+                  printBarcodeLabel({
+                    template: "finished_output",
+                    lotNumber: lot.lotNumber,
+                    barcodeValue: lot.barcodeValue,
+                    productName: itemName,
+                    quantity: lot.quantity,
+                    unit,
+                    producedDate: lot.producedDate || lot.receivedDate,
+                    sourceBatch: sourceBatch?.batchCode || sourceBatch?.batchNumber || undefined,
+                    expiryDate: lot.expiryDate,
+                  });
+                } else {
+                  printBarcodeLabel({
+                    template: "raw_intake",
+                    lotNumber: lot.lotNumber,
+                    barcodeValue: lot.barcodeValue,
+                    itemName,
+                    quantity: lot.quantity,
+                    unit,
+                    sourceLabel: lot.supplierName || lot.sourceName || undefined,
+                    receivedDate: lot.receivedDate,
+                    expiryDate: lot.expiryDate,
+                    supplierLot: lot.supplierLot,
+                  });
+                }
+              }}
             >
               <Printer className="mr-2 h-4 w-4" />
               {lot.barcodePrintedAt ? 'Reprint Label' : 'Print Label'}

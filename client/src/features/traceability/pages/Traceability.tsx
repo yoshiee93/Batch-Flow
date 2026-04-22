@@ -315,17 +315,31 @@ function ForwardTraceView({ trace, materials, products }: {
                   size="sm"
                   data-testid="button-print-label-trace"
                   onClick={() => {
-                    printBarcodeLabel({
-                      lotNumber: lot.lotNumber,
-                      barcodeValue: lot.barcodeValue,
-                      itemName,
-                      quantity: lot.quantity,
-                      unit: 'KG',
-                      sourceLabel: lot.supplierName || lot.sourceName || undefined,
-                      receivedDate: lot.receivedDate,
-                      expiryDate: lot.expiryDate,
-                      supplierLot: lot.supplierLot,
-                    });
+                    if (lotType === 'finished_good' || lotType === 'intermediate') {
+                      printBarcodeLabel({
+                        template: "finished_output",
+                        lotNumber: lot.lotNumber,
+                        barcodeValue: lot.barcodeValue,
+                        productName: itemName,
+                        quantity: lot.quantity,
+                        unit: 'KG',
+                        producedDate: lot.producedDate || lot.receivedDate,
+                        expiryDate: lot.expiryDate,
+                      });
+                    } else {
+                      printBarcodeLabel({
+                        template: "raw_intake",
+                        lotNumber: lot.lotNumber,
+                        barcodeValue: lot.barcodeValue,
+                        itemName,
+                        quantity: lot.quantity,
+                        unit: 'KG',
+                        sourceLabel: lot.supplierName || lot.sourceName || undefined,
+                        receivedDate: lot.receivedDate,
+                        expiryDate: lot.expiryDate,
+                        supplierLot: lot.supplierLot,
+                      });
+                    }
                     markLotPrinted.mutate(lot.id);
                   }}
                 >
@@ -512,12 +526,15 @@ function ForwardTraceView({ trace, materials, products }: {
                         data-testid={`button-print-outlot-${outputLot.id}`}
                         onClick={(e) => {
                           e.preventDefault();
+                          const outProduct = outputLot.productId ? products.find(p => p.id === outputLot.productId) : null;
                           printBarcodeLabel({
+                            template: "finished_output",
                             lotNumber: outputLot.lotNumber,
                             barcodeValue: outputLot.barcodeValue,
-                            itemName: outputLot.lotNumber,
+                            productName: outProduct?.name || outputLot.lotNumber,
                             quantity: outputLot.quantity,
                             unit: 'KG',
+                            producedDate: outputLot.producedDate,
                           });
                           markLotPrinted.mutate(outputLot.id);
                         }}
@@ -573,11 +590,14 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                   data-testid="button-print-batch-trace"
                   onClick={() => {
                     printBarcodeLabel({
-                      lotNumber: batch.batchNumber,
+                      template: "batch",
+                      batchCode: batch.batchCode || batch.batchNumber,
                       barcodeValue: batch.barcodeValue,
-                      itemName: product?.name || 'Batch',
+                      productName: product?.name || 'Batch',
                       quantity: batch.plannedQuantity,
                       unit: 'KG',
+                      productionDate: batch.startDate,
+                      status: batch.status,
                     });
                     markBatchPrinted.mutate(batch.id);
                   }}
@@ -719,11 +739,14 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                         data-testid={`button-reprint-output-${ol.lotId}`}
                         onClick={() => {
                           printBarcodeLabel({
+                            template: "finished_output",
                             lotNumber: ol.lotNumber,
                             barcodeValue: ol.barcodeValue,
-                            itemName: ol.productName || 'Output',
+                            productName: ol.productName || 'Output',
                             quantity: ol.quantity,
                             unit: 'KG',
+                            producedDate: batch.endDate,
+                            sourceBatch: batch.batchCode || batch.batchNumber,
                             expiryDate: ol.expiryDate,
                           });
                           markLotPrinted.mutate(ol.lotId);

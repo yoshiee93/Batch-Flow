@@ -24,10 +24,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  useBatches, useProducts, useRecipes, useMaterials, useLots, useCategories,
+  useBatches, useBatch, useProducts, useRecipes, useMaterials, useLots, useCategories,
   useUpdateBatch, useCreateBatch, useDeleteBatch,
   useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useUpdateBatchMaterial, useRecordBatchOutput,
-  useBatchOutputs, useBatchOutputLots, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch, useMarkBarcodePrinted,
+  useBatchOutputs, useBatchOutputLots, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch, useMarkBarcodePrinted, useMarkBatchBarcodePrinted,
   fetchLotByBarcode,
   type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput, type Category, type LotWithDetails, type FinalizeResult, type OutputLot
 } from '@/lib/api';
@@ -1375,7 +1375,10 @@ function BatchOutputsEditor({
   const [wetQuantity, setWetQuantity] = useState(initialWet);
   const [markCompleted, setMarkCompleted] = useState(false);
   const [finalizeResult, setFinalizeResult] = useState<FinalizeResult | null>(null);
+  const [summaryBatchPrintedAt, setSummaryBatchPrintedAt] = useState<string | null>(null);
   const markLotPrinted = useMarkBarcodePrinted();
+  const markBatchPrinted = useMarkBatchBarcodePrinted();
+  const { data: batchData } = useBatch(isCompleted ? batchId : '');
   
   useEffect(() => {
     setWasteQuantity(initialWaste);
@@ -1471,6 +1474,38 @@ function BatchOutputsEditor({
             <span className="font-mono" data-testid="text-finalize-completed-at">{completedAt}</span>
           </div>
         </div>
+        {finalizeResult.batch.barcodeValue && (
+          <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 gap-2" data-testid="summary-batch-label">
+            <div className="space-y-0.5 min-w-0">
+              <div className="font-medium text-sm">Batch Label</div>
+              <div className="text-xs text-muted-foreground font-mono">{finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber}</div>
+              {finalizeResult.batch.barcodeValue && <div className="text-xs text-muted-foreground font-mono">{finalizeResult.batch.barcodeValue}</div>}
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs h-7 px-2 shrink-0"
+              data-testid="button-print-batch-label-summary"
+              onClick={() => {
+                printBarcodeLabel({
+                  template: "batch",
+                  batchCode: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
+                  barcodeValue: finalizeResult.batch.barcodeValue,
+                  productName: allProducts.find(p => p.id === finalizeResult.batch.productId)?.name || 'Batch',
+                  quantity: finalizeResult.batch.plannedQuantity,
+                  unit: 'KG',
+                  productionDate: finalizeResult.batch.startDate,
+                  status: finalizeResult.batch.status,
+                });
+                markBatchPrinted.mutate(finalizeResult.batch.id);
+                setSummaryBatchPrintedAt(new Date().toISOString());
+              }}
+            >
+              <Printer className="h-3 w-3 mr-1" />
+              {summaryBatchPrintedAt || finalizeResult.batch.barcodePrintedAt ? 'Reprint' : 'Print Batch Label'}
+            </Button>
+          </div>
+        )}
         {finalizeResult.outputLots.length > 0 ? (
           <p className="text-sm text-muted-foreground">
             Print barcode labels for the finished-good lots produced in this batch.
@@ -1496,11 +1531,14 @@ function BatchOutputsEditor({
                     data-testid={`button-print-final-lot-${ol.lotId}`}
                     onClick={() => {
                       printBarcodeLabel({
+                        template: "finished_output",
                         lotNumber: ol.lotNumber,
                         barcodeValue: ol.barcodeValue,
-                        itemName: ol.productName || 'Output',
+                        productName: ol.productName || 'Output',
                         quantity: ol.quantity,
                         unit: 'KG',
+                        producedDate: finalizeResult.batch.endDate,
+                        sourceBatch: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
                         expiryDate: ol.expiryDate,
                       });
                       markLotPrinted.mutate(ol.lotId);
@@ -1660,11 +1698,14 @@ function BatchOutputsEditor({
                         data-testid={`button-reprint-lot-${ol.lotId}`}
                         onClick={() => {
                           printBarcodeLabel({
+                            template: "finished_output",
                             lotNumber: ol.lotNumber,
                             barcodeValue: ol.barcodeValue,
-                            itemName: ol.productName || 'Output',
+                            productName: ol.productName || 'Output',
                             quantity: ol.quantity,
                             unit: 'KG',
+                            producedDate: batchData?.endDate,
+                            sourceBatch: batchData?.batchCode || batchData?.batchNumber,
                             expiryDate: ol.expiryDate,
                           });
                           markLotPrinted.mutate(ol.lotId);

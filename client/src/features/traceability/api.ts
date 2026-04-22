@@ -56,6 +56,7 @@ export interface BackwardTraceResponse {
   batch: {
     id: string;
     batchNumber: string;
+    batchCode: string | null;
     status: string;
     plannedQuantity: string;
     actualQuantity: string | null;

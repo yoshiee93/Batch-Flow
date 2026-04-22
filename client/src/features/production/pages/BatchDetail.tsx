@@ -263,11 +263,14 @@ export default function BatchDetail() {
                         data-testid="button-print-batch-barcode"
                         onClick={() => {
                           printBarcodeLabel({
-                            lotNumber: batch.batchCode || batch.batchNumber,
+                            template: "batch",
+                            batchCode: batch.batchCode || batch.batchNumber,
                             barcodeValue: batch.barcodeValue,
-                            itemName: product?.name || 'Batch',
+                            productName: product?.name || 'Batch',
                             quantity: batch.plannedQuantity,
                             unit: 'KG',
+                            productionDate: batch.startDate,
+                            status: batch.status,
                           });
                           markBatchBarcodePrinted.mutate(batch.id);
                         }}
@@ -467,11 +470,14 @@ export default function BatchDetail() {
                         data-testid={`button-reprint-${ol.lotId}`}
                         onClick={() => {
                           printBarcodeLabel({
+                            template: "finished_output",
                             lotNumber: ol.lotNumber,
                             barcodeValue: ol.barcodeValue,
-                            itemName: ol.productName || 'Output',
+                            productName: ol.productName || 'Output',
                             quantity: ol.quantity,
                             unit: 'KG',
+                            producedDate: batch.endDate,
+                            sourceBatch: batch.batchCode || batch.batchNumber,
                             expiryDate: ol.expiryDate,
                           });
                           markLotBarcodePrinted.mutate(ol.lotId);
