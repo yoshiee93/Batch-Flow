@@ -27,7 +27,7 @@ import {
   useBatches, useProducts, useRecipes, useMaterials, useLots, useCategories,
   useUpdateBatch, useCreateBatch, useDeleteBatch,
   useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useUpdateBatchMaterial, useRecordBatchOutput,
-  useBatchOutputs, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch, useMarkBarcodePrinted,
+  useBatchOutputs, useBatchOutputLots, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch, useMarkBarcodePrinted,
   fetchLotByBarcode,
   type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput, type Category, type LotWithDetails, type FinalizeResult, type OutputLot
 } from '@/lib/api';
@@ -836,8 +836,16 @@ export default function Production() {
       <Dialog open={isRecordOutputOpen} onOpenChange={setIsRecordOutputOpen}>
         <DialogContent className="w-full sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Manage Outputs for {selectedBatch?.batchNumber}</DialogTitle>
-            <DialogDescription>Add multiple product outputs from this batch. Each output will be added to product inventory.</DialogDescription>
+            <DialogTitle>
+              {selectedBatch?.status === 'completed'
+                ? `Print Output Labels — ${selectedBatch?.batchNumber}`
+                : `Manage Outputs for ${selectedBatch?.batchNumber}`}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedBatch?.status === 'completed'
+                ? 'Print or reprint barcode labels for the finished-good lots produced in this batch.'
+                : 'Add multiple product outputs from this batch. Each output will be added to product inventory.'}
+            </DialogDescription>
           </DialogHeader>
           {selectedBatch && (
             <BatchOutputsEditor
@@ -1159,6 +1167,18 @@ function BatchCard({
                 </div>
               </div>
               <div className="flex items-center gap-1 ml-4" onClick={(e) => e.stopPropagation()}>
+                {isCompleted && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-green-600"
+                    onClick={() => onRecordOutputClick(batch)}
+                    title="Print Output Labels"
+                    data-testid={`button-print-labels-${batch.id}`}
+                  >
+                    <Printer size={16} />
+                  </Button>
+                )}
                 {!isCompleted && canManageBatches && (
                   <>
                     <Button size="icon" variant="ghost" onClick={() => onRecordInputClick(batch)} title="Record Input" data-testid={`button-input-${batch.id}`}>
@@ -1195,7 +1215,10 @@ function BatchCard({
                           <Package size={14} className="mr-2" /> Record Input
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onRecordOutputClick(batch)} data-testid={`button-record-${batch.id}`}>
-                          <Scale size={14} className="mr-2" /> Manage Outputs
+                          {isCompleted
+                            ? <><Printer size={14} className="mr-2" /> Print Output Labels</>
+                            : <><Scale size={14} className="mr-2" /> Manage Outputs</>
+                          }
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-destructive" onClick={() => onDeleteClick(batch)} data-testid={`button-delete-batch-${batch.id}`}>
@@ -1305,7 +1328,11 @@ function BatchCard({
                 {batch.startDate && <span>Batch Date: {format(new Date(batch.startDate), 'MMM d, yyyy')}</span>}
                 {batch.endDate && <span>Completed: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
               </div>
-              {!isCompleted && (
+              {isCompleted ? (
+                <Button size="sm" variant="outline" className="text-green-600 border-green-200" onClick={() => onRecordOutputClick(batch)} data-testid={`button-print-labels-expanded-${batch.id}`}>
+                  <Printer size={14} className="mr-1 sm:mr-2" /> Print Output Labels
+                </Button>
+              ) : (
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => onRecordInputClick(batch)}>
                     <Package size={14} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Add </span>Input
@@ -1358,6 +1385,7 @@ function BatchOutputsEditor({
   }, [batchId, initialWaste, initialMilling, initialWet]);
   
   const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
+  const { data: outputLots = [], isLoading: outputLotsLoading } = useBatchOutputLots(batchId);
   const { data: allProducts = [] } = useProducts();
   const { data: allCategories = [] } = useCategories();
   const addBatchOutput = useAddBatchOutput();
@@ -1592,35 +1620,95 @@ function BatchOutputsEditor({
         </div>
       )}
       
-      <div>
-        <h4 className="font-medium text-sm mb-2">Product Outputs ({outputs.length})</h4>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-4 w-4 animate-spin" />
-          </div>
-        ) : outputs.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-2">No outputs recorded yet</p>
-        ) : (
-          <div className="space-y-2">
-            {outputs.map((output) => {
-              const product = allProducts.find(p => p.id === output.productId);
-              return (
-                <div 
-                  key={output.id} 
-                  className="flex items-center justify-between p-2 bg-muted rounded text-sm"
-                  data-testid={`output-row-${output.id}`}
+      {isCompleted ? (
+        <div>
+          <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+            <Printer size={14} />
+            Output Lot Labels ({outputLots.length})
+          </h4>
+          {outputLotsLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          ) : outputLots.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">No output lots found for this batch.</p>
+          ) : (
+            <div className="space-y-2">
+              {outputLots.map((ol: OutputLot) => (
+                <div
+                  key={ol.lotId}
+                  className="flex items-start justify-between p-3 border rounded-lg bg-muted/30 gap-2"
+                  data-testid={`output-lot-row-${ol.lotId}`}
                 >
-                  <div>
-                    <span className="font-mono text-muted-foreground">{product?.sku}</span>
-                    <span className="mx-2">-</span>
-                    <span>{product?.name || 'Unknown Product'}</span>
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="font-medium text-sm">{ol.productName || 'Output'}</div>
+                    <div className="font-mono text-xs text-muted-foreground">{ol.lotNumber}</div>
+                    {ol.barcodeValue && (
+                      <div className="font-mono text-xs text-muted-foreground">{ol.barcodeValue}</div>
+                    )}
+                    {ol.barcodePrintedAt && (
+                      <div className="text-xs text-green-600">Label printed</div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono">{output.quantity} KG</span>
-                    {!isCompleted && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-mono text-sm">{parseFloat(ol.quantity).toFixed(2)} KG</span>
+                    {ol.barcodeValue && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-7 px-2"
+                        data-testid={`button-reprint-lot-${ol.lotId}`}
+                        onClick={() => {
+                          printBarcodeLabel({
+                            lotNumber: ol.lotNumber,
+                            barcodeValue: ol.barcodeValue,
+                            itemName: ol.productName || 'Output',
+                            quantity: ol.quantity,
+                            unit: 'KG',
+                            expiryDate: ol.expiryDate,
+                          });
+                          markLotPrinted.mutate(ol.lotId);
+                        }}
+                      >
+                        <Printer className="h-3 w-3 mr-1" />
+                        {ol.barcodePrintedAt ? 'Reprint' : 'Print Label'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div>
+          <h4 className="font-medium text-sm mb-2">Product Outputs ({outputs.length})</h4>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          ) : outputs.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">No outputs recorded yet</p>
+          ) : (
+            <div className="space-y-2">
+              {outputs.map((output) => {
+                const product = allProducts.find(p => p.id === output.productId);
+                return (
+                  <div
+                    key={output.id}
+                    className="flex items-center justify-between p-2 bg-muted rounded text-sm"
+                    data-testid={`output-row-${output.id}`}
+                  >
+                    <div>
+                      <span className="font-mono text-muted-foreground">{product?.sku}</span>
+                      <span className="mx-2">-</span>
+                      <span>{product?.name || 'Unknown Product'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono">{output.quantity} KG</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-6 w-6 text-destructive hover:text-destructive"
                         onClick={() => handleRemoveOutput(output.id)}
                         disabled={removeBatchOutput.isPending}
@@ -1628,18 +1716,18 @@ function BatchOutputsEditor({
                       >
                         <X size={14} />
                       </Button>
-                    )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-            <div className="flex justify-between items-center pt-2 font-medium text-sm">
-              <span>Total Output:</span>
-              <span className="font-mono">{totalOutputQuantity.toFixed(2)} KG</span>
+                );
+              })}
+              <div className="flex justify-between items-center pt-2 font-medium text-sm">
+                <span>Total Output:</span>
+                <span className="font-mono">{totalOutputQuantity.toFixed(2)} KG</span>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
       
       {!isCompleted && (
         <>
