@@ -1,0 +1,101 @@
+Task: Update Receive Stock logic to support both materials and finished goods using a configurable receivable flag instead of hardcoded material-only logic
+
+Before making changes:
+- Inspect current inventory, materials, products, and categories structure
+- Identify where Receive Stock currently fetches materials
+- Identify how items are stored and typed (material vs product)
+
+Goal:
+Allow users to receive stock for:
+- raw materials
+- purchased finished goods
+- any item marked as receivable
+
+Remove the restriction that only materials can be received.
+
+---
+
+1. Add receivable flag to items
+
+Update item model (material/product or unified item model):
+
+Add field:
+- isReceivable: boolean (default true for materials, false for others unless specified)
+
+Ensure:
+- existing materials are set to true
+- existing products default to false (unless manually changed)
+
+---
+
+2. Update backend receive stock logic
+
+Modify receive stock endpoints:
+
+Instead of:
+- validating only materials
+
+Change to:
+- allow any item where isReceivable = true
+
+Ensure:
+- stock movements still work
+- lot creation still works
+- traceability remains intact
+
+---
+
+3. Update frontend Receive Stock form
+
+Modify item dropdown:
+
+Instead of:
+- loading only materials
+
+Change to:
+- load all items where isReceivable = true
+
+Display:
+- item name
+- type (material / product if applicable)
+
+---
+
+4. Optional: add filter/toggle in UI
+
+Add optional toggle or grouping:
+- Materials
+- Finished Goods
+
+But keep default as:
+- show all receivable items
+
+---
+
+5. Add setting/edit support
+
+In item creation/edit screen:
+
+Add:
+- checkbox: “Can be received into stock”
+
+This sets:
+- isReceivable = true/false
+
+---
+
+6. Preserve existing workflows
+
+Ensure:
+- production still consumes correct item types
+- finished goods created from batches still behave as before
+- no duplicate logic is introduced
+
+---
+
+7. Acceptance criteria
+
+- Newly created items marked as receivable appear in Receive Stock
+- Both materials and finished goods can be received
+- Stock movements and lot tracking still work correctly
+- No reliance on hardcoded “materials only” logic
