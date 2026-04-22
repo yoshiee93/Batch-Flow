@@ -289,6 +289,8 @@ function ForwardTraceView({ trace, materials, products }: {
   const product = lot.productId ? products.find(p => p.id === lot.productId) : null;
   const itemName = material?.name || product?.name || lot.lotNumber;
   const markLotPrinted = useMarkBarcodePrinted();
+  const isProducedLot = lotType === 'finished_good' || lotType === 'intermediate';
+  const { data: sourceBatchData } = useBatch(isProducedLot && lot.sourceBatchId ? lot.sourceBatchId : '');
 
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
@@ -325,6 +327,7 @@ function ForwardTraceView({ trace, materials, products }: {
                         unit: 'KG',
                         producedDate: lot.producedDate || lot.receivedDate,
                         expiryDate: lot.expiryDate,
+                        sourceBatch: sourceBatchData ? (sourceBatchData.batchCode || sourceBatchData.batchNumber) : undefined,
                       });
                     } else {
                       printBarcodeLabel({
