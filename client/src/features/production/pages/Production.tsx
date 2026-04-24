@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle, ChevronDown, ChevronRight, ChevronsUpDown, Check, ExternalLink, Printer } from 'lucide-react';
+import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle, ChevronDown, ChevronRight, ChevronsUpDown, Check, ExternalLink, Printer, RefreshCw } from 'lucide-react';
 import { Link } from 'wouter';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -61,6 +61,7 @@ export default function Production() {
     recipeId: '',
     startDate: format(new Date(), 'yyyy-MM-dd'),
   });
+  const [batchNumberEdited, setBatchNumberEdited] = useState(false);
   
   const [editForm, setEditForm] = useState({
     actualQuantity: '',
@@ -116,8 +117,10 @@ export default function Production() {
   // Add uncategorized products
   const uncategorizedProducts = products.filter(p => !p.categoryId);
   
-  // Auto-fill batchNumber with SOP batch code when product + date are set and codes are available
+  // Auto-fill batchNumber with SOP batch code when product + date are set and codes are available.
+  // Only runs if the user has not manually edited the batch number field.
   useEffect(() => {
+    if (batchNumberEdited) return;
     if (!newBatch.productId || !newBatch.startDate) return;
     const product = products.find(p => p.id === newBatch.productId);
     if (!product?.fruitCode) return;
@@ -129,7 +132,7 @@ export default function Production() {
       setNewBatch(prev => ({ ...prev, batchNumber: code }));
     } catch {
     }
-  }, [newBatch.productId, newBatch.startDate, products, categories]);
+  }, [batchNumberEdited, newBatch.productId, newBatch.startDate, products, categories]);
 
   const handleCreateBatch = async () => {
     if (!newBatch.batchNumber || !newBatch.productId) {
@@ -154,6 +157,7 @@ export default function Production() {
       });
       setIsCreateDialogOpen(false);
       setNewBatch({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
+      setBatchNumberEdited(false);
     } catch (error) {
       toast({ title: "Error", description: "Failed to create batch", variant: "destructive" });
     }
@@ -359,20 +363,29 @@ export default function Production() {
     }
   };
 
-  // Compute SOP batch code preview for the create dialog
-  const batchCodePreview = (() => {
-    if (!newBatch.productId || !newBatch.startDate) return null;
+  // Whether the current product+date combination can auto-generate a SOP batch code
+  const canAutoGenerate = (() => {
+    if (!newBatch.productId || !newBatch.startDate) return false;
     const product = products.find(p => p.id === newBatch.productId);
-    if (!product?.fruitCode) return null;
+    if (!product?.fruitCode) return false;
     const category = categories.find(c => c.id === product.categoryId);
-    if (!category?.processCode) return null;
+    return !!category?.processCode;
+  })();
+
+  const handleRegenerateBatchNumber = () => {
+    if (!newBatch.productId || !newBatch.startDate) return;
+    const product = products.find(p => p.id === newBatch.productId);
+    if (!product?.fruitCode) return;
+    const category = categories.find(c => c.id === product.categoryId);
+    if (!category?.processCode) return;
     try {
       const date = new Date(newBatch.startDate + 'T00:00:00Z');
-      return buildBatchCode(product.fruitCode, category.processCode, date);
+      const code = buildBatchCode(product.fruitCode, category.processCode, date);
+      setNewBatch(prev => ({ ...prev, batchNumber: code }));
+      setBatchNumberEdited(false);
     } catch {
-      return null;
     }
-  })();
+  };
 
   if (isLoading) {
     return (
@@ -400,7 +413,13 @@ export default function Production() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono" data-testid="text-production-title">Production Control</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage batches, record inputs and outputs.</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={canManageBatches ? setIsCreateDialogOpen : undefined}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={canManageBatches ? (open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            setNewBatch({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
+            setBatchNumberEdited(false);
+          }
+        } : undefined}>
           {canManageBatches && (
             <DialogTrigger asChild>
               <Button size="lg" className="font-mono" data-testid="button-create-batch">
@@ -414,27 +433,6 @@ export default function Production() {
               <DialogDescription>Start a new production batch</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="batchNumber">Batch Number *</Label>
-                <Input
-                  id="batchNumber"
-                  placeholder="e.g. SW3260132 or BATCH-001"
-                  value={newBatch.batchNumber}
-                  onChange={(e) => setNewBatch({ ...newBatch, batchNumber: e.target.value })}
-                  data-testid="input-batch-number"
-                />
-                {batchCodePreview ? (
-                  <div className="rounded-md bg-primary/5 border border-primary/20 px-3 py-2 text-xs">
-                    <span className="text-muted-foreground">SOP Batch Code: </span>
-                    <span className="font-mono font-bold text-primary" data-testid="text-batch-code-preview">{batchCodePreview}</span>
-                    <span className="text-muted-foreground ml-1">(auto-filled)</span>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Set a Fruit Code on the product and a Process Code on its category to auto-generate SOP codes.
-                  </p>
-                )}
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="product">Product *</Label>
                 <Popover open={createProductSearchOpen} onOpenChange={setCreateProductSearchOpen}>
@@ -522,9 +520,47 @@ export default function Production() {
                 />
                 <p className="text-xs text-muted-foreground">Defaults to today. Change if recording a previous day's batch.</p>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="batchNumber">Batch Number *</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="batchNumber"
+                    placeholder="e.g. SW3260132 or BATCH-001"
+                    value={newBatch.batchNumber}
+                    onChange={(e) => {
+                      setNewBatch({ ...newBatch, batchNumber: e.target.value });
+                      setBatchNumberEdited(true);
+                    }}
+                    data-testid="input-batch-number"
+                    className="flex-1"
+                  />
+                  {canAutoGenerate && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="shrink-0 px-2"
+                      onClick={handleRegenerateBatchNumber}
+                      data-testid="button-regenerate-batch-number"
+                      title="Regenerate batch number from product and date"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {canAutoGenerate
+                    ? "Auto-generated from product and production date. Edit manually if needed, or click Regenerate."
+                    : "Set a Fruit Code on the product and a Process Code on its category to enable auto-generation."}
+                </p>
+              </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => {
+                setIsCreateDialogOpen(false);
+                setNewBatch({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
+                setBatchNumberEdited(false);
+              }}>Cancel</Button>
               <Button onClick={handleCreateBatch} disabled={createBatch.isPending} data-testid="button-submit-batch">
                 {createBatch.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create Batch
