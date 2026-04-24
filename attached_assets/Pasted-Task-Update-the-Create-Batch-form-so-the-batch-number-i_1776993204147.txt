@@ -1,0 +1,74 @@
+Task: Update the Create Batch form so the batch number is auto-generated after selecting product/process/date, while still allowing manual override
+
+Before making changes:
+- Inspect the current batch creation form, batch model, batch code generation helper, product selection logic, and batch detail/edit flow
+- Reuse the existing batch code generation logic and current batch model
+- Extend the current form instead of rebuilding the batch workflow
+
+Business goal:
+When creating a batch, users should not need to type the batch number first.
+The system should generate the batch number automatically based on the configured batch coding rules after the user selects the product and other required inputs.
+Users must still be able to manually edit/override the batch number when needed.
+
+Required behavior:
+
+1. Reorder the create batch workflow
+Update the form so the user provides the inputs required to generate the batch number before the batch number field is finalized.
+
+Recommended order:
+- product
+- process type (if applicable)
+- production date
+- auto-generated batch number
+
+Do not make batch number the first required input.
+
+2. Auto-generate the batch number
+Once the required values are available, generate the batch number automatically using the existing SOP batch code logic.
+
+Use the existing format and rules already implemented in the system.
+
+The generation should happen when the form has enough information, such as:
+- selected product / fruit code
+- selected process code
+- production date
+
+3. Keep manual override
+The batch number field must remain editable.
+
+Required behavior:
+- default value should be auto-generated
+- user can manually edit the field if needed
+- do not overwrite a user-edited batch number silently
+- if the user edits the batch number manually, preserve their value unless they explicitly request regeneration
+
+4. Add regenerate behavior
+Add a small “Regenerate” action/button near the batch number field.
+
+Required behavior:
+- if product, process, or production date changes, the system should update the suggested code only if the batch number has not been manually overridden yet
+- if the user has manually changed the field, do not auto-replace it
+- pressing “Regenerate” should rebuild the batch number from the current form inputs
+
+5. Support editing existing batches carefully
+If the batch form is also used for editing:
+- preserve existing batch numbers by default
+- do not auto-replace an existing saved batch number unless the user intentionally regenerates it
+
+6. Keep the UI clear
+Add a small helper note such as:
+- “Batch number auto-generated from product, process, and production date. You can edit it if required.”
+
+7. Preserve existing functionality
+- do not break current batch creation
+- do not break barcode/batch code logic
+- keep tracking/search working with batch numbers
+- keep the current data model intact unless a small improvement is required
+
+Acceptance criteria:
+- user selects product/process/date before relying on batch number
+- batch number auto-generates correctly
+- user can manually edit the batch number
+- manual edits are not overwritten unexpectedly
+- user can click Regenerate to rebuild the batch number
+- existing batch code/search/barcode behavior still works
