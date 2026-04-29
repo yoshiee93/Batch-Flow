@@ -899,14 +899,7 @@ export default function Inventory() {
                             className="w-full justify-between font-normal"
                             data-testid="select-receive-item"
                           >
-                            {selectedReceiveItem ? (
-                              <span className="flex items-center gap-2">
-                                {selectedReceiveItem.name}
-                                <Badge variant="outline" className={`text-xs ${selectedReceiveItem.itemType === 'product' ? 'text-blue-600 border-blue-200' : ''}`}>
-                                  {selectedReceiveItem.itemType === 'product' ? 'Product' : 'Material'}
-                                </Badge>
-                              </span>
-                            ) : 'Select item...'}
+                            {selectedReceiveItem ? selectedReceiveItem.name : 'Select item...'}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
@@ -928,9 +921,6 @@ export default function Inventory() {
                                     >
                                       <Check className={cn("mr-2 h-4 w-4", receiveForm.itemId === item.id ? "opacity-100" : "opacity-0")} />
                                       <span className="flex-1">{item.sku ? `${item.sku} — ` : ''}{item.name} ({item.unit})</span>
-                                      <Badge variant="outline" className={`ml-2 text-xs ${item.itemType === 'product' ? 'text-blue-600 border-blue-200' : ''}`}>
-                                        {item.itemType === 'product' ? 'Prod.' : 'Mat.'}
-                                      </Badge>
                                     </CommandItem>
                                   ))}
                                 </CommandGroup>
