@@ -335,7 +335,7 @@ export default function Inventory() {
       };
       setReceivedLot(lotWithDetails);
       setReceivedTemplateName(null);
-      fetchLabelTemplate('raw_intake', null).then(tmpl => {
+      fetchLabelTemplate('raw_intake', result.lot.customerId).then(tmpl => {
         setReceivedTemplateName(tmpl ? tmpl.name : null);
       });
     } catch (error: unknown) {
@@ -347,7 +347,7 @@ export default function Inventory() {
   async function handlePrintReceivedLot(lot: LotWithDetails) {
     const itemName = lot.materialName || lot.productName || getLotItemName(lot as Lot);
     const unit = getLotUnit(lot as Lot);
-    const tmpl = await fetchLabelTemplate('raw_intake', null);
+    const tmpl = await fetchLabelTemplate('raw_intake', lot.customerId);
     printBarcodeLabel({
       template: 'raw_intake',
       lotNumber: lot.lotNumber,
