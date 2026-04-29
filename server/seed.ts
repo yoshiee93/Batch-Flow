@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, materials } from "@shared/schema";
+import { users, materials, batches } from "@shared/schema";
 import { sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
@@ -21,22 +21,29 @@ async function resetToAdminOnly() {
 export async function seedIfEmpty() {
   const isProduction = process.env.NODE_ENV === "production";
 
-  if (isProduction && process.env.RESET_DB === "true") {
-    console.log("RESET_DB=true ignored in production — skipping destructive reset.");
-    return;
+  if (process.env.RESET_DB === "true") {
+    if (isProduction) {
+      console.log("RESET_DB=true is ignored in production — continuing with safe startup checks.");
+    } else {
+      console.log("RESET_DB=true — forcing database reset (development only)...");
+      await resetToAdminOnly();
+      return;
+    }
   }
 
-  if (!isProduction && process.env.RESET_DB === "true") {
-    console.log("RESET_DB=true — forcing database reset (development only)...");
-    await resetToAdminOnly();
-    return;
-  }
+  const [existingUsers, existingMaterials, existingBatches] = await Promise.all([
+    db.select().from(users).limit(1),
+    db.select().from(materials).limit(1),
+    db.select().from(batches).limit(1),
+  ]);
 
-  const existingUsers = await db.select().from(users).limit(1);
-  const existingMaterials = await db.select().from(materials).limit(1);
+  const isFreshInstall =
+    existingUsers.length === 0 &&
+    existingMaterials.length === 0 &&
+    existingBatches.length === 0;
 
-  if (existingUsers.length === 0 && existingMaterials.length === 0) {
-    console.log("Fresh install detected (no users, no materials) — seeding admin account...");
+  if (isFreshInstall) {
+    console.log("Fresh install detected (no users, no materials, no batches) — seeding admin account...");
     await resetToAdminOnly();
   }
 }

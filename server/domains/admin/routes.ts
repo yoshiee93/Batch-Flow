@@ -1,4 +1,4 @@
-import { Router, json } from "express";
+import { Router } from "express";
 import { db } from "../../db";
 import { sql } from "drizzle-orm";
 import {
@@ -66,9 +66,7 @@ adminRouter.get("/admin/export", adminOnly, asyncHandler(async (_req, res) => {
   res.send(JSON.stringify(snapshot, null, 2));
 }));
 
-const largeJson = json({ limit: "50mb" });
-
-adminRouter.post("/admin/import", adminOnly, largeJson, asyncHandler(async (req, res) => {
+adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
   const payload = req.body;
 
   if (!payload || typeof payload !== "object" || payload.version !== 1 || !payload.tables) {
