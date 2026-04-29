@@ -85,8 +85,31 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
     }
   }
 
+  const currentAdminId = req.session?.userId as string | undefined;
+
   await db.transaction(async (tx) => {
-    await tx.execute(sql`SET CONSTRAINTS ALL DEFERRED`);
+    if (t.users.length > 0) {
+      for (const u of t.users) {
+        await tx.execute(sql`
+          INSERT INTO users (id, username, password, full_name, role, active, created_at)
+          VALUES (
+            ${u.id}, ${u.username}, ${u.password}, ${u.fullName ?? u.full_name},
+            ${u.role}, ${u.active ?? true}, ${u.createdAt ?? u.created_at ?? new Date().toISOString()}
+          )
+          ON CONFLICT (id) DO UPDATE SET
+            username = EXCLUDED.username,
+            full_name = EXCLUDED.full_name,
+            role = EXCLUDED.role,
+            active = EXCLUDED.active
+        `);
+      }
+    }
+
+    if (currentAdminId) {
+      await tx.execute(sql`
+        UPDATE users SET role = 'admin', active = true WHERE id = ${currentAdminId}
+      `);
+    }
 
     await tx.execute(sql`
       TRUNCATE audit_logs, stock_movements, quality_checks, order_items, orders,
@@ -110,20 +133,6 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
     if (t.qualityChecks?.length) await tx.insert(qualityChecks).values(t.qualityChecks);
     if (t.stockMovements?.length) await tx.insert(stockMovements).values(t.stockMovements);
     if (t.auditLogs?.length) await tx.insert(auditLogs).values(t.auditLogs);
-
-    if (Array.isArray(t.users) && t.users.length > 0) {
-      for (const u of t.users) {
-        await tx.execute(sql`
-          INSERT INTO users (id, username, password, full_name, role, active, created_at)
-          VALUES (${u.id}, ${u.username}, ${u.password}, ${u.fullName}, ${u.role}, ${u.active ?? true}, ${u.createdAt ?? new Date().toISOString()})
-          ON CONFLICT (id) DO UPDATE SET
-            username = EXCLUDED.username,
-            full_name = EXCLUDED.full_name,
-            role = EXCLUDED.role,
-            active = EXCLUDED.active
-        `);
-      }
-    }
   });
 
   res.json({ success: true, message: "Database restored successfully from backup." });
