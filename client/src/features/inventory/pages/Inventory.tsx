@@ -167,19 +167,31 @@ export default function Inventory() {
   function handlePrintLabel(lot: Lot) {
     const itemName = getLotItemName(lot);
     const unit = getLotUnit(lot);
-    const sourceLabel = lot.supplierName || lot.sourceName || undefined;
-    printBarcodeLabel({
-      template: "raw_intake",
-      lotNumber: lot.lotNumber,
-      barcodeValue: lot.barcodeValue,
-      itemName,
-      quantity: lot.originalQuantity || lot.quantity,
-      unit,
-      sourceLabel,
-      receivedDate: lot.receivedDate,
-      expiryDate: lot.expiryDate,
-      supplierLot: lot.supplierLot,
-    });
+    if (lot.lotType === 'finished_good' || lot.lotType === 'intermediate') {
+      printBarcodeLabel({
+        template: "finished_output",
+        lotNumber: lot.lotNumber,
+        barcodeValue: lot.barcodeValue,
+        productName: itemName,
+        quantity: lot.originalQuantity || lot.quantity,
+        unit,
+        producedDate: lot.producedDate || lot.receivedDate,
+        expiryDate: lot.expiryDate,
+      });
+    } else {
+      printBarcodeLabel({
+        template: "raw_intake",
+        lotNumber: lot.lotNumber,
+        barcodeValue: lot.barcodeValue,
+        itemName,
+        quantity: lot.originalQuantity || lot.quantity,
+        unit,
+        sourceLabel: lot.supplierName || lot.sourceName || undefined,
+        receivedDate: lot.receivedDate,
+        expiryDate: lot.expiryDate,
+        supplierLot: lot.supplierLot,
+      });
+    }
     if (!lot.barcodePrintedAt) {
       markBarcodePrinted.mutate(lot.id);
     }
