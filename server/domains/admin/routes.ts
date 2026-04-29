@@ -119,7 +119,7 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
     if (backupUsernames.length > 0) {
       await tx.execute(sql`
         DELETE FROM users
-        WHERE username = ANY(${backupUsernames}::text[])
+        WHERE username IN (${sql.join(backupUsernames.map(n => sql`${n}`), sql`, `)})
         AND id NOT IN (${sql.join(
           Array.from(backupUserIds).map(id => sql`${id}`),
           sql`, `
