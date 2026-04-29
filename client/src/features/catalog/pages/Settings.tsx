@@ -564,6 +564,12 @@ export default function Settings() {
                 data-testid="input-fruitcode-edit"
               />
               <p className="text-xs text-muted-foreground">1–5 alphanumeric characters. Leave blank to clear. Known codes: SW = Strawberry Whole, BW = Blueberry Whole, PP = Passion Fruit Puree.</p>
+              {!fruitCodeIsReceivable && !fruitCodeInput.trim() && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800" data-testid="warning-no-fruitcode">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+                  <p className="text-xs">This product is a finished good but has no fruit code. Lot numbers will use the generic format (FG-YYMMDD-NNNN) instead of matching the batch number.</p>
+                </div>
+              )}
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">

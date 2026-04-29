@@ -1872,6 +1872,32 @@ function BatchOutputsEditor({
               Mark batch as completed and generate output lots
             </Label>
           </div>
+
+          {markCompleted && (() => {
+            const missingNames: string[] = [];
+            const primaryProduct = batchData ? allProducts.find(p => p.id === batchData.productId) : undefined;
+            if (primaryProduct && !primaryProduct.fruitCode?.trim()) {
+              missingNames.push(`${primaryProduct.name} (primary product)`);
+            }
+            outputs.forEach(o => {
+              const product = allProducts.find(p => p.id === o.productId);
+              if (product && !product.fruitCode?.trim()) {
+                missingNames.push(product.name);
+              }
+            });
+            return missingNames.length > 0 ? (
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800" data-testid="warning-finalize-no-fruitcode">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+                <div className="text-xs space-y-0.5">
+                  <p className="font-medium">Some products have no fruit code:</p>
+                  <ul className="list-disc list-inside">
+                    {missingNames.map((name, i) => <li key={i}>{name}</li>)}
+                  </ul>
+                  <p>Their lot numbers will use the generic format (FG-YYMMDD-NNNN) instead of matching the batch number.</p>
+                </div>
+              </div>
+            ) : null;
+          })()}
           
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
