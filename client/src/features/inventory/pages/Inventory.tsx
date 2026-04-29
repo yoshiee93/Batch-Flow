@@ -178,7 +178,7 @@ export default function Inventory() {
         quantity: lot.originalQuantity || lot.quantity,
         unit,
         producedDate: lot.producedDate || lot.receivedDate,
-        sourceBatch: srcBatch?.batchCode || srcBatch?.batchNumber || undefined,
+        sourceBatch: srcBatch?.batchCode || srcBatch?.batchNumber || 'N/A',
         expiryDate: lot.expiryDate,
       });
     } else {
