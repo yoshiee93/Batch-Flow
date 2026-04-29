@@ -65,6 +65,7 @@ export default function Customers() {
         address: formData.address || null,
         notes: formData.notes || null,
         active: true,
+        defaultLabelTemplateId: formData.defaultLabelTemplateId || null,
       });
       toast({ title: "Customer created", description: `Customer ${formData.name} created successfully` });
       setIsCreateDialogOpen(false);

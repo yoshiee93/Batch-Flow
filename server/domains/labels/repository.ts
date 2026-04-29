@@ -73,7 +73,7 @@ export const labelsRepository = {
   },
 
   async updateTemplate(id: string, data: Partial<InsertLabelTemplate>): Promise<LabelTemplate | undefined> {
-    const [updated] = await db.update(labelTemplates).set(data).where(eq(labelTemplates.id, id)).returning();
+    const [updated] = await db.update(labelTemplates).set({ ...data, updatedAt: new Date() }).where(eq(labelTemplates.id, id)).returning();
     return updated;
   },
 
