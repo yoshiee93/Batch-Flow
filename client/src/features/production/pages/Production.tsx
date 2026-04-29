@@ -363,14 +363,21 @@ export default function Production() {
     }
   };
 
-  // Whether the current product+date combination can auto-generate a SOP batch code
-  const canAutoGenerate = (() => {
-    if (!newBatch.productId || !newBatch.startDate) return false;
+  // Diagnostic info for batch number auto-generation
+  const batchCodeDiagnostic = (() => {
+    if (!newBatch.productId) return { canGenerate: false, reason: null };
     const product = products.find(p => p.id === newBatch.productId);
-    if (!product?.fruitCode) return false;
+    if (!product?.fruitCode) {
+      return { canGenerate: false, reason: `"${product?.name}" has no Fruit Code set. Add one in Settings → Products.` };
+    }
     const category = categories.find(c => c.id === product.categoryId);
-    return !!category?.processCode;
+    if (!category?.processCode) {
+      const catName = category?.name ?? 'its category';
+      return { canGenerate: false, reason: `Category "${catName}" has no Process Code set. Add one in Settings → Categories.` };
+    }
+    return { canGenerate: true, reason: null };
   })();
+  const canAutoGenerate = batchCodeDiagnostic.canGenerate;
 
   const handleRegenerateBatchNumber = () => {
     if (!newBatch.productId || !newBatch.startDate) return;
@@ -551,7 +558,9 @@ export default function Production() {
                 <p className="text-xs text-muted-foreground">
                   {canAutoGenerate
                     ? "Auto-generated from product and production date. Edit manually if needed, or click Regenerate."
-                    : "Set a Fruit Code on the product and a Process Code on its category to enable auto-generation."}
+                    : batchCodeDiagnostic.reason
+                      ? <span className="text-amber-600 dark:text-amber-500">⚠ {batchCodeDiagnostic.reason}{" "}<Link href="/settings" className="underline hover:text-amber-700">Open Settings</Link></span>
+                      : "Select a product above to auto-generate the batch number."}
                 </p>
               </div>
             </div>
