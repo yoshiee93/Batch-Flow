@@ -60,9 +60,10 @@ adminRouter.get("/admin/export", adminOnly, asyncHandler(async (_req, res) => {
     },
   };
 
+  const dateStr = new Date().toISOString().split('T')[0];
   res.setHeader("Content-Type", "application/json");
-  res.setHeader("Content-Disposition", `attachment; filename="cleartrace-export-${new Date().toISOString().split('T')[0]}.json"`);
-  res.json(snapshot);
+  res.setHeader("Content-Disposition", `attachment; filename="cleartrace-export-${dateStr}.json"`);
+  res.send(JSON.stringify(snapshot, null, 2));
 }));
 
 adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
@@ -73,7 +74,7 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
   }
 
   const t = payload.tables;
-  const requiredTables = ["users", "categories", "products", "materials", "lots", "batches"];
+  const requiredTables = ["categories", "products", "materials", "lots", "batches"];
   for (const tbl of requiredTables) {
     if (!Array.isArray(t[tbl])) {
       return res.status(400).json({ error: `Missing or invalid table: ${tbl}` });
@@ -83,9 +84,13 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
   await db.transaction(async (tx) => {
     await tx.execute(sql`SET CONSTRAINTS ALL DEFERRED`);
 
-    await tx.execute(sql`TRUNCATE audit_logs, stock_movements, quality_checks, order_items, orders, batch_outputs, batch_materials, batches, recipe_items, recipes, lots, materials, products, categories, customers, users CASCADE`);
+    await tx.execute(sql`
+      TRUNCATE audit_logs, stock_movements, quality_checks, order_items, orders,
+        batch_outputs, batch_materials, batches, recipe_items, recipes, lots,
+        materials, products, categories, customers
+      CASCADE
+    `);
 
-    if (t.users?.length) await tx.insert(users).values(t.users);
     if (t.customers?.length) await tx.insert(customers).values(t.customers);
     if (t.categories?.length) await tx.insert(categories).values(t.categories);
     if (t.products?.length) await tx.insert(products).values(t.products);
@@ -101,6 +106,20 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
     if (t.qualityChecks?.length) await tx.insert(qualityChecks).values(t.qualityChecks);
     if (t.stockMovements?.length) await tx.insert(stockMovements).values(t.stockMovements);
     if (t.auditLogs?.length) await tx.insert(auditLogs).values(t.auditLogs);
+
+    if (Array.isArray(t.users) && t.users.length > 0) {
+      for (const u of t.users) {
+        await tx.execute(sql`
+          INSERT INTO users (id, username, password, full_name, role, active, created_at)
+          VALUES (${u.id}, ${u.username}, ${u.password}, ${u.fullName}, ${u.role}, ${u.active ?? true}, ${u.createdAt ?? new Date().toISOString()})
+          ON CONFLICT (id) DO UPDATE SET
+            username = EXCLUDED.username,
+            full_name = EXCLUDED.full_name,
+            role = EXCLUDED.role,
+            active = EXCLUDED.active
+        `);
+      }
+    }
   });
 
   res.json({ success: true, message: "Database restored successfully from backup." });
