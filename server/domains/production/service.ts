@@ -23,6 +23,12 @@ async function createStockMovement(data: InsertStockMovement) {
   return inventoryRepository.createStockMovement(data);
 }
 
+function twoYearsFrom(date: Date): Date {
+  const d = new Date(date);
+  d.setFullYear(d.getFullYear() + 2);
+  return d;
+}
+
 export const productionService = {
   getBatches: repo.getBatches.bind(repo),
   getBatch: repo.getBatch.bind(repo),
@@ -363,6 +369,7 @@ export const productionService = {
               quantity: output.quantity,
               remainingQuantity: output.quantity,
               producedDate: now,
+              expiryDate: twoYearsFrom(now),
               sourceBatchId: batchId,
             });
             await createStockMovement({ movementType: "production_output", productId: output.productId, lotId: finishedLot.id, batchId, quantity: output.quantity, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
@@ -392,6 +399,7 @@ export const productionService = {
               quantity: updated.actualQuantity!,
               remainingQuantity: updated.actualQuantity!,
               producedDate: now,
+              expiryDate: twoYearsFrom(now),
               sourceBatchId: batchId,
             });
             await createStockMovement({ movementType: "production_output", productId: batch.productId, lotId: finishedLot.id, batchId, quantity: updated.actualQuantity!, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
@@ -439,6 +447,7 @@ export const productionService = {
         } else {
           const lotNumber = await generateLotNumber("FG");
           const barcodeValue = await generateBarcodeValue();
+          const producedNow = new Date();
           await repo.insertLot({
             lotNumber,
             lotType: "finished_good",
@@ -448,7 +457,8 @@ export const productionService = {
             originalQuantity: actualQuantity,
             quantity: actualQuantity,
             remainingQuantity: actualQuantity,
-            producedDate: new Date(),
+            producedDate: producedNow,
+            expiryDate: twoYearsFrom(producedNow),
             sourceBatchId: batchId,
           });
         }
@@ -496,7 +506,7 @@ export const productionService = {
           const finishedLot = await repo.insertLot({
             lotNumber, lotType: "finished_good", status: "active", barcodeValue,
             productId: output.productId, originalQuantity: output.quantity, quantity: output.quantity,
-            remainingQuantity: output.quantity, producedDate: now, sourceBatchId: batchId,
+            remainingQuantity: output.quantity, producedDate: now, expiryDate: twoYearsFrom(now), sourceBatchId: batchId,
           });
           await createStockMovement({ movementType: "production_output", productId: output.productId, lotId: finishedLot.id, batchId, quantity: output.quantity, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
           await createAuditLog({ entityType: "lot", entityId: finishedLot.id, action: "finished_lot_created", changes: JSON.stringify({ lotNumber, barcodeValue, productId: output.productId, quantity: output.quantity, sourceBatchId: batchId, regenerated: true }) });
@@ -510,7 +520,7 @@ export const productionService = {
         const finishedLot = await repo.insertLot({
           lotNumber, lotType: "finished_good", status: "active", barcodeValue,
           productId: batch.productId, originalQuantity: batch.actualQuantity!, quantity: batch.actualQuantity!,
-          remainingQuantity: batch.actualQuantity!, producedDate: now, sourceBatchId: batchId,
+          remainingQuantity: batch.actualQuantity!, producedDate: now, expiryDate: twoYearsFrom(now), sourceBatchId: batchId,
         });
         await createStockMovement({ movementType: "production_output", productId: batch.productId, lotId: finishedLot.id, batchId, quantity: batch.actualQuantity!, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
         await createAuditLog({ entityType: "lot", entityId: finishedLot.id, action: "finished_lot_created", changes: JSON.stringify({ lotNumber, barcodeValue, productId: batch.productId, quantity: batch.actualQuantity, sourceBatchId: batchId, regenerated: true }) });

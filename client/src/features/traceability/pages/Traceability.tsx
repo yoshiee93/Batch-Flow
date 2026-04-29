@@ -540,6 +540,7 @@ function ForwardTraceView({ trace, materials, products }: {
                             unit: 'KG',
                             producedDate: outputLot.producedDate,
                             sourceBatch: srcBatchUsage ? (srcBatchUsage.batch.batchCode || srcBatchUsage.batch.batchNumber) : undefined,
+                            expiryDate: outputLot.expiryDate,
                           });
                           markLotPrinted.mutate(outputLot.id);
                         }}

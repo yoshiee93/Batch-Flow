@@ -175,9 +175,9 @@ function printFinishedOutputLabel(data: FinishedOutputData): void {
     ${barcodeSection(bc)}
     <div class="details">
       ${rowHtml("Qty:", `${esc(data.quantity)} ${esc(data.unit)}`)}
-      ${rowHtml("Produced:", formatDate(data.producedDate))}
-      ${rowHtml("Batch:", data.sourceBatch ?? "")}
-      ${rowHtml("Expires:", formatDate(data.expiryDate))}
+      ${rowHtml("Production Date:", formatDate(data.producedDate))}
+      ${rowHtml("Batch No:", data.sourceBatch ?? "")}
+      ${rowHtml("Best Before:", formatDate(data.expiryDate))}
     </div>
   </div>`);
 }
