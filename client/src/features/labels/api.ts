@@ -30,10 +30,11 @@ export function parseLabelTemplateSettings(settings: string): LabelTemplateSetti
   }
 }
 
-export function useLabelTemplates() {
+export function useLabelTemplates(options?: { enabled?: boolean }) {
   return useQuery<LabelTemplate[]>({
     queryKey: ["label-templates"],
     queryFn: () => fetchApi("/label-templates"),
+    enabled: options?.enabled !== false,
   });
 }
 

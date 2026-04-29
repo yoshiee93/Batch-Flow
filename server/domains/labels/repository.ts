@@ -1,7 +1,7 @@
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import {
-  labelTemplates,
+  labelTemplates, customers,
   type LabelTemplate, type InsertLabelTemplate,
   type LabelTemplateType,
 } from "@shared/schema";
@@ -31,13 +31,39 @@ export const labelsRepository = {
 
   async getTemplateForContext(labelType: LabelTemplateType, customerId?: string | null): Promise<LabelTemplate | undefined> {
     if (customerId) {
+      // First: check if customer has a defaultLabelTemplateId set
+      const [customer] = await db
+        .select({ defaultLabelTemplateId: customers.defaultLabelTemplateId })
+        .from(customers)
+        .where(eq(customers.id, customerId))
+        .limit(1);
+
+      if (customer?.defaultLabelTemplateId) {
+        const [pinned] = await db
+          .select()
+          .from(labelTemplates)
+          .where(and(
+            eq(labelTemplates.id, customer.defaultLabelTemplateId),
+            eq(labelTemplates.labelType, labelType),
+          ))
+          .limit(1);
+        if (pinned) return pinned;
+      }
+
+      // Second: check for a customer-specific template row matching the type
       const [customerTemplate] = await db
         .select()
         .from(labelTemplates)
-        .where(and(eq(labelTemplates.labelType, labelType), eq(labelTemplates.customerId, customerId), eq(labelTemplates.isDefault, true)))
+        .where(and(
+          eq(labelTemplates.labelType, labelType),
+          eq(labelTemplates.customerId, customerId),
+          eq(labelTemplates.isDefault, true),
+        ))
         .limit(1);
       if (customerTemplate) return customerTemplate;
     }
+
+    // Final fallback: global system default for this type
     return this.getDefaultTemplate(labelType);
   },
 

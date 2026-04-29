@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Loader2, AlertCircle, Pencil, Trash2, Tag, Star } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, Pencil, Trash2, Tag, Star, ShieldOff } from 'lucide-react';
 import {
   useLabelTemplates, useCreateLabelTemplate, useUpdateLabelTemplate, useDeleteLabelTemplate,
   parseLabelTemplateSettings,
@@ -17,6 +17,7 @@ import {
 } from '@/features/labels/api';
 import { useCustomers } from '@/features/customers/api';
 import { useToast } from '@/hooks/use-toast';
+import { useRole } from '@/contexts/AuthContext';
 import type { LabelTemplateSettings } from '@shared/schema';
 
 const LABEL_TYPE_LABELS: Record<LabelTemplateType, string> = {
@@ -65,6 +66,7 @@ const FIELD_LABELS: { key: keyof LabelTemplateSettings; label: string; applicabl
 ];
 
 export default function LabelsPage() {
+  const { role } = useRole();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<LabelTemplate | null>(null);
@@ -150,6 +152,16 @@ export default function LabelsPage() {
       const msg = err instanceof Error ? err.message : "Failed to delete template";
       toast({ title: "Cannot delete", description: msg, variant: "destructive" });
     }
+  }
+
+  if (role !== "admin") {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-muted-foreground">
+        <ShieldOff className="h-12 w-12" />
+        <p className="text-lg font-medium">Admin access required</p>
+        <p className="text-sm">Label templates can only be managed by administrators.</p>
+      </div>
+    );
   }
 
   const visibleFields = FIELD_LABELS.filter(f => f.applicableTo.includes(form.labelType));

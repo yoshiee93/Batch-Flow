@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { z } from "zod";
 import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../lib/authMiddleware";
 import { labelsRepository } from "./repository";
@@ -12,15 +11,20 @@ export const labelsRouter = Router();
 labelsRouter.get("/label-templates", asyncHandler(async (req, res) => {
   const { labelType, customerId } = req.query;
   if (labelType && typeof labelType === "string") {
+    // Template resolution for print — available to all authenticated users
     const type = labelType as "raw_intake" | "finished_output" | "batch";
     const cid = typeof customerId === "string" ? customerId : undefined;
     const template = await labelsRepository.getTemplateForContext(type, cid);
     return res.json(template ?? null);
   }
+  // List all templates — admin only
+  if (!req.session?.userRole || req.session.userRole !== "admin") {
+    return res.status(403).json({ error: "Admin access required" });
+  }
   res.json(await labelsRepository.getAllTemplates());
 }));
 
-labelsRouter.get("/label-templates/:id", asyncHandler(async (req, res) => {
+labelsRouter.get("/label-templates/:id", adminOnly, asyncHandler(async (req, res) => {
   const template = await labelsRepository.getTemplate(req.params.id);
   if (!template) return res.status(404).json({ error: "Template not found" });
   res.json(template);

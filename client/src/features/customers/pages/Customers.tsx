@@ -33,7 +33,7 @@ export default function Customers() {
   const { canManageCustomers } = useRole();
 
   const { data: customers = [], isLoading, isError } = useCustomers();
-  const { data: labelTemplates = [] } = useLabelTemplates();
+  const { data: labelTemplates = [] } = useLabelTemplates({ enabled: canManageCustomers });
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
   const deleteCustomer = useDeleteCustomer();

@@ -34,7 +34,7 @@ export const customers = pgTable("customers", {
   address: text("address"),
   notes: text("notes"),
   active: boolean("active").notNull().default(true),
-  defaultLabelTemplateId: varchar("default_label_template_id"),
+  defaultLabelTemplateId: varchar("default_label_template_id").references(() => labelTemplates.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
