@@ -3,7 +3,7 @@ import { productionRepository as repo } from "./repository";
 import { inventoryRepository, type BatchInputLotEntry, type BatchOutputLotEntry } from "../inventory/repository";
 import { catalogRepository } from "../catalog/repository";
 import { createAuditLog } from "../../lib/auditLog";
-import { generateLotNumber, generateBarcodeValue } from "../../lib/lotUtils";
+import { generateLotNumber, generateBarcodeValue, deriveLotNumber } from "../../lib/lotUtils";
 import { buildBatchCode } from "@shared/batchCodeConfig";
 import {
   batchMaterials, batchOutputs, lots, stockMovements, qualityChecks, auditLogs,
@@ -358,7 +358,8 @@ export const productionService = {
         for (const output of outputs) {
           const existingLots = await repo.getLotsForBatchAndProduct(batchId, output.productId);
           if (existingLots.length === 0) {
-            const lotNumber = await generateLotNumber("FG");
+            const outputProduct = await repo.getProductById(output.productId);
+            const lotNumber = await deriveLotNumber(batch.batchCode, outputProduct?.fruitCode);
             const barcodeValue = await generateBarcodeValue();
             const finishedLot = await repo.insertLot({
               lotNumber,
@@ -388,7 +389,8 @@ export const productionService = {
         if (qty > 0) {
           const existingLots = await repo.getLotsForBatch(batchId);
           if (existingLots.length === 0) {
-            const lotNumber = await generateLotNumber("FG");
+            const primaryProduct = await repo.getProductById(batch.productId);
+            const lotNumber = await deriveLotNumber(batch.batchCode, primaryProduct?.fruitCode);
             const barcodeValue = await generateBarcodeValue();
             const finishedLot = await repo.insertLot({
               lotNumber,

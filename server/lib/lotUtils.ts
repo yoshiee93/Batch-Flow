@@ -3,6 +3,34 @@ import { db } from "../db";
 
 type IdRow = { id: string };
 
+/**
+ * Derives an output lot number from the batch code and the output product's
+ * fruit code.  For example batch "SS3261193" + fruitCode "SW" → "SW3261193".
+ * If the derived number is already taken, appends "-2", "-3", … until free.
+ * Falls back to generateLotNumber("FG") when either value is missing or the
+ * batch code has no recognisable numeric body.
+ */
+export async function deriveLotNumber(
+  batchCode: string | null | undefined,
+  fruitCode: string | null | undefined,
+): Promise<string> {
+  if (batchCode && fruitCode) {
+    const match = batchCode.match(/^[A-Za-z]+(\d.*)$/);
+    if (match) {
+      const body = match[1];
+      const base = `${fruitCode}${body}`;
+      const first = await db.execute(sql`SELECT 1 FROM lots WHERE lot_number = ${base} LIMIT 1`);
+      if (first.rows.length === 0) return base;
+      for (let i = 2; i <= 100; i++) {
+        const candidate = `${base}-${i}`;
+        const check = await db.execute(sql`SELECT 1 FROM lots WHERE lot_number = ${candidate} LIMIT 1`);
+        if (check.rows.length === 0) return candidate;
+      }
+    }
+  }
+  return generateLotNumber("FG");
+}
+
 export async function generateLotNumber(prefix: string = "LOT"): Promise<string> {
   const now = new Date();
   const year = now.getFullYear().toString().slice(-2);
