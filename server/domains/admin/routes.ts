@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, json } from "express";
 import { db } from "../../db";
 import { sql } from "drizzle-orm";
 import {
@@ -66,7 +66,9 @@ adminRouter.get("/admin/export", adminOnly, asyncHandler(async (_req, res) => {
   res.send(JSON.stringify(snapshot, null, 2));
 }));
 
-adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
+const largeJson = json({ limit: "50mb" });
+
+adminRouter.post("/admin/import", adminOnly, largeJson, asyncHandler(async (req, res) => {
   const payload = req.body;
 
   if (!payload || typeof payload !== "object" || payload.version !== 1 || !payload.tables) {
@@ -74,10 +76,14 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
   }
 
   const t = payload.tables;
-  const requiredTables = ["categories", "products", "materials", "lots", "batches"];
-  for (const tbl of requiredTables) {
+  const allTables = [
+    "users", "customers", "categories", "products", "materials", "lots",
+    "recipes", "recipeItems", "batches", "batchMaterials", "batchOutputs",
+    "orders", "orderItems", "qualityChecks", "stockMovements", "auditLogs",
+  ];
+  for (const tbl of allTables) {
     if (!Array.isArray(t[tbl])) {
-      return res.status(400).json({ error: `Missing or invalid table: ${tbl}` });
+      return res.status(400).json({ error: `Missing or invalid table "${tbl}" in backup file. This file may be from an incompatible version.` });
     }
   }
 

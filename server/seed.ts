@@ -19,12 +19,14 @@ async function resetToAdminOnly() {
 }
 
 export async function seedIfEmpty() {
-  if (process.env.NODE_ENV === "production") {
-    console.log("Production environment — skipping destructive seed/reset logic.");
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (isProduction && process.env.RESET_DB === "true") {
+    console.log("RESET_DB=true ignored in production — skipping destructive reset.");
     return;
   }
 
-  if (process.env.RESET_DB === "true") {
+  if (!isProduction && process.env.RESET_DB === "true") {
     console.log("RESET_DB=true — forcing database reset (development only)...");
     await resetToAdminOnly();
     return;
