@@ -87,49 +87,51 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
 
   const currentAdminId = req.session?.userId as string | undefined;
 
-  const currentAdminRecord = currentAdminId
-    ? (await db.select().from(users).where(sql`id = ${currentAdminId}`).limit(1))[0] ?? null
-    : null;
-
   await db.transaction(async (tx) => {
     await tx.execute(sql`
-      TRUNCATE users, customers, categories, products, materials, lots,
+      TRUNCATE customers, categories, products, materials, lots,
         recipes, recipe_items, batches, batch_materials, batch_outputs,
         orders, order_items, quality_checks, stock_movements, audit_logs
       CASCADE
     `);
 
-    if (t.users.length > 0) {
-      await tx.insert(users).values(
-        t.users.map((u: Record<string, unknown>) => ({
-          id: u.id,
-          username: u.username,
-          password: u.password,
-          fullName: (u.fullName ?? u.full_name) as string,
-          role: u.role as "admin" | "production" | "inventory" | "readonly",
-          active: (u.active ?? true) as boolean,
-          createdAt: u.createdAt ? new Date(u.createdAt as string) : u.created_at ? new Date(u.created_at as string) : new Date(),
-        }))
-      );
+    const backupUserIds = new Set(t.users.map((u: Record<string, unknown>) => u.id as string));
+
+    if (backupUserIds.size > 0) {
+      await tx.execute(sql`
+        DELETE FROM users
+        WHERE id NOT IN (${sql.join(
+          [...backupUserIds].map(id => sql`${id}`),
+          sql`, `
+        )})
+        ${currentAdminId ? sql`AND id != ${currentAdminId}` : sql``}
+      `);
+    } else if (currentAdminId) {
+      await tx.execute(sql`DELETE FROM users WHERE id != ${currentAdminId}`);
+    }
+
+    for (const u of t.users as Record<string, unknown>[]) {
+      await tx.execute(sql`
+        INSERT INTO users (id, username, password, full_name, role, active, created_at)
+        VALUES (
+          ${u.id}, ${u.username}, ${u.password},
+          ${(u.fullName ?? u.full_name) as string},
+          ${u.role as string}, ${(u.active ?? true) as boolean},
+          ${u.createdAt ? new Date(u.createdAt as string) : u.created_at ? new Date(u.created_at as string) : new Date()}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          username = EXCLUDED.username,
+          password = EXCLUDED.password,
+          full_name = EXCLUDED.full_name,
+          role = EXCLUDED.role,
+          active = EXCLUDED.active
+      `);
     }
 
     if (currentAdminId) {
-      const adminInBackup = t.users.some((u: Record<string, unknown>) => u.id === currentAdminId);
-      if (!adminInBackup && currentAdminRecord) {
-        await tx.insert(users).values({
-          id: currentAdminRecord.id,
-          username: currentAdminRecord.username,
-          password: currentAdminRecord.password,
-          fullName: currentAdminRecord.fullName,
-          role: "admin",
-          active: true,
-          createdAt: currentAdminRecord.createdAt,
-        });
-      } else {
-        await tx.execute(sql`
-          UPDATE users SET role = 'admin', active = true WHERE id = ${currentAdminId}
-        `);
-      }
+      await tx.execute(sql`
+        UPDATE users SET role = 'admin', active = true WHERE id = ${currentAdminId}
+      `);
     }
 
     if (t.customers?.length) await tx.insert(customers).values(t.customers);
