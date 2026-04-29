@@ -17,7 +17,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  useMaterials, useProducts, useCategories, useLots,
+  useMaterials, useProducts, useCategories, useLots, useBatches,
   useUpdateMaterial, useDeleteMaterial,
   useCreateProduct, useUpdateProduct, useDeleteProduct,
   useReceiveStock, useReceivableItems, useMarkBarcodePrinted,
@@ -89,6 +89,7 @@ export default function Inventory() {
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
   const { data: lots = [], isLoading: lotsLoading } = useLots();
+  const { data: batches = [] } = useBatches();
   const { data: receivableItems = [] } = useReceivableItems();
 
   const updateMaterial = useUpdateMaterial();
@@ -168,6 +169,7 @@ export default function Inventory() {
     const itemName = getLotItemName(lot);
     const unit = getLotUnit(lot);
     if (lot.lotType === 'finished_good' || lot.lotType === 'intermediate') {
+      const srcBatch = lot.sourceBatchId ? batches.find(b => b.id === lot.sourceBatchId) : undefined;
       printBarcodeLabel({
         template: "finished_output",
         lotNumber: lot.lotNumber,
@@ -176,6 +178,7 @@ export default function Inventory() {
         quantity: lot.originalQuantity || lot.quantity,
         unit,
         producedDate: lot.producedDate || lot.receivedDate,
+        sourceBatch: srcBatch?.batchCode || srcBatch?.batchNumber || undefined,
         expiryDate: lot.expiryDate,
       });
     } else {
