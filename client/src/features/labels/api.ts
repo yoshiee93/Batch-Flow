@@ -10,8 +10,9 @@ export interface LabelTemplate {
   labelType: LabelTemplateType;
   customerId: string | null;
   isDefault: boolean;
-  settings: string;
+  settings: LabelTemplateSettings;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface LabelTemplateCreate {
@@ -19,15 +20,15 @@ export interface LabelTemplateCreate {
   labelType: LabelTemplateType;
   customerId?: string | null;
   isDefault?: boolean;
-  settings?: string;
+  settings?: LabelTemplateSettings;
 }
 
-export function parseLabelTemplateSettings(settings: string): LabelTemplateSettings {
-  try {
-    return JSON.parse(settings) as LabelTemplateSettings;
-  } catch {
-    return {};
+export function parseLabelTemplateSettings(settings: LabelTemplateSettings | string | null | undefined): LabelTemplateSettings {
+  if (!settings) return {};
+  if (typeof settings === "string") {
+    try { return JSON.parse(settings) as LabelTemplateSettings; } catch { return {}; }
   }
+  return settings;
 }
 
 export function useLabelTemplates(options?: { enabled?: boolean }) {

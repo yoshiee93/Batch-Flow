@@ -27,15 +27,15 @@ const LABEL_TYPE_LABELS: Record<LabelTemplateType, string> = {
 };
 
 const DEFAULT_SETTINGS: LabelTemplateSettings = {
-  showProductionDate: true,
-  showMadeInAustralia: false,
-  showExpiryDate: true,
-  showBatchCode: true,
   showQuantity: true,
-  showSupplierLot: true,
-  showSource: true,
-  showBarcodeText: true,
-  showReceivedDate: true,
+  showProductionDate: false,
+  showMadeInAustralia: false,
+  showExpiryDate: false,
+  showBatchCode: false,
+  showSupplierLot: false,
+  showSource: false,
+  showBarcodeText: false,
+  showReceivedDate: false,
 };
 
 interface TemplateFormData {
@@ -56,6 +56,7 @@ const EMPTY_FORM: TemplateFormData = {
 
 const FIELD_LABELS: { key: keyof LabelTemplateSettings; label: string; applicableTo: LabelTemplateType[] }[] = [
   { key: 'showQuantity', label: 'Quantity', applicableTo: ['raw_intake', 'finished_output', 'batch'] },
+  { key: 'showBarcodeText', label: 'Barcode Number Text (below barcode)', applicableTo: ['raw_intake', 'finished_output', 'batch'] },
   { key: 'showProductionDate', label: 'Production Date', applicableTo: ['finished_output', 'batch'] },
   { key: 'showReceivedDate', label: 'Received Date', applicableTo: ['raw_intake'] },
   { key: 'showExpiryDate', label: 'Expiry / Best Before', applicableTo: ['raw_intake', 'finished_output'] },
@@ -115,7 +116,7 @@ export default function LabelsPage() {
         labelType: form.labelType,
         customerId: form.customerId || null,
         isDefault: form.isDefault,
-        settings: JSON.stringify(form.settings),
+        settings: form.settings,
       });
       toast({ title: "Template created", description: `"${form.name}" has been created` });
       setIsCreateOpen(false);
@@ -134,7 +135,7 @@ export default function LabelsPage() {
         labelType: form.labelType,
         customerId: form.customerId || null,
         isDefault: form.isDefault,
-        settings: JSON.stringify(form.settings),
+        settings: form.settings,
       });
       toast({ title: "Template updated", description: `"${form.name}" has been saved` });
       setIsEditOpen(false);

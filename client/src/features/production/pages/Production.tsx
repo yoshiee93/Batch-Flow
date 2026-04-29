@@ -963,6 +963,7 @@ function BatchMaterialsEditor({
   const [editQuantity, setEditQuantity] = useState('');
   
   const { data: batchMaterials = [], isLoading } = useBatchMaterials(batchId);
+  const { data: products = [] } = useProducts();
   const removeBatchMaterial = useRemoveBatchMaterial();
   const updateBatchMaterial = useUpdateBatchMaterial();
   const { toast } = useToast();

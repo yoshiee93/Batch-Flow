@@ -10,7 +10,7 @@ import {
   Barcode, Printer, Package, ChevronRight
 } from 'lucide-react';
 import {
-  useLots, useBatches, useMaterials, useProducts,
+  useLots, useBatches, useBatch, useMaterials, useProducts,
   useTraceabilityForward, useTraceabilityBackward,
   fetchLotByBarcode, fetchBatchByBarcode,
   useBatchOutputLots, useMarkBatchBarcodePrinted, useMarkBarcodePrinted,

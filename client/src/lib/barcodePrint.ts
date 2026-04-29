@@ -64,15 +64,15 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
-function generateBarcodeSvg(value: string): string {
+function generateBarcodeSvg(value: string, displayValue = true): string {
   const svgNs = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNs, "svg");
   try {
     JsBarcode(svg, value, {
       format: "CODE128",
       width: 2,
-      height: 60,
-      displayValue: true,
+      height: displayValue ? 60 : 72,
+      displayValue,
       fontSize: 13,
       margin: 4,
       background: "#ffffff",
@@ -145,8 +145,8 @@ function rowHtml(key: string, val: string): string {
     : "";
 }
 
-function barcodeSection(value: string): string {
-  const svg = generateBarcodeSvg(value);
+function barcodeSection(value: string, displayValue = true): string {
+  const svg = generateBarcodeSvg(value, displayValue);
   return svg
     ? `<div class="barcode-wrap">${svg}</div>`
     : `<div style="font-size:12px;text-align:center;padding:8px;border:1px dashed #ccc;margin:6px 0;">Barcode: ${esc(value)}</div>`;
@@ -164,7 +164,7 @@ function printRawIntakeLabel(data: RawIntakeData): void {
     <span class="label-type">Raw Intake</span>
     <div class="lot-number">${esc(data.lotNumber)}</div>
     <div class="item-name">${esc(data.itemName)}</div>
-    ${barcodeSection(bc)}
+    ${barcodeSection(bc, show(s?.showBarcodeText))}
     <div class="details">
       ${show(s?.showQuantity) ? rowHtml("Qty:", `${esc(data.quantity)} ${esc(data.unit)}`) : ""}
       ${show(s?.showReceivedDate) ? rowHtml("Received:", formatDate(data.receivedDate)) : ""}
@@ -184,7 +184,7 @@ function printFinishedOutputLabel(data: FinishedOutputData): void {
     <span class="label-type">Finished Output</span>
     <div class="lot-number">${esc(data.lotNumber)}</div>
     <div class="item-name">${esc(data.productName)}</div>
-    ${barcodeSection(bc)}
+    ${barcodeSection(bc, show(s?.showBarcodeText))}
     <div class="details">
       ${show(s?.showQuantity) ? rowHtml("Qty:", `${esc(data.quantity)} ${esc(data.unit)}`) : ""}
       ${show(s?.showProductionDate) ? rowHtml("Production Date:", formatDate(data.producedDate)) : ""}
@@ -206,7 +206,7 @@ function printBatchLabel(data: BatchLabelData): void {
     <span class="label-type">Batch</span>
     <div class="lot-number">${esc(data.batchCode)}</div>
     <div class="item-name">${esc(data.productName)}</div>
-    ${barcodeSection(bc)}
+    ${barcodeSection(bc, show(s?.showBarcodeText))}
     <div class="details">
       ${show(s?.showQuantity) && data.quantity ? rowHtml("Qty:", `${esc(data.quantity)} ${esc(data.unit ?? 'KG')}`) : ""}
       ${show(s?.showProductionDate) ? rowHtml("Date:", formatDate(data.productionDate)) : ""}

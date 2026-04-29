@@ -87,7 +87,7 @@ export const labelsRepository = {
       .from(labelTemplates)
       .where(and(eq(labelTemplates.isDefault, true), isNull(labelTemplates.customerId)));
     const existingTypes = new Set(allDefaults.map(t => t.labelType));
-    const allSettings = JSON.stringify({
+    const allSettings = {
       showProductionDate: true,
       showMadeInAustralia: true,
       showExpiryDate: true,
@@ -97,7 +97,7 @@ export const labelsRepository = {
       showSource: true,
       showBarcodeText: true,
       showReceivedDate: true,
-    });
+    };
     const toCreate: InsertLabelTemplate[] = [];
     if (!existingTypes.has("raw_intake")) {
       toCreate.push({ name: "Default Raw Intake", labelType: "raw_intake", isDefault: true, settings: allSettings });

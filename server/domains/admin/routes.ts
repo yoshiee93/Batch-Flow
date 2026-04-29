@@ -101,7 +101,7 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
       await tx.execute(sql`
         DELETE FROM users
         WHERE id NOT IN (${sql.join(
-          [...backupUserIds].map(id => sql`${id}`),
+          Array.from(backupUserIds).map(id => sql`${id}`),
           sql`, `
         )})
         ${currentAdminId ? sql`AND id != ${currentAdminId}` : sql``}
