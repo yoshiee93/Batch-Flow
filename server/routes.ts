@@ -10,6 +10,7 @@ import { traceabilityRouter } from "./domains/traceability/routes";
 import { qualityRouter } from "./domains/quality/routes";
 import { customersRouter } from "./domains/customers/routes";
 import { dashboardRouter } from "./domains/dashboard/routes";
+import { adminRouter } from "./domains/admin/routes";
 import { requireAuth } from "./lib/authMiddleware";
 
 export async function registerRoutes(
@@ -27,6 +28,7 @@ export async function registerRoutes(
   app.use("/api", qualityRouter);
   app.use("/api", customersRouter);
   app.use("/api", dashboardRouter);
+  app.use("/api", adminRouter);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error("API Error:", err);

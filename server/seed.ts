@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, materials } from "@shared/schema";
 import { sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
@@ -19,13 +19,22 @@ async function resetToAdminOnly() {
 }
 
 export async function seedIfEmpty() {
+  if (process.env.NODE_ENV === "production") {
+    console.log("Production environment — skipping destructive seed/reset logic.");
+    return;
+  }
+
   if (process.env.RESET_DB === "true") {
-    console.log("RESET_DB=true — forcing database reset...");
+    console.log("RESET_DB=true — forcing database reset (development only)...");
     await resetToAdminOnly();
     return;
   }
-  const existing = await db.select().from(users).limit(1);
-  if (existing.length === 0) {
+
+  const existingUsers = await db.select().from(users).limit(1);
+  const existingMaterials = await db.select().from(materials).limit(1);
+
+  if (existingUsers.length === 0 && existingMaterials.length === 0) {
+    console.log("Fresh install detected (no users, no materials) — seeding admin account...");
     await resetToAdminOnly();
   }
 }

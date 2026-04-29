@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList, Leaf } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList, Leaf, Database, Download, Upload, ShieldAlert } from 'lucide-react';
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useProducts, useUpdateProduct, type Category, type Product } from '@/features/catalog/api';
 import { PROCESS_CODE_MAP, FRUIT_CODE_MAP } from '@shared/batchCodeConfig';
 import { useToast } from '@/hooks/use-toast';
@@ -31,7 +31,12 @@ export default function Settings() {
   const [fruitCodeInput, setFruitCodeInput] = useState('');
   const [fruitCodeIsReceivable, setFruitCodeIsReceivable] = useState(false);
 
-  const { canManageSettings } = useRole();
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+
+  const { canManageSettings, isAdmin } = useRole();
 
   const { data: categories = [], isLoading, isError } = useCategories();
   const { data: products = [] } = useProducts();
@@ -62,6 +67,62 @@ export default function Settings() {
       setSelectedProduct(null);
     } catch {
       toast({ title: "Error", description: "Failed to update product", variant: "destructive" });
+    }
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const res = await fetch('/api/admin/export', { credentials: 'include' });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = new Date().toISOString().split('T')[0];
+      a.href = url;
+      a.download = `cleartrace-export-${date}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: 'Export complete', description: 'Database snapshot downloaded successfully.' });
+    } catch {
+      toast({ title: 'Export failed', description: 'Could not export database.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingImportFile(file);
+    setIsImportConfirmOpen(true);
+    e.target.value = '';
+  };
+
+  const handleImportConfirm = async () => {
+    if (!pendingImportFile) return;
+    setIsImportConfirmOpen(false);
+    setIsImporting(true);
+    try {
+      const text = await pendingImportFile.text();
+      const payload = JSON.parse(text);
+      const res = await fetch('/api/admin/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+      toast({ title: 'Import complete', description: 'Database restored successfully from backup.' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Import failed';
+      toast({ title: 'Import failed', description: message, variant: 'destructive' });
+    } finally {
+      setIsImporting(false);
+      setPendingImportFile(null);
     }
   };
 
@@ -382,6 +443,104 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Data Management
+            </CardTitle>
+            <CardDescription>
+              Export a full backup of all database records, or restore from a previously exported file.
+              These actions affect all data across the entire system.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 rounded-lg border p-4 space-y-2">
+                <div className="flex items-center gap-2 font-medium">
+                  <Download className="h-4 w-4 text-primary" />
+                  Export Database
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Downloads a complete JSON snapshot of all tables — materials, products, batches, lots, orders, recipes, and more.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  data-testid="button-export-database"
+                >
+                  {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+                  {isExporting ? 'Exporting...' : 'Download Backup'}
+                </Button>
+              </div>
+
+              <div className="flex-1 rounded-lg border border-destructive/30 p-4 space-y-2">
+                <div className="flex items-center gap-2 font-medium">
+                  <Upload className="h-4 w-4 text-destructive" />
+                  Import / Restore
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Restore the database from a backup file. <span className="text-destructive font-medium">This will overwrite all existing data.</span>
+                </p>
+                <label>
+                  <Button
+                    variant="outline"
+                    className="border-destructive/50 text-destructive hover:bg-destructive/10 cursor-pointer"
+                    disabled={isImporting}
+                    asChild
+                    data-testid="button-import-database"
+                  >
+                    <span>
+                      {isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                      {isImporting ? 'Restoring...' : 'Restore from Backup'}
+                      <input
+                        type="file"
+                        accept=".json"
+                        className="hidden"
+                        onChange={handleImportFileSelect}
+                        data-testid="input-import-file"
+                      />
+                    </span>
+                  </Button>
+                </label>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <ShieldAlert className="h-5 w-5" />
+              Confirm Database Restore
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>You are about to restore the database from <strong>{pendingImportFile?.name}</strong>.</p>
+                <p className="text-destructive font-medium">This will permanently overwrite ALL existing data in the system, including batches, lots, orders, inventory, and users.</p>
+                <p>This action cannot be undone. Make sure you have a current backup before proceeding.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-import" onClick={() => setPendingImportFile(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={handleImportConfirm}
+              data-testid="button-confirm-import"
+            >
+              Yes, Overwrite Everything
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={isFruitCodeDialogOpen} onOpenChange={setIsFruitCodeDialogOpen}>
         <DialogContent>
