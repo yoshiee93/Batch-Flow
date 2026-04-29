@@ -106,11 +106,11 @@ export const inventoryRepository = {
     return row;
   },
 
-  async getReceivableItems(): Promise<Array<{ id: string; name: string; sku: string; unit: string; itemType: "material" | "product" }>> {
-    const mats = await db.select({ id: materials.id, name: materials.name, sku: materials.sku, unit: materials.unit })
+  async getReceivableItems(): Promise<Array<{ id: string; name: string; sku: string; unit: string; itemType: "material" | "product"; categoryId: string | null }>> {
+    const mats = await db.select({ id: materials.id, name: materials.name, sku: materials.sku, unit: materials.unit, categoryId: materials.categoryId })
       .from(materials)
       .where(and(eq(materials.isReceivable, true), eq(materials.active, true)));
-    const prods = await db.select({ id: products.id, name: products.name, sku: products.sku, unit: products.unit })
+    const prods = await db.select({ id: products.id, name: products.name, sku: products.sku, unit: products.unit, categoryId: products.categoryId })
       .from(products)
       .where(and(eq(products.isReceivable, true), eq(products.active, true)));
     return [

@@ -83,6 +83,7 @@ export default function Inventory() {
   const [receiveForm, setReceiveForm] = useState(EMPTY_RECEIVE_FORM);
   const [receivedLot, setReceivedLot] = useState<LotWithDetails | null>(null);
   const [itemSearchOpen, setItemSearchOpen] = useState(false);
+  const [receiveCategoryFilter, setReceiveCategoryFilter] = useState<string>('all');
 
   const { canReceiveStock, canManageSettings } = useRole();
 
@@ -341,6 +342,7 @@ export default function Inventory() {
   const handleOpenReceive = () => {
     setReceiveForm(EMPTY_RECEIVE_FORM);
     setReceivedLot(null);
+    setReceiveCategoryFilter('all');
     setIsReceiveStockOpen(true);
   };
 
@@ -348,6 +350,7 @@ export default function Inventory() {
     setIsReceiveStockOpen(false);
     setReceivedLot(null);
     setReceiveForm(EMPTY_RECEIVE_FORM);
+    setReceiveCategoryFilter('all');
   };
 
   if (isLoading) {
@@ -799,54 +802,111 @@ export default function Inventory() {
                   <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
                     No receivable items configured. Mark materials or products as receivable in their settings.
                   </p>
-                ) : (
-                  <Popover open={itemSearchOpen} onOpenChange={setItemSearchOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between font-normal"
-                        data-testid="select-receive-item"
-                      >
-                        {selectedReceiveItem ? (
-                          <span className="flex items-center gap-2">
-                            {selectedReceiveItem.name}
-                            <Badge variant="outline" className={`text-xs ${selectedReceiveItem.itemType === 'product' ? 'text-blue-600 border-blue-200' : ''}`}>
-                              {selectedReceiveItem.itemType === 'product' ? 'Product' : 'Material'}
-                            </Badge>
-                          </span>
-                        ) : 'Select item...'}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search items..." />
-                        <CommandList>
-                          <CommandEmpty>No item found.</CommandEmpty>
-                          <CommandGroup>
-                            {receivableItems.map((item: ReceivableItem) => (
-                              <CommandItem
-                                key={item.id}
-                                value={`${item.sku} ${item.name} ${item.itemType}`}
-                                onSelect={() => {
-                                  setReceiveForm({ ...receiveForm, itemId: item.id, itemType: item.itemType });
-                                  setItemSearchOpen(false);
-                                }}
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", receiveForm.itemId === item.id ? "opacity-100" : "opacity-0")} />
-                                <span className="flex-1">{item.sku ? `${item.sku} — ` : ''}{item.name} ({item.unit})</span>
-                                <Badge variant="outline" className={`ml-2 text-xs ${item.itemType === 'product' ? 'text-blue-600 border-blue-200' : ''}`}>
-                                  {item.itemType === 'product' ? 'Prod.' : 'Mat.'}
-                                </Badge>
-                              </CommandItem>
+                ) : (() => {
+                  const receivableCategories = categories.filter(c =>
+                    receivableItems.some(i => i.categoryId === c.id)
+                  );
+                  const hasUncategorised = receivableItems.some(i => !i.categoryId);
+                  const filteredItems = receiveCategoryFilter === 'all'
+                    ? receivableItems
+                    : receiveCategoryFilter === 'uncategorised'
+                      ? receivableItems.filter(i => !i.categoryId)
+                      : receivableItems.filter(i => i.categoryId === receiveCategoryFilter);
+
+                  const buildGroups = () => {
+                    if (receiveCategoryFilter !== 'all') {
+                      return [{ label: null, items: filteredItems }];
+                    }
+                    const groups: { label: string | null; items: typeof receivableItems }[] = [];
+                    for (const cat of receivableCategories) {
+                      const catItems = receivableItems.filter(i => i.categoryId === cat.id);
+                      if (catItems.length > 0) groups.push({ label: cat.name, items: catItems });
+                    }
+                    if (hasUncategorised) {
+                      const uncatItems = receivableItems.filter(i => !i.categoryId);
+                      if (uncatItems.length > 0) groups.push({ label: 'Uncategorised', items: uncatItems });
+                    }
+                    return groups.length > 0 ? groups : [{ label: null, items: receivableItems }];
+                  };
+
+                  return (
+                    <div className="space-y-2">
+                      {(receivableCategories.length > 0 || hasUncategorised) && (
+                        <Select value={receiveCategoryFilter} onValueChange={(v) => {
+                          setReceiveCategoryFilter(v);
+                          if (receiveForm.itemId) {
+                            const stillVisible = (v === 'all'
+                              ? receivableItems
+                              : v === 'uncategorised'
+                                ? receivableItems.filter(i => !i.categoryId)
+                                : receivableItems.filter(i => i.categoryId === v)
+                            ).some(i => i.id === receiveForm.itemId);
+                            if (!stillVisible) setReceiveForm({ ...receiveForm, itemId: '', itemType: '' as '' | 'material' | 'product' });
+                          }
+                        }}>
+                          <SelectTrigger data-testid="select-receive-category-filter">
+                            <SelectValue placeholder="All categories" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All categories</SelectItem>
+                            {receivableCategories.map(c => (
+                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                             ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                )}
+                            {hasUncategorised && <SelectItem value="uncategorised">Uncategorised</SelectItem>}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <Popover open={itemSearchOpen} onOpenChange={setItemSearchOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between font-normal"
+                            data-testid="select-receive-item"
+                          >
+                            {selectedReceiveItem ? (
+                              <span className="flex items-center gap-2">
+                                {selectedReceiveItem.name}
+                                <Badge variant="outline" className={`text-xs ${selectedReceiveItem.itemType === 'product' ? 'text-blue-600 border-blue-200' : ''}`}>
+                                  {selectedReceiveItem.itemType === 'product' ? 'Product' : 'Material'}
+                                </Badge>
+                              </span>
+                            ) : 'Select item...'}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search items..." />
+                            <CommandList>
+                              <CommandEmpty>No item found.</CommandEmpty>
+                              {buildGroups().map((group, gi) => (
+                                <CommandGroup key={gi} heading={group.label ?? undefined}>
+                                  {group.items.map((item: ReceivableItem) => (
+                                    <CommandItem
+                                      key={item.id}
+                                      value={`${item.sku} ${item.name} ${item.itemType}`}
+                                      onSelect={() => {
+                                        setReceiveForm({ ...receiveForm, itemId: item.id, itemType: item.itemType });
+                                        setItemSearchOpen(false);
+                                      }}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", receiveForm.itemId === item.id ? "opacity-100" : "opacity-0")} />
+                                      <span className="flex-1">{item.sku ? `${item.sku} — ` : ''}{item.name} ({item.unit})</span>
+                                      <Badge variant="outline" className={`ml-2 text-xs ${item.itemType === 'product' ? 'text-blue-600 border-blue-200' : ''}`}>
+                                        {item.itemType === 'product' ? 'Prod.' : 'Mat.'}
+                                      </Badge>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              ))}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

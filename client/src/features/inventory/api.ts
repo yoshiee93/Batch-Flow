@@ -125,6 +125,7 @@ export interface ReceivableItem {
   sku: string;
   unit: string;
   itemType: "material" | "product";
+  categoryId: string | null;
 }
 
 export function useReceivableItems() {
