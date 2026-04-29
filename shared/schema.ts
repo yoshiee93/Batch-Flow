@@ -121,6 +121,7 @@ export const lots = pgTable("lots", {
   receivedDate: timestamp("received_date").notNull().defaultNow(),
   producedDate: timestamp("produced_date"),
   sourceBatchId: varchar("source_batch_id"),
+  customerId: varchar("customer_id").references(() => customers.id),
   barcodePrintedAt: timestamp("barcode_printed_at"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

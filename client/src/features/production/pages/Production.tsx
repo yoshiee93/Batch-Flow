@@ -1435,8 +1435,6 @@ function BatchOutputsEditor({
   const markLotPrinted = useMarkBarcodePrinted();
   const markBatchPrinted = useMarkBatchBarcodePrinted();
   const { data: batchData } = useBatch(isCompleted ? batchId : '');
-  const { data: batchTemplate } = useLabelTemplate('batch');
-  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
   
   useEffect(() => {
     setWasteQuantity(initialWaste);
@@ -1447,6 +1445,9 @@ function BatchOutputsEditor({
   
   const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
   const { data: outputLots = [], isLoading: outputLotsLoading } = useBatchOutputLots(batchId, { enabled: isCompleted });
+  const batchCustomerId = outputLots[0]?.customerId ?? null;
+  const { data: batchTemplate } = useLabelTemplate('batch', batchCustomerId);
+  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output', batchCustomerId);
   const { data: allProducts = [] } = useProducts();
   const { data: allCategories = [] } = useCategories();
   const addBatchOutput = useAddBatchOutput();

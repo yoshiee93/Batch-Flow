@@ -292,8 +292,8 @@ function ForwardTraceView({ trace, materials, products }: {
   const markLotPrinted = useMarkBarcodePrinted();
   const isProducedLot = lotType === 'finished_good' || lotType === 'intermediate';
   const { data: sourceBatchData } = useBatch(isProducedLot && lot.sourceBatchId ? lot.sourceBatchId : '');
-  const { data: rawIntakeTemplate } = useLabelTemplate('raw_intake');
-  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
+  const { data: rawIntakeTemplate } = useLabelTemplate('raw_intake', lot.customerId);
+  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output', lot.customerId);
 
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
@@ -571,8 +571,9 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
   const { data: outputLots = [], isLoading: outputsLoading } = useBatchOutputLots(batchId);
   const markBatchPrinted = useMarkBatchBarcodePrinted();
   const markLotPrinted = useMarkBarcodePrinted();
-  const { data: batchTemplate } = useLabelTemplate('batch');
-  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
+  const batchCustomerId = outputLots[0]?.customerId ?? null;
+  const { data: batchTemplate } = useLabelTemplate('batch', batchCustomerId);
+  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output', batchCustomerId);
 
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">

@@ -23,6 +23,7 @@ export interface Lot {
   receivedDate: string;
   producedDate: string | null;
   sourceBatchId: string | null;
+  customerId: string | null;
   barcodePrintedAt: string | null;
   notes: string | null;
   createdAt: string;
@@ -69,6 +70,7 @@ export interface OutputLot {
   producedDate: string | null;
   expiryDate: string | null;
   barcodePrintedAt: string | null;
+  customerId: string | null;
 }
 
 export interface StockMovement {

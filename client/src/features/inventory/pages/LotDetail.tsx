@@ -84,8 +84,8 @@ export default function LotDetail() {
   const { data: usage = [], isLoading: usageLoading } = useLotUsage(id!);
   const { data: lineage, isLoading: lineageLoading } = useLotLineage(id!);
   const { data: sourceBatch } = useBatch(lot?.sourceBatchId || '');
-  const { data: rawIntakeTemplate } = useLabelTemplate('raw_intake');
-  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
+  const { data: rawIntakeTemplate } = useLabelTemplate('raw_intake', lot?.customerId);
+  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output', lot?.customerId);
 
   if (lotLoading) {
     return (

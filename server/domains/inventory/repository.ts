@@ -51,6 +51,7 @@ export type BatchOutputLotEntry = {
   producedDate: Date | null;
   expiryDate: Date | null;
   barcodePrintedAt: Date | null;
+  customerId: string | null;
 };
 
 export const inventoryRepository = {
@@ -226,6 +227,7 @@ export const inventoryRepository = {
       producedDate: row.lot.producedDate,
       expiryDate: row.lot.expiryDate,
       barcodePrintedAt: row.lot.barcodePrintedAt,
+      customerId: row.lot.customerId ?? null,
     }));
   },
 

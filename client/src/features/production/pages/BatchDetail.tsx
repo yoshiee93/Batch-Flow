@@ -84,8 +84,9 @@ export default function BatchDetail() {
   const markBatchBarcodePrinted = useMarkBatchBarcodePrinted();
   const markLotBarcodePrinted = useMarkBarcodePrinted();
   const updateBatch = useUpdateBatch();
-  const { data: batchTemplate } = useLabelTemplate('batch');
-  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
+  const batchCustomerId = outputLots[0]?.customerId ?? null;
+  const { data: batchTemplate } = useLabelTemplate('batch', batchCustomerId);
+  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output', batchCustomerId);
   const createQualityCheck = useCreateQualityCheck();
 
   const [showQcForm, setShowQcForm] = useState(false);

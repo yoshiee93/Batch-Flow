@@ -237,6 +237,27 @@ export default function Customers() {
                   data-testid="input-customer-notes"
                 />
               </div>
+              {labelTemplates.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="create-label-template">Default Label Template</Label>
+                  <Select
+                    value={formData.defaultLabelTemplateId || 'none'}
+                    onValueChange={(val) => setFormData({ ...formData, defaultLabelTemplateId: val === 'none' ? '' : val })}
+                  >
+                    <SelectTrigger id="create-label-template" data-testid="select-create-customer-label-template">
+                      <SelectValue placeholder="Use system default" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Use system default</SelectItem>
+                      {labelTemplates.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name} ({t.labelType.replace(/_/g, ' ')})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setIsCreateDialogOpen(false); resetForm(); }}>Cancel</Button>

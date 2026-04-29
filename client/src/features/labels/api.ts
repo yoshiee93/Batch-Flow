@@ -50,6 +50,16 @@ export function useLabelTemplate(labelType: LabelTemplateType, customerId?: stri
   });
 }
 
+export async function fetchLabelTemplate(labelType: LabelTemplateType, customerId?: string | null): Promise<LabelTemplate | null> {
+  const params = new URLSearchParams({ labelType });
+  if (customerId) params.set("customerId", customerId);
+  try {
+    return await fetchApi(`/label-templates?${params.toString()}`);
+  } catch {
+    return null;
+  }
+}
+
 export function useCreateLabelTemplate() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -27,7 +27,7 @@ const LABEL_TYPE_LABELS: Record<LabelTemplateType, string> = {
 };
 
 const DEFAULT_SETTINGS: LabelTemplateSettings = {
-  showQuantity: true,
+  showQuantity: false,
   showProductionDate: false,
   showMadeInAustralia: false,
   showExpiryDate: false,

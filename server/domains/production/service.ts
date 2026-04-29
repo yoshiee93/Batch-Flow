@@ -353,6 +353,7 @@ export const productionService = {
 
     if (markCompleted) {
       const now = new Date();
+
       if (outputs.length > 0) {
         for (const output of outputs) {
           const existingLots = await repo.getLotsForBatchAndProduct(batchId, output.productId);

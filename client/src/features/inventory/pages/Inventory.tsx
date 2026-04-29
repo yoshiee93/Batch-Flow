@@ -24,7 +24,7 @@ import {
   type Material, type Product, type Category, type Lot, type LotWithDetails, type ReceivableItem,
 } from '@/lib/api';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
-import { useLabelTemplate, parseLabelTemplateSettings } from '@/features/labels/api';
+import { fetchLabelTemplate, parseLabelTemplateSettings } from '@/features/labels/api';
 import { useToast } from '@/hooks/use-toast';
 import { useRole } from '@/contexts/AuthContext';
 
@@ -100,8 +100,6 @@ export default function Inventory() {
   const deleteProduct = useDeleteProduct();
   const receiveStock = useReceiveStock();
   const markBarcodePrinted = useMarkBarcodePrinted();
-  const { data: rawIntakeTemplate } = useLabelTemplate('raw_intake');
-  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
   const { toast } = useToast();
 
   const isLoading = materialsLoading || productsLoading || lotsLoading;
@@ -168,11 +166,12 @@ export default function Inventory() {
     return 'KG';
   }
 
-  function handlePrintLabel(lot: Lot) {
+  async function handlePrintLabel(lot: Lot) {
     const itemName = getLotItemName(lot);
     const unit = getLotUnit(lot);
     if (lot.lotType === 'finished_good' || lot.lotType === 'intermediate') {
       const srcBatch = lot.sourceBatchId ? batches.find(b => b.id === lot.sourceBatchId) : undefined;
+      const tmpl = await fetchLabelTemplate('finished_output', lot.customerId);
       printBarcodeLabel({
         template: "finished_output",
         lotNumber: lot.lotNumber,
@@ -183,9 +182,10 @@ export default function Inventory() {
         producedDate: lot.producedDate || lot.receivedDate,
         sourceBatch: srcBatch?.batchCode || srcBatch?.batchNumber || 'N/A',
         expiryDate: lot.expiryDate,
-        templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
+        templateSettings: tmpl ? parseLabelTemplateSettings(tmpl.settings) : undefined,
       });
     } else {
+      const tmpl = await fetchLabelTemplate('raw_intake', lot.customerId);
       printBarcodeLabel({
         template: "raw_intake",
         lotNumber: lot.lotNumber,
@@ -197,7 +197,7 @@ export default function Inventory() {
         receivedDate: lot.receivedDate,
         expiryDate: lot.expiryDate,
         supplierLot: lot.supplierLot,
-        templateSettings: rawIntakeTemplate ? parseLabelTemplateSettings(rawIntakeTemplate.settings) : undefined,
+        templateSettings: tmpl ? parseLabelTemplateSettings(tmpl.settings) : undefined,
       });
     }
     if (!lot.barcodePrintedAt) {
