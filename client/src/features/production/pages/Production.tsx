@@ -1014,6 +1014,9 @@ function BatchMaterialsEditor({
         <div className="space-y-2 max-h-[300px] overflow-y-auto">
           {batchMaterials.map((bm) => {
             const material = materials.find(m => m.id === bm.materialId);
+            const inputProduct = !bm.materialId ? products.find(p => p.id === bm.productId) : null;
+            const inputName = material?.name || inputProduct?.name || 'Unknown';
+            const inputSku = material?.sku || inputProduct?.sku;
             const lot = lots.find(l => l.id === bm.lotId);
             const isEditing = editingMaterial?.id === bm.id;
             
@@ -1024,11 +1027,11 @@ function BatchMaterialsEditor({
                 data-testid={`edit-batch-material-${bm.id}`}
               >
                 <div className="flex-1">
-                  <div className="font-medium text-sm">{material?.name || 'Unknown Material'}</div>
+                  <div className="font-medium text-sm">{inputName}</div>
                   <div className="text-xs text-muted-foreground">
-                    <span className="font-mono">{material?.sku}</span>
-                    <span className="mx-2">•</span>
-                    <span>Lot: {lot?.lotNumber || 'Unknown'}</span>
+                    {inputSku && <span className="font-mono">{inputSku}</span>}
+                    {inputSku && <span className="mx-2">•</span>}
+                    <span>Lot: {lot?.lotNumber || (bm.productId ? 'Product input' : 'Unknown')}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1291,11 +1294,14 @@ function BatchCard({
                   <div className="space-y-2">
                     {batchMaterials.map((bm) => {
                       const material = materials.find(m => m.id === bm.materialId);
+                      const inputProduct = !bm.materialId ? products.find(p => p.id === bm.productId) : null;
+                      const inputName = material?.name || inputProduct?.name || 'Unknown';
+                      const inputSku = material?.sku || inputProduct?.sku;
                       return (
                         <div key={bm.id} className="flex items-center justify-between p-2 bg-background rounded border text-sm" data-testid={`batch-material-${bm.id}`}>
                           <div>
-                            <span className="font-medium">{material?.name || 'Unknown'}</span>
-                            <span className="text-muted-foreground text-xs ml-2">({material?.sku})</span>
+                            <span className="font-medium">{inputName}</span>
+                            {inputSku && <span className="text-muted-foreground text-xs ml-2">({inputSku})</span>}
                           </div>
                           <span className="font-mono text-blue-600">{parseFloat(bm.quantity).toFixed(2)} KG</span>
                         </div>
