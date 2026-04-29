@@ -84,6 +84,7 @@ export default function Inventory() {
   const [receivedLot, setReceivedLot] = useState<LotWithDetails | null>(null);
   const [itemSearchOpen, setItemSearchOpen] = useState(false);
   const [receiveCategoryFilter, setReceiveCategoryFilter] = useState<string>('all');
+  const [receivedTemplateName, setReceivedTemplateName] = useState<string | null>(null);
 
   const { canReceiveStock, canManageSettings } = useRole();
 
@@ -333,15 +334,42 @@ export default function Inventory() {
         ...(receiveForm.itemType === 'material' ? { materialName: itemName } : { productName: itemName }),
       };
       setReceivedLot(lotWithDetails);
+      setReceivedTemplateName(null);
+      fetchLabelTemplate('raw_intake', null).then(tmpl => {
+        setReceivedTemplateName(tmpl ? tmpl.name : null);
+      });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Failed to receive stock';
       toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
 
+  async function handlePrintReceivedLot(lot: LotWithDetails) {
+    const itemName = lot.materialName || lot.productName || getLotItemName(lot as Lot);
+    const unit = getLotUnit(lot as Lot);
+    const tmpl = await fetchLabelTemplate('raw_intake', null);
+    printBarcodeLabel({
+      template: 'raw_intake',
+      lotNumber: lot.lotNumber,
+      barcodeValue: lot.barcodeValue,
+      itemName,
+      quantity: lot.originalQuantity || lot.quantity,
+      unit,
+      sourceLabel: lot.supplierName || lot.sourceName || undefined,
+      receivedDate: lot.receivedDate,
+      expiryDate: lot.expiryDate,
+      supplierLot: lot.supplierLot,
+      templateSettings: tmpl ? parseLabelTemplateSettings(tmpl.settings) : undefined,
+    });
+    if (!lot.barcodePrintedAt) {
+      markBarcodePrinted.mutate(lot.id);
+    }
+  }
+
   const handleOpenReceive = () => {
     setReceiveForm(EMPTY_RECEIVE_FORM);
     setReceivedLot(null);
+    setReceivedTemplateName(null);
     setReceiveCategoryFilter('all');
     setIsReceiveStockOpen(true);
   };
@@ -349,6 +377,7 @@ export default function Inventory() {
   const handleCloseReceive = () => {
     setIsReceiveStockOpen(false);
     setReceivedLot(null);
+    setReceivedTemplateName(null);
     setReceiveForm(EMPTY_RECEIVE_FORM);
     setReceiveCategoryFilter('all');
   };
@@ -773,11 +802,17 @@ export default function Inventory() {
                     <span className="text-sm text-muted-foreground">Barcode</span>
                     <span className="font-mono text-sm text-muted-foreground">{receivedLot.barcodeValue}</span>
                   </div>
+                  <div className="flex justify-between items-center mt-2 pt-2 border-t">
+                    <span className="text-sm text-muted-foreground">Label template</span>
+                    <span className="text-sm font-medium" data-testid="text-received-template-name">
+                      {receivedTemplateName ?? 'Default Raw Intake'}
+                    </span>
+                  </div>
                 </div>
               </div>
               <Button
                 className="w-full gap-2"
-                onClick={() => handlePrintLabel(receivedLot as Lot)}
+                onClick={() => handlePrintReceivedLot(receivedLot)}
                 data-testid="button-print-label-received"
               >
                 <Printer className="h-4 w-4" /> Print Label
@@ -785,7 +820,7 @@ export default function Inventory() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => { setReceiveForm(EMPTY_RECEIVE_FORM); setReceivedLot(null); }}
+                onClick={() => { setReceiveForm(EMPTY_RECEIVE_FORM); setReceivedLot(null); setReceivedTemplateName(null); }}
                 data-testid="button-receive-another"
               >
                 Receive Another
