@@ -165,6 +165,8 @@ export const batches = pgTable("batches", {
   barcodeValue: varchar("barcode_value", { length: 100 }).unique(),
   barcodePrintedAt: timestamp("barcode_printed_at"),
   batchCode: varchar("batch_code", { length: 20 }).unique(),
+  cleaningTime: decimal("cleaning_time", { precision: 10, scale: 2 }),
+  numberOfStaff: integer("number_of_staff"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

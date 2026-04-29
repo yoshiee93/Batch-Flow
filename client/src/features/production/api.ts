@@ -14,6 +14,8 @@ export interface Batch {
   wasteQuantity: string | null;
   millingQuantity: string | null;
   wetQuantity: string | null;
+  cleaningTime: string | null;
+  numberOfStaff: number | null;
   startDate: string | null;
   endDate: string | null;
   assignedTo: string | null;
@@ -236,19 +238,37 @@ export function useRemoveBatchOutput() {
 export function useFinalizeBatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ batchId, wasteQuantity, millingQuantity, wetQuantity, markCompleted }: {
+    mutationFn: ({ batchId, wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, markCompleted }: {
       batchId: string;
       wasteQuantity: string;
       millingQuantity: string;
       wetQuantity: string;
+      cleaningTime?: string;
+      numberOfStaff?: number;
       markCompleted: boolean;
     }) =>
       fetchApi<FinalizeResult>(`/batches/${batchId}/finalize`, {
         method: "POST",
-        body: JSON.stringify({ wasteQuantity, millingQuantity, wetQuantity, markCompleted })
+        body: JSON.stringify({ wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, markCompleted })
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batchOutputLots"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    },
+  });
+}
+
+export function useUpdateBatchOutput() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, quantity }: { id: string; quantity: string }) =>
+      fetchApi<BatchOutput>(`/batch-outputs/${id}`, { method: "PATCH", body: JSON.stringify({ quantity }) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batchOutputs"] });
       queryClient.invalidateQueries({ queryKey: ["batchOutputLots"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["lots"] });

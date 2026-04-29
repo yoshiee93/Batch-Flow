@@ -75,8 +75,17 @@ export const productionRepository = {
     return created;
   },
 
+  async updateBatchOutputQty(id: string, quantity: string): Promise<BatchOutput> {
+    const [updated] = await db.update(batchOutputs).set({ quantity }).where(eq(batchOutputs.id, id)).returning();
+    return updated;
+  },
+
   async deleteBatchOutputById(id: string): Promise<void> {
     await db.delete(batchOutputs).where(eq(batchOutputs.id, id));
+  },
+
+  async deleteLotById(id: string): Promise<void> {
+    await db.delete(lots).where(eq(lots.id, id));
   },
 
   async getProductById(productId: string) {

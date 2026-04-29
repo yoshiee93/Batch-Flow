@@ -291,7 +291,6 @@ export const productionService = {
     const quantityNum = parseFloat(quantity);
     const batch = await repo.getBatch(batchId);
     if (!batch) throw new Error("Batch not found");
-    if (batch.status === "completed") throw new Error("Cannot add output to completed batch");
 
     const product = await repo.getProductById(productId);
     if (!product) throw new Error("Product not found");
@@ -302,6 +301,23 @@ export const productionService = {
 
     await createStockMovement({ movementType: "production_output", productId, batchId, quantity, reference: `Production output: ${product.name}` });
     await createAuditLog({ entityType: "batch", entityId: batchId, action: "output_added", changes: JSON.stringify({ productId, quantity }) });
+
+    // For a completed batch, immediately create a finished-good lot for this new output
+    if (batch.status === "completed") {
+      const existingLots = await repo.getLotsForBatchAndProduct(batchId, productId);
+      if (existingLots.length === 0) {
+        const now = new Date();
+        const lotNumber = await deriveLotNumber(batch.batchCode, product.fruitCode);
+        const barcodeValue = await generateBarcodeValue();
+        const finishedLot = await repo.insertLot({
+          lotNumber, lotType: "finished_good", status: "active", barcodeValue,
+          productId, originalQuantity: quantity, quantity, remainingQuantity: quantity,
+          producedDate: now, expiryDate: twoYearsFrom(now), sourceBatchId: batchId,
+        });
+        await createStockMovement({ movementType: "production_output", productId, lotId: finishedLot.id, batchId, quantity, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
+        await createAuditLog({ entityType: "lot", entityId: finishedLot.id, action: "finished_lot_created", changes: JSON.stringify({ lotNumber, barcodeValue, productId, quantity, sourceBatchId: batchId }) });
+      }
+    }
 
     const { customersService } = await import("../customers/service");
     await customersService.runStockAllocation();
@@ -314,12 +330,20 @@ export const productionService = {
     if (!output) return;
 
     const batch = await repo.getBatch(output.batchId);
-    if (batch && batch.status === "completed") throw new Error("Cannot remove output from completed batch");
 
     const product = await repo.getProductById(output.productId);
     if (product) {
-      const newStock = (parseFloat(product.currentStock || "0") - parseFloat(output.quantity)).toFixed(2);
+      const newStock = Math.max(0, parseFloat(product.currentStock || "0") - parseFloat(output.quantity)).toFixed(2);
       await repo.updateProductStock(output.productId, newStock);
+    }
+
+    // For completed batches, also remove the associated finished-good lot
+    if (batch && batch.status === "completed") {
+      const existingLots = await repo.getLotsForBatchAndProduct(output.batchId, output.productId);
+      for (const lot of existingLots) {
+        await createAuditLog({ entityType: "lot", entityId: lot.id, action: "finished_lot_removed", changes: JSON.stringify({ lotId: lot.id, productId: output.productId, quantity: output.quantity, reason: "output_row_deleted" }) });
+        await repo.deleteLotById(lot.id);
+      }
     }
 
     await createStockMovement({ movementType: "adjustment", productId: output.productId, batchId: output.batchId, quantity: `-${output.quantity}`, reference: "Production output removed - reversal" });
@@ -330,7 +354,48 @@ export const productionService = {
     await customersService.runStockAllocation();
   },
 
-  async finalizeBatch(batchId: string, wasteQuantity: string, millingQuantity: string, wetQuantity: string, markCompleted: boolean): Promise<FinalizeBatchResult> {
+  async updateBatchOutput(id: string, newQuantity: string): Promise<BatchOutput> {
+    const newQty = parseFloat(newQuantity);
+    if (isNaN(newQty) || newQty <= 0) throw new Error("Quantity must be a positive number");
+
+    const output = await repo.getBatchOutputById(id);
+    if (!output) throw new Error("Batch output not found");
+
+    const oldQty = parseFloat(output.quantity);
+    const delta = newQty - oldQty;
+    if (delta === 0) return output;
+
+    // Adjust product stock by delta
+    const product = await repo.getProductById(output.productId);
+    if (product) {
+      const newStock = (parseFloat(product.currentStock || "0") + delta).toFixed(2);
+      await repo.updateProductStock(output.productId, newStock);
+    }
+
+    // Adjust the finished-good lot quantity if the batch is completed
+    const batch = await repo.getBatch(output.batchId);
+    if (batch && batch.status === "completed") {
+      const existingLots = await repo.getLotsForBatchAndProduct(output.batchId, output.productId);
+      if (existingLots.length > 0) {
+        const lot = existingLots[0];
+        const newLotQty = (parseFloat(lot.quantity) + delta).toFixed(3);
+        const newRemainingQty = Math.max(0, parseFloat(lot.remainingQuantity || "0") + delta).toFixed(3);
+        await repo.updateLotFields(lot.id, { quantity: newLotQty, remainingQuantity: newRemainingQty });
+      }
+    }
+
+    const updated = await repo.updateBatchOutputQty(id, newQuantity);
+
+    await createStockMovement({ movementType: "adjustment", productId: output.productId, batchId: output.batchId, quantity: delta.toFixed(2), reference: `Batch output adjusted: ${oldQty} → ${newQty} KG` });
+    await createAuditLog({ entityType: "batch_output", entityId: id, action: "update", changes: JSON.stringify({ oldQuantity: oldQty, newQuantity: newQty, delta }) });
+
+    const { customersService } = await import("../customers/service");
+    await customersService.runStockAllocation();
+
+    return updated;
+  },
+
+  async finalizeBatch(batchId: string, wasteQuantity: string, millingQuantity: string, wetQuantity: string, cleaningTime: string | null, numberOfStaff: number | null, markCompleted: boolean): Promise<FinalizeBatchResult> {
     const batch = await repo.getBatch(batchId);
     if (!batch) throw new Error("Batch not found");
 
@@ -342,6 +407,8 @@ export const productionService = {
       wasteQuantity,
       millingQuantity,
       wetQuantity,
+      cleaningTime: cleaningTime || null,
+      numberOfStaff: numberOfStaff || null,
     };
     if (markCompleted) {
       updateData.status = "completed";
@@ -412,7 +479,7 @@ export const productionService = {
       }
     }
 
-    await createAuditLog({ entityType: "batch", entityId: batchId, action: markCompleted ? "completed" : "updated", changes: JSON.stringify({ totalOutput, wasteQuantity, millingQuantity, wetQuantity, markCompleted }) });
+    await createAuditLog({ entityType: "batch", entityId: batchId, action: markCompleted ? "completed" : "updated", changes: JSON.stringify({ totalOutput, wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, markCompleted }) });
 
     const outputLots = await inventoryRepository.getBatchOutputLots(batchId);
     return { batch: updated, outputLots };

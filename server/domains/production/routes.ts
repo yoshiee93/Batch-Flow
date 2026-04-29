@@ -147,18 +147,33 @@ productionRouter.post("/batches/:id/outputs", productionOrAdmin, asyncHandler(as
   res.status(201).json(await svc.addBatchOutput(req.params.id, productId, quantity));
 }));
 
+productionRouter.patch("/batch-outputs/:id", productionOrAdmin, asyncHandler(async (req, res) => {
+  const { quantity } = req.body;
+  if (!quantity) return res.status(400).json({ error: "quantity is required" });
+  const qty = parseFloat(quantity);
+  if (isNaN(qty) || qty <= 0) return res.status(400).json({ error: "quantity must be a positive number" });
+  try {
+    res.json(await svc.updateBatchOutput(req.params.id, quantity));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to update batch output";
+    res.status(400).json({ error: message });
+  }
+}));
+
 productionRouter.delete("/batch-outputs/:id", productionOrAdmin, asyncHandler(async (req, res) => {
   await svc.removeBatchOutput(req.params.id);
   res.status(204).send();
 }));
 
 productionRouter.post("/batches/:id/finalize", productionOrAdmin, asyncHandler(async (req, res) => {
-  const { wasteQuantity, millingQuantity, wetQuantity, markCompleted } = req.body;
+  const { wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, markCompleted } = req.body;
   res.json(await svc.finalizeBatch(
     req.params.id,
     wasteQuantity || "0",
     millingQuantity || "0",
     wetQuantity || "0",
+    cleaningTime || null,
+    numberOfStaff ? parseInt(numberOfStaff) : null,
     markCompleted || false
   ));
 }));

@@ -26,8 +26,8 @@ import {
 import {
   useBatches, useBatch, useProducts, useRecipes, useMaterials, useLots, useCategories,
   useUpdateBatch, useCreateBatch, useDeleteBatch,
-  useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useUpdateBatchMaterial, useRecordBatchOutput,
-  useBatchOutputs, useBatchOutputLots, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch, useMarkBarcodePrinted, useMarkBatchBarcodePrinted, useRegenerateOutputLots,
+  useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useUpdateBatchMaterial,
+  useBatchOutputs, useBatchOutputLots, useAddBatchOutput, useRemoveBatchOutput, useUpdateBatchOutput, useFinalizeBatch, useMarkBarcodePrinted, useMarkBatchBarcodePrinted, useRegenerateOutputLots,
   fetchLotByBarcode,
   type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput, type Category, type LotWithDetails, type FinalizeResult, type OutputLot
 } from '@/lib/api';
@@ -52,7 +52,6 @@ export default function Production() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isRecordInputOpen, setIsRecordInputOpen] = useState(false);
   const [isRecordOutputOpen, setIsRecordOutputOpen] = useState(false);
-  const [isAddOutputOpen, setIsAddOutputOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   
@@ -87,13 +86,6 @@ export default function Production() {
   const barcodeScanRef = useRef<HTMLInputElement>(null);
   const [createProductSearchOpen, setCreateProductSearchOpen] = useState(false);
   
-  const [recordOutputForm, setRecordOutputForm] = useState({
-    actualQuantity: '',
-    wasteQuantity: '',
-    millingQuantity: '',
-    markCompleted: false,
-  });
-
   const { canManageBatches } = useRole();
 
   const { data: batches = [], isLoading, isError } = useBatches();
@@ -106,8 +98,6 @@ export default function Production() {
   const createBatch = useCreateBatch();
   const deleteBatch = useDeleteBatch();
   const recordBatchInput = useRecordBatchInput();
-  const recordBatchOutput = useRecordBatchOutput();
-  const finalizeBatchQuick = useFinalizeBatch();
   const { toast } = useToast();
 
   // Group products by category for dropdown display
@@ -235,11 +225,6 @@ export default function Production() {
     }
   };
 
-  const handleAddOutputClick = (batch: Batch) => {
-    setSelectedBatch(batch);
-    setIsAddOutputOpen(true);
-  };
-
   const handleRecordInput = async () => {
     if (!selectedBatch) return;
 
@@ -309,51 +294,7 @@ export default function Production() {
 
   const handleRecordOutputClick = (batch: Batch) => {
     setSelectedBatch(batch);
-    setRecordOutputForm({
-      actualQuantity: batch.actualQuantity || '',
-      wasteQuantity: batch.wasteQuantity || '',
-      millingQuantity: batch.millingQuantity || '',
-      markCompleted: false,
-    });
     setIsRecordOutputOpen(true);
-  };
-
-  const handleRecordOutput = async () => {
-    if (!selectedBatch) return;
-    try {
-      await recordBatchOutput.mutateAsync({
-        batchId: selectedBatch.id,
-        actualQuantity: recordOutputForm.actualQuantity || "0",
-        wasteQuantity: recordOutputForm.wasteQuantity || "0",
-        millingQuantity: recordOutputForm.millingQuantity || "0",
-        markCompleted: recordOutputForm.markCompleted,
-      });
-      toast({ 
-        title: "Output recorded", 
-        description: recordOutputForm.markCompleted 
-          ? "Production output recorded and batch marked complete. Finished goods added to inventory." 
-          : "Production output has been recorded. Finished goods added to inventory."
-      });
-      setIsRecordOutputOpen(false);
-      setSelectedBatch(null);
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to record output", variant: "destructive" });
-    }
-  };
-
-  const handleMarkComplete = async (batch: Batch) => {
-    try {
-      await finalizeBatchQuick.mutateAsync({
-        batchId: batch.id,
-        wasteQuantity: batch.wasteQuantity || "0",
-        millingQuantity: batch.millingQuantity || "0",
-        wetQuantity: batch.wetQuantity || "0",
-        markCompleted: true,
-      });
-      toast({ title: "Batch completed", description: `Batch ${batch.batchNumber} marked as completed and output lot generated` });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to complete batch", variant: "destructive" });
-    }
   };
 
   const handleDeleteClick = (batch: Batch) => {
@@ -600,8 +541,6 @@ export default function Production() {
             onEditClick={handleEditClick}
             onRecordInputClick={handleRecordInputClick}
             onRecordOutputClick={handleRecordOutputClick}
-            onAddOutputClick={handleAddOutputClick}
-            onMarkComplete={handleMarkComplete}
             onDeleteClick={handleDeleteClick}
           />
         ))}
@@ -889,17 +828,17 @@ export default function Production() {
       </Dialog>
 
       <Dialog open={isRecordOutputOpen} onOpenChange={setIsRecordOutputOpen}>
-        <DialogContent className="w-full sm:max-w-2xl">
+        <DialogContent className="w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {selectedBatch?.status === 'completed'
-                ? `Print Output Labels — ${selectedBatch?.batchNumber}`
+                ? `View / Edit Output — ${selectedBatch?.batchNumber}`
                 : `Manage Outputs for ${selectedBatch?.batchNumber}`}
             </DialogTitle>
             <DialogDescription>
               {selectedBatch?.status === 'completed'
-                ? 'Print or reprint barcode labels for the finished-good lots produced in this batch.'
-                : 'Add multiple product outputs from this batch. Each output will be added to product inventory.'}
+                ? 'Edit or add output quantities and print finished-good lot labels for this completed batch.'
+                : 'Add product outputs from this batch. Each output will be added to product inventory.'}
             </DialogDescription>
           </DialogHeader>
           {selectedBatch && (
@@ -909,26 +848,9 @@ export default function Production() {
               wasteQuantity={selectedBatch.wasteQuantity || '0'}
               millingQuantity={selectedBatch.millingQuantity || '0'}
               wetQuantity={selectedBatch.wetQuantity || '0'}
+              cleaningTime={selectedBatch.cleaningTime || ''}
+              numberOfStaff={selectedBatch.numberOfStaff ?? undefined}
               onClose={() => setIsRecordOutputOpen(false)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isAddOutputOpen} onOpenChange={setIsAddOutputOpen}>
-        <DialogContent className="w-full sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Add Output for {selectedBatch?.batchNumber}</DialogTitle>
-            <DialogDescription>Record finished products from this batch. Each output will be added to inventory.</DialogDescription>
-          </DialogHeader>
-          {selectedBatch && (
-            <BatchOutputsEditor
-              batchId={selectedBatch.id}
-              isCompleted={selectedBatch.status === 'completed'}
-              wasteQuantity={selectedBatch.wasteQuantity || '0'}
-              millingQuantity={selectedBatch.millingQuantity || '0'}
-              wetQuantity={selectedBatch.wetQuantity || '0'}
-              onClose={() => setIsAddOutputOpen(false)}
             />
           )}
         </DialogContent>
@@ -1124,8 +1046,6 @@ function BatchCard({
   onEditClick, 
   onRecordInputClick,
   onRecordOutputClick,
-  onAddOutputClick,
-  onMarkComplete,
   onDeleteClick 
 }: { 
   batch: Batch; 
@@ -1135,8 +1055,6 @@ function BatchCard({
   onEditClick: (batch: Batch) => void;
   onRecordInputClick: (batch: Batch) => void;
   onRecordOutputClick: (batch: Batch) => void;
-  onAddOutputClick: (batch: Batch) => void;
-  onMarkComplete: (batch: Batch) => void;
   onDeleteClick: (batch: Batch) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -1226,28 +1144,22 @@ function BatchCard({
                 </div>
               </div>
               <div className="flex items-center gap-1 ml-4" onClick={(e) => e.stopPropagation()}>
-                {isCompleted && canManageBatches && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="text-green-600"
-                    onClick={() => onRecordOutputClick(batch)}
-                    title="Print Output Labels"
-                    data-testid={`button-print-labels-${batch.id}`}
-                  >
-                    <Printer size={16} />
-                  </Button>
-                )}
-                {!isCompleted && canManageBatches && (
+                {canManageBatches && (
                   <>
-                    <Button size="icon" variant="ghost" onClick={() => onRecordInputClick(batch)} title="Record Input" data-testid={`button-input-${batch.id}`}>
-                      <Package size={16} />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="text-green-600" onClick={() => onAddOutputClick(batch)} title="Add Output" data-testid={`button-add-output-${batch.id}`}>
-                      <ArrowDownCircle size={16} />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="text-green-600" onClick={() => onMarkComplete(batch)} title="Complete" data-testid={`button-complete-${batch.id}`}>
-                      <CheckCircle size={16} />
+                    {!isCompleted && (
+                      <Button size="icon" variant="ghost" onClick={() => onRecordInputClick(batch)} title="Record Input" data-testid={`button-input-${batch.id}`}>
+                        <Package size={16} />
+                      </Button>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-green-600"
+                      onClick={() => onRecordOutputClick(batch)}
+                      title={isCompleted ? "View / Edit Output" : "Manage Outputs"}
+                      data-testid={`button-manage-outputs-${batch.id}`}
+                    >
+                      {isCompleted ? <Printer size={16} /> : <ArrowDownCircle size={16} />}
                     </Button>
                   </>
                 )}
@@ -1275,7 +1187,7 @@ function BatchCard({
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onRecordOutputClick(batch)} data-testid={`button-record-${batch.id}`}>
                           {isCompleted
-                            ? <><Printer size={14} className="mr-2" /> Print Output Labels</>
+                            ? <><Printer size={14} className="mr-2" /> View / Edit Output</>
                             : <><Scale size={14} className="mr-2" /> Manage Outputs</>
                           }
                         </DropdownMenuItem>
@@ -1390,23 +1302,27 @@ function BatchCard({
                 {batch.startDate && <span>Batch Date: {format(new Date(batch.startDate), 'MMM d, yyyy')}</span>}
                 {batch.endDate && <span>Completed: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
               </div>
-              {isCompleted && canManageBatches ? (
-                <Button size="sm" variant="outline" className="text-green-600 border-green-200" onClick={() => onRecordOutputClick(batch)} data-testid={`button-print-labels-expanded-${batch.id}`}>
-                  <Printer size={14} className="mr-1 sm:mr-2" /> Print Output Labels
-                </Button>
-              ) : !isCompleted ? (
+              {canManageBatches && (
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={() => onRecordInputClick(batch)}>
-                    <Package size={14} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Add </span>Input
-                  </Button>
-                  <Button size="sm" variant="outline" className="text-green-600 border-green-200" onClick={() => onAddOutputClick(batch)}>
-                    <ArrowDownCircle size={14} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Add </span>Output
-                  </Button>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => onMarkComplete(batch)}>
-                    <CheckCircle size={14} className="mr-1 sm:mr-2" /> Complete
+                  {!isCompleted && (
+                    <Button size="sm" variant="outline" onClick={() => onRecordInputClick(batch)}>
+                      <Package size={14} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Add </span>Input
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant={isCompleted ? "outline" : "default"}
+                    className={isCompleted ? "text-green-600 border-green-200" : "bg-green-600 hover:bg-green-700"}
+                    onClick={() => onRecordOutputClick(batch)}
+                    data-testid={`button-manage-outputs-expanded-${batch.id}`}
+                  >
+                    {isCompleted
+                      ? <><Printer size={14} className="mr-1 sm:mr-2" /> View / Edit Output</>
+                      : <><ArrowDownCircle size={14} className="mr-1 sm:mr-2" /> Manage Outputs / Complete</>
+                    }
                   </Button>
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
         </CollapsibleContent>
@@ -1421,6 +1337,8 @@ function BatchOutputsEditor({
   wasteQuantity: initialWaste,
   millingQuantity: initialMilling,
   wetQuantity: initialWet,
+  cleaningTime: initialCleaningTime,
+  numberOfStaff: initialNumberOfStaff,
   onClose,
 }: { 
   batchId: string;
@@ -1428,6 +1346,8 @@ function BatchOutputsEditor({
   wasteQuantity: string;
   millingQuantity: string;
   wetQuantity: string;
+  cleaningTime?: string;
+  numberOfStaff?: number;
   onClose: () => void;
 }) {
   const [newOutputForm, setNewOutputForm] = useState({ productId: '', quantity: '' });
@@ -1435,19 +1355,25 @@ function BatchOutputsEditor({
   const [wasteQuantity, setWasteQuantity] = useState(initialWaste);
   const [millingQuantity, setMillingQuantity] = useState(initialMilling);
   const [wetQuantity, setWetQuantity] = useState(initialWet);
+  const [cleaningTime, setCleaningTime] = useState(initialCleaningTime || '');
+  const [numberOfStaff, setNumberOfStaff] = useState(initialNumberOfStaff ? String(initialNumberOfStaff) : '');
   const [markCompleted, setMarkCompleted] = useState(false);
   const [finalizeResult, setFinalizeResult] = useState<FinalizeResult | null>(null);
   const [summaryBatchPrintedAt, setSummaryBatchPrintedAt] = useState<string | null>(null);
+  const [editingOutputId, setEditingOutputId] = useState<string | null>(null);
+  const [editOutputQty, setEditOutputQty] = useState('');
   const markLotPrinted = useMarkBarcodePrinted();
   const markBatchPrinted = useMarkBatchBarcodePrinted();
-  const { data: batchData } = useBatch(isCompleted ? batchId : '');
+  const { data: batchData } = useBatch(batchId);
   
   useEffect(() => {
     setWasteQuantity(initialWaste);
     setMillingQuantity(initialMilling);
     setWetQuantity(initialWet);
+    setCleaningTime(initialCleaningTime || '');
+    setNumberOfStaff(initialNumberOfStaff ? String(initialNumberOfStaff) : '');
     setMarkCompleted(false);
-  }, [batchId, initialWaste, initialMilling, initialWet]);
+  }, [batchId, initialWaste, initialMilling, initialWet, initialCleaningTime, initialNumberOfStaff]);
   
   const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
   const { data: outputLots = [], isLoading: outputLotsLoading } = useBatchOutputLots(batchId, { enabled: isCompleted });
@@ -1458,17 +1384,16 @@ function BatchOutputsEditor({
   const { data: allCategories = [] } = useCategories();
   const addBatchOutput = useAddBatchOutput();
   const removeBatchOutput = useRemoveBatchOutput();
+  const updateBatchOutput = useUpdateBatchOutput();
   const finalizeBatch = useFinalizeBatch();
   const regenerateOutputLots = useRegenerateOutputLots();
   const { toast } = useToast();
 
-  // Group products by category for dropdown display
   const productsByCategory = allCategories.map(category => ({
     category,
     products: allProducts.filter(p => p.categoryId === category.id)
   })).filter(group => group.products.length > 0);
   
-  // Add uncategorized products
   const uncategorizedProducts = allProducts.filter(p => !p.categoryId);
   
   const handleAddOutput = async () => {
@@ -1477,12 +1402,8 @@ function BatchOutputsEditor({
       return;
     }
     try {
-      await addBatchOutput.mutateAsync({
-        batchId,
-        productId: newOutputForm.productId,
-        quantity: newOutputForm.quantity,
-      });
-      toast({ title: "Output added", description: "Product output has been added to batch and inventory" });
+      await addBatchOutput.mutateAsync({ batchId, productId: newOutputForm.productId, quantity: newOutputForm.quantity });
+      toast({ title: "Output added", description: isCompleted ? "Product output added and finished-good lot created" : "Product output has been added to batch and inventory" });
       setNewOutputForm({ productId: '', quantity: '' });
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to add output", variant: "destructive" });
@@ -1497,6 +1418,18 @@ function BatchOutputsEditor({
       toast({ title: "Error", description: error.message || "Failed to remove output", variant: "destructive" });
     }
   };
+
+  const handleUpdateOutput = async () => {
+    if (!editingOutputId) return;
+    try {
+      await updateBatchOutput.mutateAsync({ id: editingOutputId, quantity: editOutputQty });
+      toast({ title: "Output updated", description: "Quantity updated and inventory adjusted" });
+      setEditingOutputId(null);
+      setEditOutputQty('');
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to update output", variant: "destructive" });
+    }
+  };
   
   const handleFinalize = async () => {
     try {
@@ -1505,6 +1438,8 @@ function BatchOutputsEditor({
         wasteQuantity: wasteQuantity || "0",
         millingQuantity: millingQuantity || "0",
         wetQuantity: wetQuantity || "0",
+        cleaningTime: cleaningTime || undefined,
+        numberOfStaff: numberOfStaff ? parseInt(numberOfStaff) : undefined,
         markCompleted,
       });
       if (markCompleted) {
@@ -1574,9 +1509,7 @@ function BatchOutputsEditor({
           </div>
         )}
         {finalizeResult.outputLots.length > 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Print barcode labels for the finished-good lots produced in this batch.
-          </p>
+          <p className="text-sm text-muted-foreground">Print barcode labels for the finished-good lots produced in this batch.</p>
         ) : (
           <p className="text-sm text-muted-foreground">No output lots were generated for this batch.</p>
         )}
@@ -1635,99 +1568,183 @@ function BatchOutputsEditor({
   
   return (
     <div className="space-y-4 py-2">
-      {!isCompleted && (
-        <div className="space-y-4 pb-4 border-b">
-          <h4 className="font-medium text-sm">Add Product Output</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="output-product">Product</Label>
-              <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={productSearchOpen}
-                    className="w-full justify-between font-normal"
-                    data-testid="select-output-product"
-                  >
-                    {newOutputForm.productId
-                      ? allProducts.find(p => p.id === newOutputForm.productId)?.name || "Select product..."
-                      : "Search products..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search products..." />
-                    <CommandList>
-                      <CommandEmpty>No product found.</CommandEmpty>
-                      {productsByCategory.map(({ category, products: categoryProducts }) => (
-                        <CommandGroup key={category.id} heading={category.name}>
-                          {categoryProducts.map(product => (
-                            <CommandItem
-                              key={product.id}
-                              value={`${category.name} ${product.sku} ${product.name}`}
-                              onSelect={() => {
-                                setNewOutputForm({ ...newOutputForm, productId: product.id });
-                                setProductSearchOpen(false);
-                              }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", newOutputForm.productId === product.id ? "opacity-100" : "opacity-0")} />
-                              {product.sku ? `${product.sku} - ` : ''}{product.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      ))}
-                      {uncategorizedProducts.length > 0 && (
-                        <CommandGroup heading="Uncategorized">
-                          {uncategorizedProducts.map(product => (
-                            <CommandItem
-                              key={product.id}
-                              value={`Uncategorized ${product.sku} ${product.name}`}
-                              onSelect={() => {
-                                setNewOutputForm({ ...newOutputForm, productId: product.id });
-                                setProductSearchOpen(false);
-                              }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", newOutputForm.productId === product.id ? "opacity-100" : "opacity-0")} />
-                              {product.sku ? `${product.sku} - ` : ''}{product.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      )}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="output-quantity">Quantity (KG)</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="output-quantity"
-                  type="number"
-                  step="0.01"
-                  value={newOutputForm.quantity}
-                  onChange={(e) => setNewOutputForm({ ...newOutputForm, quantity: e.target.value })}
-                  placeholder="0.00"
-                  data-testid="input-output-quantity"
-                />
-                <Button 
-                  onClick={handleAddOutput} 
-                  disabled={addBatchOutput.isPending}
-                  data-testid="button-add-output"
+      {/* Add Product Output — always shown */}
+      <div className="space-y-3 pb-4 border-b">
+        <h4 className="font-medium text-sm">Add Product Output</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="output-product">Product</Label>
+            <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={productSearchOpen}
+                  className="w-full justify-between font-normal"
+                  data-testid="select-output-product"
                 >
-                  {addBatchOutput.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus size={16} />}
-                  Add
+                  {newOutputForm.productId
+                    ? allProducts.find(p => p.id === newOutputForm.productId)?.name || "Select product..."
+                    : "Search products..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
-              </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search products..." />
+                  <CommandList>
+                    <CommandEmpty>No product found.</CommandEmpty>
+                    {productsByCategory.map(({ category, products: categoryProducts }) => (
+                      <CommandGroup key={category.id} heading={category.name}>
+                        {categoryProducts.map(product => (
+                          <CommandItem
+                            key={product.id}
+                            value={`${category.name} ${product.sku} ${product.name}`}
+                            onSelect={() => { setNewOutputForm({ ...newOutputForm, productId: product.id }); setProductSearchOpen(false); }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", newOutputForm.productId === product.id ? "opacity-100" : "opacity-0")} />
+                            {product.sku ? `${product.sku} - ` : ''}{product.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    ))}
+                    {uncategorizedProducts.length > 0 && (
+                      <CommandGroup heading="Uncategorized">
+                        {uncategorizedProducts.map(product => (
+                          <CommandItem
+                            key={product.id}
+                            value={`Uncategorized ${product.sku} ${product.name}`}
+                            onSelect={() => { setNewOutputForm({ ...newOutputForm, productId: product.id }); setProductSearchOpen(false); }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", newOutputForm.productId === product.id ? "opacity-100" : "opacity-0")} />
+                            {product.sku ? `${product.sku} - ` : ''}{product.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="output-quantity">Quantity (KG)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="output-quantity"
+                type="number"
+                step="0.01"
+                value={newOutputForm.quantity}
+                onChange={(e) => setNewOutputForm({ ...newOutputForm, quantity: e.target.value })}
+                placeholder="0.00"
+                data-testid="input-output-quantity"
+              />
+              <Button onClick={handleAddOutput} disabled={addBatchOutput.isPending} data-testid="button-add-output">
+                {addBatchOutput.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus size={16} />}
+                Add
+              </Button>
             </div>
           </div>
         </div>
-      )}
-      
-      {isCompleted ? (
-        <div>
+      </div>
+
+      {/* Product Outputs list — always shown */}
+      <div>
+        <h4 className="font-medium text-sm mb-2">Product Outputs ({outputs.length})</h4>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </div>
+        ) : outputs.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-2">No outputs recorded yet</p>
+        ) : (
+          <div className="space-y-2">
+            {outputs.map((output) => {
+              const product = allProducts.find(p => p.id === output.productId);
+              const isEditing = editingOutputId === output.id;
+              return (
+                <div
+                  key={output.id}
+                  className="flex items-center justify-between p-2 bg-muted rounded text-sm"
+                  data-testid={`output-row-${output.id}`}
+                >
+                  <div>
+                    <span className="font-mono text-muted-foreground">{product?.sku}</span>
+                    <span className="mx-2">-</span>
+                    <span>{product?.name || 'Unknown Product'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isEditing ? (
+                      <>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          value={editOutputQty}
+                          onChange={(e) => setEditOutputQty(e.target.value)}
+                          className="w-24 h-7 text-sm font-mono"
+                          data-testid={`input-edit-output-qty-${output.id}`}
+                        />
+                        <span className="text-xs text-muted-foreground">KG</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
+                          onClick={handleUpdateOutput}
+                          disabled={updateBatchOutput.isPending}
+                          data-testid={`button-save-output-qty-${output.id}`}
+                        >
+                          <CheckCircle size={13} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => { setEditingOutputId(null); setEditOutputQty(''); }}
+                          data-testid={`button-cancel-output-edit-${output.id}`}
+                        >
+                          <X size={13} />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-mono">{output.quantity} KG</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          onClick={() => { setEditingOutputId(output.id); setEditOutputQty(output.quantity); }}
+                          data-testid={`button-edit-output-${output.id}`}
+                        >
+                          <Pencil size={13} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:text-destructive"
+                          onClick={() => handleRemoveOutput(output.id)}
+                          disabled={removeBatchOutput.isPending}
+                          data-testid={`button-remove-output-${output.id}`}
+                        >
+                          <X size={14} />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="flex justify-between items-center pt-2 font-medium text-sm">
+              <span>Total Output:</span>
+              <span className="font-mono">{totalOutputQuantity.toFixed(2)} KG</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Lot Labels — only for completed batches */}
+      {isCompleted && (
+        <div className="pt-2 border-t">
           <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
             <Printer size={14} />
             Output Lot Labels ({outputLots.length})
@@ -1770,12 +1787,8 @@ function BatchOutputsEditor({
                   <div className="space-y-0.5 min-w-0">
                     <div className="font-medium text-sm">{ol.productName || 'Output'}</div>
                     <div className="font-mono text-xs text-muted-foreground">{ol.lotNumber}</div>
-                    {ol.barcodeValue && (
-                      <div className="font-mono text-xs text-muted-foreground">{ol.barcodeValue}</div>
-                    )}
-                    {ol.barcodePrintedAt && (
-                      <div className="text-xs text-green-600">Label printed</div>
-                    )}
+                    {ol.barcodeValue && <div className="font-mono text-xs text-muted-foreground">{ol.barcodeValue}</div>}
+                    {ol.barcodePrintedAt && <div className="text-xs text-green-600">Label printed</div>}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="font-mono text-sm">{parseFloat(ol.quantity).toFixed(2)} KG</span>
@@ -1811,55 +1824,9 @@ function BatchOutputsEditor({
             </div>
           )}
         </div>
-      ) : (
-        <div>
-          <h4 className="font-medium text-sm mb-2">Product Outputs ({outputs.length})</h4>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
-            </div>
-          ) : outputs.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">No outputs recorded yet</p>
-          ) : (
-            <div className="space-y-2">
-              {outputs.map((output) => {
-                const product = allProducts.find(p => p.id === output.productId);
-                return (
-                  <div
-                    key={output.id}
-                    className="flex items-center justify-between p-2 bg-muted rounded text-sm"
-                    data-testid={`output-row-${output.id}`}
-                  >
-                    <div>
-                      <span className="font-mono text-muted-foreground">{product?.sku}</span>
-                      <span className="mx-2">-</span>
-                      <span>{product?.name || 'Unknown Product'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono">{output.quantity} KG</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-destructive hover:text-destructive"
-                        onClick={() => handleRemoveOutput(output.id)}
-                        disabled={removeBatchOutput.isPending}
-                        data-testid={`button-remove-output-${output.id}`}
-                      >
-                        <X size={14} />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-              <div className="flex justify-between items-center pt-2 font-medium text-sm">
-                <span>Total Output:</span>
-                <span className="font-mono">{totalOutputQuantity.toFixed(2)} KG</span>
-              </div>
-            </div>
-          )}
-        </div>
       )}
       
+      {/* Waste/Milling/Wet/Cleaning/Staff — only for in-progress */}
       {!isCompleted && (
         <>
           <div className="space-y-4 pt-4 border-t">
@@ -1867,39 +1834,29 @@ function BatchOutputsEditor({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="waste">Waste (KG)</Label>
-                <Input
-                  id="waste"
-                  type="number"
-                  step="0.01"
-                  value={wasteQuantity}
-                  onChange={(e) => setWasteQuantity(e.target.value)}
-                  placeholder="0.00"
-                  data-testid="input-finalize-waste"
-                />
+                <Input id="waste" type="number" step="0.01" value={wasteQuantity} onChange={(e) => setWasteQuantity(e.target.value)} placeholder="0.00" data-testid="input-finalize-waste" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="milling">Milling (KG)</Label>
-                <Input
-                  id="milling"
-                  type="number"
-                  step="0.01"
-                  value={millingQuantity}
-                  onChange={(e) => setMillingQuantity(e.target.value)}
-                  placeholder="0.00"
-                  data-testid="input-finalize-milling"
-                />
+                <Input id="milling" type="number" step="0.01" value={millingQuantity} onChange={(e) => setMillingQuantity(e.target.value)} placeholder="0.00" data-testid="input-finalize-milling" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="wet">Wet (KG)</Label>
-                <Input
-                  id="wet"
-                  type="number"
-                  step="0.01"
-                  value={wetQuantity}
-                  onChange={(e) => setWetQuantity(e.target.value)}
-                  placeholder="0.00"
-                  data-testid="input-finalize-wet"
-                />
+                <Input id="wet" type="number" step="0.01" value={wetQuantity} onChange={(e) => setWetQuantity(e.target.value)} placeholder="0.00" data-testid="input-finalize-wet" />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="font-medium text-sm">Labour</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cleaningTime">Cleaning Time (hours)</Label>
+                <Input id="cleaningTime" type="number" step="0.25" min="0" value={cleaningTime} onChange={(e) => setCleaningTime(e.target.value)} placeholder="0.00" data-testid="input-finalize-cleaning-time" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="numberOfStaff">Number of Staff</Label>
+                <Input id="numberOfStaff" type="number" step="1" min="0" value={numberOfStaff} onChange={(e) => setNumberOfStaff(e.target.value)} placeholder="0" data-testid="input-finalize-number-of-staff" />
               </div>
             </div>
           </div>
@@ -1912,7 +1869,7 @@ function BatchOutputsEditor({
               data-testid="checkbox-finalize-completed"
             />
             <Label htmlFor="markCompletedFinal" className="text-sm font-normal cursor-pointer">
-              Mark batch as completed (cannot add more outputs after)
+              Mark batch as completed and generate output lots
             </Label>
           </div>
           
