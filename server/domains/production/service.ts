@@ -302,7 +302,7 @@ export const productionService = {
     await createStockMovement({ movementType: "production_output", productId, batchId, quantity, reference: `Production output: ${product.name}` });
     await createAuditLog({ entityType: "batch", entityId: batchId, action: "output_added", changes: JSON.stringify({ productId, quantity }) });
 
-    // For a completed batch, immediately create a finished-good lot for this new output
+    // For a completed batch, immediately create/update a finished-good lot for this new output
     if (batch.status === "completed") {
       const existingLots = await repo.getLotsForBatchAndProduct(batchId, productId);
       if (existingLots.length === 0) {
@@ -316,6 +316,15 @@ export const productionService = {
         });
         await createStockMovement({ movementType: "production_output", productId, lotId: finishedLot.id, batchId, quantity, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
         await createAuditLog({ entityType: "lot", entityId: finishedLot.id, action: "finished_lot_created", changes: JSON.stringify({ lotNumber, barcodeValue, productId, quantity, sourceBatchId: batchId }) });
+      } else {
+        // Lot already exists: recompute total from all output rows for (batchId, productId)
+        const allOutputsForProduct = (await repo.getBatchOutputs(batchId)).filter(o => o.productId === productId);
+        const totalQty = allOutputsForProduct.reduce((sum, o) => sum + parseFloat(o.quantity), 0).toFixed(3);
+        const lot = existingLots[0];
+        const addedDelta = quantityNum;
+        const newRemaining = Math.max(0, parseFloat(lot.remainingQuantity || "0") + addedDelta).toFixed(3);
+        await repo.updateLotFields(lot.id, { quantity: totalQty, remainingQuantity: newRemaining });
+        await createAuditLog({ entityType: "lot", entityId: lot.id, action: "finished_lot_qty_increased", changes: JSON.stringify({ productId, addedQty: quantity, newTotal: totalQty }) });
       }
     }
 
@@ -337,12 +346,25 @@ export const productionService = {
       await repo.updateProductStock(output.productId, newStock);
     }
 
-    // For completed batches, also remove the associated finished-good lot
+    // For completed batches, update or remove the associated finished-good lot
     if (batch && batch.status === "completed") {
+      // Compute total quantity of OTHER output rows for the same (batchId, productId)
+      const remainingOutputs = (await repo.getBatchOutputs(output.batchId))
+        .filter(o => o.productId === output.productId && o.id !== id);
+      const remainingTotal = remainingOutputs.reduce((sum, o) => sum + parseFloat(o.quantity), 0);
+
       const existingLots = await repo.getLotsForBatchAndProduct(output.batchId, output.productId);
       for (const lot of existingLots) {
-        await createAuditLog({ entityType: "lot", entityId: lot.id, action: "finished_lot_removed", changes: JSON.stringify({ lotId: lot.id, productId: output.productId, quantity: output.quantity, reason: "output_row_deleted" }) });
-        await repo.deleteLotById(lot.id);
+        if (remainingTotal <= 0) {
+          // No more output rows for this product — remove the lot entirely
+          await createAuditLog({ entityType: "lot", entityId: lot.id, action: "finished_lot_removed", changes: JSON.stringify({ lotId: lot.id, productId: output.productId, reason: "all_output_rows_deleted" }) });
+          await repo.deleteLotById(lot.id);
+        } else {
+          // Update lot quantity to match remaining outputs
+          const newRemaining = Math.max(0, parseFloat(lot.remainingQuantity || "0") - parseFloat(output.quantity)).toFixed(3);
+          await repo.updateLotFields(lot.id, { quantity: remainingTotal.toFixed(3), remainingQuantity: newRemaining });
+          await createAuditLog({ entityType: "lot", entityId: lot.id, action: "finished_lot_qty_decreased", changes: JSON.stringify({ lotId: lot.id, productId: output.productId, removedQty: output.quantity, newTotal: remainingTotal.toFixed(3) }) });
+        }
       }
     }
 

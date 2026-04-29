@@ -1,7 +1,7 @@
 import { eq, and, desc, isNotNull } from "drizzle-orm";
 import { db } from "../../db";
 import {
-  batches, batchMaterials, batchOutputs, lots, products, materials,
+  batches, batchMaterials, batchOutputs, lots, products, materials, stockMovements,
   type Batch, type InsertBatch,
   type BatchMaterial, type InsertBatchMaterial,
   type BatchOutput, type InsertBatchOutput,
@@ -85,6 +85,8 @@ export const productionRepository = {
   },
 
   async deleteLotById(id: string): Promise<void> {
+    // Null out stock_movements.lotId references to avoid FK constraint violation
+    await db.update(stockMovements).set({ lotId: null }).where(eq(stockMovements.lotId, id));
     await db.delete(lots).where(eq(lots.id, id));
   },
 

@@ -1851,8 +1851,8 @@ function BatchOutputsEditor({
             <h4 className="font-medium text-sm">Labour</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="cleaningTime">Cleaning Time (hours)</Label>
-                <Input id="cleaningTime" type="number" step="0.25" min="0" value={cleaningTime} onChange={(e) => setCleaningTime(e.target.value)} placeholder="0.00" data-testid="input-finalize-cleaning-time" />
+                <Label htmlFor="cleaningTime">Cleaning Time (mins)</Label>
+                <Input id="cleaningTime" type="number" step="1" min="0" value={cleaningTime} onChange={(e) => setCleaningTime(e.target.value)} placeholder="0" data-testid="input-finalize-cleaning-time" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="numberOfStaff">Number of Staff</Label>
