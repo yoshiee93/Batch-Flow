@@ -161,19 +161,35 @@ productionRouter.patch("/batch-outputs/:id", productionOrAdmin, asyncHandler(asy
 }));
 
 productionRouter.delete("/batch-outputs/:id", productionOrAdmin, asyncHandler(async (req, res) => {
-  await svc.removeBatchOutput(req.params.id);
-  res.status(204).send();
+  try {
+    await svc.removeBatchOutput(req.params.id);
+    res.status(204).send();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to remove batch output";
+    res.status(400).json({ error: message });
+  }
 }));
 
 productionRouter.post("/batches/:id/finalize", productionOrAdmin, asyncHandler(async (req, res) => {
   const { wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, markCompleted } = req.body;
+
+  // Validate optional numeric fields
+  if (cleaningTime != null && cleaningTime !== '') {
+    const ct = parseFloat(cleaningTime);
+    if (isNaN(ct) || ct < 0) return res.status(400).json({ error: "cleaningTime must be a non-negative number" });
+  }
+  if (numberOfStaff != null && numberOfStaff !== '') {
+    const ns = Number(numberOfStaff);
+    if (!Number.isInteger(ns) || ns < 0) return res.status(400).json({ error: "numberOfStaff must be a non-negative integer" });
+  }
+
   res.json(await svc.finalizeBatch(
     req.params.id,
     wasteQuantity || "0",
     millingQuantity || "0",
     wetQuantity || "0",
     cleaningTime || null,
-    numberOfStaff != null ? Number(numberOfStaff) : null,
+    numberOfStaff != null && numberOfStaff !== '' ? Number(numberOfStaff) : null,
     markCompleted || false
   ));
 }));

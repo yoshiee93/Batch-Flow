@@ -342,8 +342,12 @@ export const productionService = {
 
     const product = await repo.getProductById(output.productId);
     if (product) {
-      const newStock = Math.max(0, parseFloat(product.currentStock || "0") - parseFloat(output.quantity)).toFixed(2);
-      await repo.updateProductStock(output.productId, newStock);
+      const currentStock = parseFloat(product.currentStock || "0");
+      const removeQty = parseFloat(output.quantity);
+      if (currentStock - removeQty < 0) {
+        throw new Error(`Cannot remove output: product "${product.name}" current stock (${currentStock.toFixed(2)} KG) is less than the output quantity being reversed (${removeQty.toFixed(2)} KG). Stock may have already been consumed.`);
+      }
+      await repo.updateProductStock(output.productId, (currentStock - removeQty).toFixed(2));
     }
 
     // For completed batches, update or remove the associated finished-good lot
