@@ -391,11 +391,14 @@ export const productionService = {
     const delta = newQty - oldQty;
     if (delta === 0) return output;
 
-    // Adjust product stock by delta
+    // Adjust product stock by delta — reject if reduction would drive stock negative
     const product = await repo.getProductById(output.productId);
     if (product) {
-      const newStock = (parseFloat(product.currentStock || "0") + delta).toFixed(2);
-      await repo.updateProductStock(output.productId, newStock);
+      const currentStock = parseFloat(product.currentStock || "0");
+      if (delta < 0 && currentStock + delta < 0) {
+        throw new Error(`Cannot reduce output: product "${product.name}" current stock (${currentStock.toFixed(2)} KG) is less than the quantity being reversed (${Math.abs(delta).toFixed(2)} KG). Stock may have already been consumed.`);
+      }
+      await repo.updateProductStock(output.productId, (currentStock + delta).toFixed(2));
     }
 
     // Adjust the finished-good lot quantity if the batch is completed
