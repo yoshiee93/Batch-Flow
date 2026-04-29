@@ -1,0 +1,71 @@
+Review the Production section and make these changes.
+
+Current issue:
+- “Add Output” is a separate action.
+- “Complete” marks a batch completed immediately without asking for output details.
+- Completed batches only allow printing labels, not editing production output.
+- Backend blocks adding/removing outputs once completed.
+
+Required changes:
+1. Remove the separate “Add Output” button from Production batch cards.
+   - Remove both compact and expanded Add Output buttons in:
+     client/src/features/production/pages/Production.tsx
+   - Keep “Add Input” and “Complete”.
+
+2. Change “Complete” so it opens the output/finalize dialog instead of instantly completing.
+   - Do not call finalizeBatchQuick directly from Complete.
+   - When Complete is clicked, open BatchOutputsEditor for that batch.
+   - The dialog must ask for:
+     - Product outputs: product + quantity, multiple rows if required
+     - Waste quantity
+     - Milling quantity
+     - Wet quantity
+     - Cleaning time
+     - Number of staff
+   - The batch should only complete after these fields are saved.
+
+3. Add new production fields:
+   - cleaningTime
+   - numberOfStaff
+   Add them to:
+   - shared/schema.ts batches table
+   - client Batch type
+   - backend finalize/update payloads
+   - any insert/update validation as needed
+   - database migration / drizzle push
+
+4. Make completed production editable.
+   - Completed batches must allow editing output rows and final production fields after completion.
+   - Rename the completed action from “Print Output Labels” to something like “View / Edit Output”.
+   - Completed batches should still allow label printing inside the dialog.
+
+5. Backend changes needed:
+   - Remove or relax these blockers in server/domains/production/service.ts:
+     - Cannot add output to completed batch
+     - Cannot remove output from completed batch
+   - Add an update batch output endpoint so incorrect output quantities/products can be corrected.
+   - When completed output is edited, inventory and finished-good lots must stay correct:
+     - If quantity changes, apply only the delta to product stock.
+     - Update matching finished-good lot quantity and remainingQuantity.
+     - Create audit logs for every edit.
+   - If an output is removed, reverse the product stock and lot quantity safely.
+
+6. Finalization logic:
+   - final actualQuantity should equal total output rows.
+   - Completing a batch should generate finished-good lots for each output row.
+   - Editing a completed batch should not duplicate lots.
+   - Re-saving a completed batch should update existing lots, not create duplicates.
+
+7. UI wording:
+   - Checkbox text “Mark batch as completed (cannot add more outputs after)” is no longer correct.
+   - Replace with “Mark batch as completed and generate output lots”.
+   - Completed batches should show that output can still be edited by authorised users.
+
+8. Test thoroughly:
+   - Create batch → add inputs → click Complete → enter outputs, cleaning time, staff count → complete.
+   - Confirm lots are generated.
+   - Reopen completed batch → edit output quantity → confirm product stock and lot quantity update correctly.
+   - Remove an output from completed batch → confirm inventory reversal.
+   - Add another output after completion → confirm new finished-good lot is generated.
+   - Confirm labels still print/reprint.
+   - Run npm run check and npm run build.
