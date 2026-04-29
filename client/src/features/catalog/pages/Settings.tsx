@@ -80,7 +80,7 @@ export default function Settings() {
       const a = document.createElement('a');
       const date = new Date().toISOString().split('T')[0];
       a.href = url;
-      a.download = `cleartrace-export-${date}.json`;
+      a.download = `ginas-table-export-${date}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

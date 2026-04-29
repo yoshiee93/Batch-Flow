@@ -37,7 +37,7 @@ export default function Login() {
             <Factory size={24} />
           </div>
           <h1 className="font-mono text-2xl font-bold tracking-tight">
-            Clear<span className="text-primary">trace</span>
+            Gina's<span className="text-primary"> Table</span>
           </h1>
           <p className="text-sm text-muted-foreground">Manufacturing Execution System</p>
         </div>

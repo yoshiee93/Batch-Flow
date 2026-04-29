@@ -62,7 +62,7 @@ adminRouter.get("/admin/export", adminOnly, asyncHandler(async (_req, res) => {
 
   const dateStr = new Date().toISOString().split('T')[0];
   res.setHeader("Content-Type", "application/json");
-  res.setHeader("Content-Disposition", `attachment; filename="cleartrace-export-${dateStr}.json"`);
+  res.setHeader("Content-Disposition", `attachment; filename="ginas-table-export-${dateStr}.json"`);
   res.send(JSON.stringify(snapshot, null, 2));
 }));
 

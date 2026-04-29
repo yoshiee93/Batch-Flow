@@ -1,8 +1,8 @@
-# Cleartrace
+# Gina's Table
 
 ## Overview
 
-Cleartrace is a Manufacturing Execution System (MES) designed for chemical and process manufacturing. It manages orders, production batches, inventory (raw materials and finished goods), product recipes/BOMs, lot traceability, and quality control. The system provides comprehensive batch tracking and inventory management for complex manufacturing environments.
+Gina's Table is a Manufacturing Execution System (MES) designed for chemical and process manufacturing. It manages orders, production batches, inventory (raw materials and finished goods), product recipes/BOMs, lot traceability, and quality control. The system provides comprehensive batch tracking and inventory management for complex manufacturing environments.
 
 ## User Preferences
 
