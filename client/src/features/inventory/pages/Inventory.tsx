@@ -24,6 +24,7 @@ import {
   type Material, type Product, type Category, type Lot, type LotWithDetails, type ReceivableItem,
 } from '@/lib/api';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
+import { useLabelTemplate, parseLabelTemplateSettings } from '@/features/labels/api';
 import { useToast } from '@/hooks/use-toast';
 import { useRole } from '@/contexts/AuthContext';
 
@@ -99,6 +100,8 @@ export default function Inventory() {
   const deleteProduct = useDeleteProduct();
   const receiveStock = useReceiveStock();
   const markBarcodePrinted = useMarkBarcodePrinted();
+  const { data: rawIntakeTemplate } = useLabelTemplate('raw_intake');
+  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
   const { toast } = useToast();
 
   const isLoading = materialsLoading || productsLoading || lotsLoading;
@@ -180,6 +183,7 @@ export default function Inventory() {
         producedDate: lot.producedDate || lot.receivedDate,
         sourceBatch: srcBatch?.batchCode || srcBatch?.batchNumber || 'N/A',
         expiryDate: lot.expiryDate,
+        templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
       });
     } else {
       printBarcodeLabel({
@@ -193,6 +197,7 @@ export default function Inventory() {
         receivedDate: lot.receivedDate,
         expiryDate: lot.expiryDate,
         supplierLot: lot.supplierLot,
+        templateSettings: rawIntakeTemplate ? parseLabelTemplateSettings(rawIntakeTemplate.settings) : undefined,
       });
     }
     if (!lot.barcodePrintedAt) {

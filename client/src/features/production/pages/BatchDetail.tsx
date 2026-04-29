@@ -24,6 +24,7 @@ import {
 import { useQualityChecks, useCreateQualityCheck, useUsers, type QualityCheck, type AppUser } from '@/features/quality/api';
 import { format } from 'date-fns';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
+import { useLabelTemplate, parseLabelTemplateSettings } from '@/features/labels/api';
 
 const batchStatusColors: Record<string, string> = {
   planned: 'bg-gray-100 text-gray-700',
@@ -83,6 +84,8 @@ export default function BatchDetail() {
   const markBatchBarcodePrinted = useMarkBatchBarcodePrinted();
   const markLotBarcodePrinted = useMarkBarcodePrinted();
   const updateBatch = useUpdateBatch();
+  const { data: batchTemplate } = useLabelTemplate('batch');
+  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
   const createQualityCheck = useCreateQualityCheck();
 
   const [showQcForm, setShowQcForm] = useState(false);
@@ -271,6 +274,7 @@ export default function BatchDetail() {
                             unit: 'KG',
                             productionDate: batch.startDate,
                             status: batch.status,
+                            templateSettings: batchTemplate ? parseLabelTemplateSettings(batchTemplate.settings) : undefined,
                           });
                           markBatchBarcodePrinted.mutate(batch.id);
                         }}
@@ -479,6 +483,7 @@ export default function BatchDetail() {
                             producedDate: batch.endDate,
                             sourceBatch: batch.batchCode || batch.batchNumber,
                             expiryDate: ol.expiryDate,
+                            templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
                           });
                           markLotBarcodePrinted.mutate(ol.lotId);
                         }}

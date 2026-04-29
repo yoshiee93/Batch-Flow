@@ -11,6 +11,7 @@ export interface Customer {
   address: string | null;
   notes: string | null;
   active: boolean;
+  defaultLabelTemplateId: string | null;
   createdAt: string;
 }
 

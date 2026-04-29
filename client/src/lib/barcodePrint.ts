@@ -1,5 +1,6 @@
 import JsBarcode from "jsbarcode";
 import { format } from "date-fns";
+import type { LabelTemplateSettings } from "@shared/schema";
 
 export type TemplateType = "raw_intake" | "finished_output" | "batch";
 
@@ -14,6 +15,7 @@ export interface RawIntakeData {
   receivedDate?: string | null;
   expiryDate?: string | null;
   supplierLot?: string | null;
+  templateSettings?: LabelTemplateSettings | null;
 }
 
 export interface FinishedOutputData {
@@ -26,6 +28,7 @@ export interface FinishedOutputData {
   producedDate?: string | null;
   sourceBatch?: string | null;
   expiryDate?: string | null;
+  templateSettings?: LabelTemplateSettings | null;
 }
 
 export interface BatchLabelData {
@@ -37,6 +40,7 @@ export interface BatchLabelData {
   unit?: string | null;
   productionDate?: string | null;
   status?: string | null;
+  templateSettings?: LabelTemplateSettings | null;
 }
 
 export type LabelData = RawIntakeData | FinishedOutputData | BatchLabelData;
@@ -108,6 +112,7 @@ function baseStyles(): string {
     .details .row { display: flex; gap: 8px; }
     .details .label-key { color: #555; width: 76px; flex-shrink: 0; }
     .details .label-val { font-weight: bold; }
+    .made-in-au { font-size: 10px; text-align: center; margin-top: 6px; border-top: 1px solid #ccc; padding-top: 4px; }
     @media print {
       html, body { margin: 0; padding: 0; }
       .label { border: 2px solid #000; }
@@ -147,8 +152,13 @@ function barcodeSection(value: string): string {
     : `<div style="font-size:12px;text-align:center;padding:8px;border:1px dashed #ccc;margin:6px 0;">Barcode: ${esc(value)}</div>`;
 }
 
+function show(flag: boolean | undefined): boolean {
+  return flag === undefined || flag === true;
+}
+
 function printRawIntakeLabel(data: RawIntakeData): void {
   const bc = data.barcodeValue || data.lotNumber;
+  const s = data.templateSettings;
   printWindow(`Raw Intake - ${data.lotNumber}`, `
   <div class="label">
     <span class="label-type">Raw Intake</span>
@@ -156,17 +166,19 @@ function printRawIntakeLabel(data: RawIntakeData): void {
     <div class="item-name">${esc(data.itemName)}</div>
     ${barcodeSection(bc)}
     <div class="details">
-      ${rowHtml("Qty:", `${esc(data.quantity)} ${esc(data.unit)}`)}
-      ${rowHtml("Received:", formatDate(data.receivedDate))}
-      ${rowHtml("Expires:", formatDate(data.expiryDate))}
-      ${rowHtml("Source:", data.sourceLabel ?? "")}
-      ${rowHtml("Sup. Lot:", data.supplierLot ?? "")}
+      ${show(s?.showQuantity) ? rowHtml("Qty:", `${esc(data.quantity)} ${esc(data.unit)}`) : ""}
+      ${show(s?.showReceivedDate) ? rowHtml("Received:", formatDate(data.receivedDate)) : ""}
+      ${show(s?.showExpiryDate) ? rowHtml("Expires:", formatDate(data.expiryDate)) : ""}
+      ${show(s?.showSource) ? rowHtml("Source:", data.sourceLabel ?? "") : ""}
+      ${show(s?.showSupplierLot) ? rowHtml("Sup. Lot:", data.supplierLot ?? "") : ""}
     </div>
+    ${show(s?.showMadeInAustralia) ? '<div class="made-in-au">Made in Australia</div>' : ""}
   </div>`);
 }
 
 function printFinishedOutputLabel(data: FinishedOutputData): void {
   const bc = data.barcodeValue || data.lotNumber;
+  const s = data.templateSettings;
   printWindow(`Output Lot - ${data.lotNumber}`, `
   <div class="label">
     <span class="label-type">Finished Output</span>
@@ -174,16 +186,18 @@ function printFinishedOutputLabel(data: FinishedOutputData): void {
     <div class="item-name">${esc(data.productName)}</div>
     ${barcodeSection(bc)}
     <div class="details">
-      ${rowHtml("Qty:", `${esc(data.quantity)} ${esc(data.unit)}`)}
-      ${rowHtml("Production Date:", formatDate(data.producedDate))}
-      ${rowHtml("Batch No:", data.sourceBatch ?? "")}
-      ${rowHtml("Best Before:", formatDate(data.expiryDate))}
+      ${show(s?.showQuantity) ? rowHtml("Qty:", `${esc(data.quantity)} ${esc(data.unit)}`) : ""}
+      ${show(s?.showProductionDate) ? rowHtml("Production Date:", formatDate(data.producedDate)) : ""}
+      ${show(s?.showBatchCode) ? rowHtml("Batch No:", data.sourceBatch ?? "") : ""}
+      ${show(s?.showExpiryDate) ? rowHtml("Best Before:", formatDate(data.expiryDate)) : ""}
     </div>
+    ${show(s?.showMadeInAustralia) ? '<div class="made-in-au">Made in Australia</div>' : ""}
   </div>`);
 }
 
 function printBatchLabel(data: BatchLabelData): void {
   const bc = data.barcodeValue || data.batchCode;
+  const s = data.templateSettings;
   const statusLabel = data.status
     ? data.status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
     : "";
@@ -194,10 +208,11 @@ function printBatchLabel(data: BatchLabelData): void {
     <div class="item-name">${esc(data.productName)}</div>
     ${barcodeSection(bc)}
     <div class="details">
-      ${data.quantity ? rowHtml("Qty:", `${esc(data.quantity)} ${esc(data.unit ?? 'KG')}`) : ""}
-      ${rowHtml("Date:", formatDate(data.productionDate))}
+      ${show(s?.showQuantity) && data.quantity ? rowHtml("Qty:", `${esc(data.quantity)} ${esc(data.unit ?? 'KG')}`) : ""}
+      ${show(s?.showProductionDate) ? rowHtml("Date:", formatDate(data.productionDate)) : ""}
       ${rowHtml("Status:", statusLabel)}
     </div>
+    ${show(s?.showMadeInAustralia) ? '<div class="made-in-au">Made in Australia</div>' : ""}
   </div>`);
 }
 

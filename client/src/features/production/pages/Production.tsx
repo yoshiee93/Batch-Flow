@@ -32,6 +32,7 @@ import {
   type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput, type Category, type LotWithDetails, type FinalizeResult, type OutputLot
 } from '@/lib/api';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
+import { useLabelTemplate, parseLabelTemplateSettings } from '@/features/labels/api';
 import { useToast } from '@/hooks/use-toast';
 import { buildBatchCode } from '@shared/batchCodeConfig';
 import { useRole } from '@/contexts/AuthContext';
@@ -1433,6 +1434,8 @@ function BatchOutputsEditor({
   const markLotPrinted = useMarkBarcodePrinted();
   const markBatchPrinted = useMarkBatchBarcodePrinted();
   const { data: batchData } = useBatch(isCompleted ? batchId : '');
+  const { data: batchTemplate } = useLabelTemplate('batch');
+  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
   
   useEffect(() => {
     setWasteQuantity(initialWaste);
@@ -1551,6 +1554,7 @@ function BatchOutputsEditor({
                   unit: 'KG',
                   productionDate: finalizeResult.batch.startDate,
                   status: finalizeResult.batch.status,
+                  templateSettings: batchTemplate ? parseLabelTemplateSettings(batchTemplate.settings) : undefined,
                 });
                 markBatchPrinted.mutate(finalizeResult.batch.id);
                 setSummaryBatchPrintedAt(new Date().toISOString());
@@ -1595,6 +1599,7 @@ function BatchOutputsEditor({
                         producedDate: finalizeResult.batch.endDate,
                         sourceBatch: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
                         expiryDate: ol.expiryDate,
+                        templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
                       });
                       markLotPrinted.mutate(ol.lotId);
                       setFinalizeResult(prev => prev ? {
@@ -1783,6 +1788,7 @@ function BatchOutputsEditor({
                             producedDate: batchData?.endDate,
                             sourceBatch: batchData?.batchCode || batchData?.batchNumber,
                             expiryDate: ol.expiryDate,
+                            templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
                           });
                           markLotPrinted.mutate(ol.lotId);
                         }}

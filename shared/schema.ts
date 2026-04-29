@@ -4,6 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "production", "inventory", "readonly"]);
+export const labelTypeEnum = pgEnum("label_type_enum", ["raw_intake", "finished_output", "batch"]);
 export const batchStatusEnum = pgEnum("batch_status", ["planned", "in_progress", "quality_check", "completed", "released", "quarantined"]);
 export const orderStatusEnum = pgEnum("order_status", ["pending", "in_production", "ready", "shipped", "cancelled"]);
 export const orderPriorityEnum = pgEnum("order_priority", ["low", "normal", "high", "urgent"]);
@@ -33,6 +34,17 @@ export const customers = pgTable("customers", {
   address: text("address"),
   notes: text("notes"),
   active: boolean("active").notNull().default(true),
+  defaultLabelTemplateId: varchar("default_label_template_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const labelTemplates = pgTable("label_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  labelType: labelTypeEnum("label_type").notNull(),
+  customerId: varchar("customer_id").references(() => customers.id),
+  isDefault: boolean("is_default").notNull().default(false),
+  settings: text("settings").notNull().default("{}"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -326,6 +338,7 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: t
 export const insertQualityCheckSchema = createInsertSchema(qualityChecks).omit({ id: true, checkedAt: true });
 export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({ id: true, createdAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
+export const insertLabelTemplateSchema = createInsertSchema(labelTemplates).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -362,3 +375,18 @@ export type SourceType = "supplier" | "farmer" | "internal_batch";
 export type StockMovement = typeof stockMovements.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertLabelTemplate = z.infer<typeof insertLabelTemplateSchema>;
+export type LabelTemplate = typeof labelTemplates.$inferSelect;
+export type LabelTemplateType = "raw_intake" | "finished_output" | "batch";
+
+export interface LabelTemplateSettings {
+  showProductionDate?: boolean;
+  showMadeInAustralia?: boolean;
+  showExpiryDate?: boolean;
+  showBatchCode?: boolean;
+  showQuantity?: boolean;
+  showSupplierLot?: boolean;
+  showSource?: boolean;
+  showBarcodeText?: boolean;
+  showReceivedDate?: boolean;
+}

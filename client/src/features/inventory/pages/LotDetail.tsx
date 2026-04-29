@@ -16,6 +16,7 @@ import {
 } from '@/lib/api';
 import { format } from 'date-fns';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
+import { useLabelTemplate, parseLabelTemplateSettings } from '@/features/labels/api';
 
 const lotStatusColors: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
@@ -83,6 +84,8 @@ export default function LotDetail() {
   const { data: usage = [], isLoading: usageLoading } = useLotUsage(id!);
   const { data: lineage, isLoading: lineageLoading } = useLotLineage(id!);
   const { data: sourceBatch } = useBatch(lot?.sourceBatchId || '');
+  const { data: rawIntakeTemplate } = useLabelTemplate('raw_intake');
+  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
 
   if (lotLoading) {
     return (
@@ -271,6 +274,7 @@ export default function LotDetail() {
                     producedDate: lot.producedDate || lot.receivedDate,
                     sourceBatch: sourceBatch?.batchCode || sourceBatch?.batchNumber || undefined,
                     expiryDate: lot.expiryDate,
+                    templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
                   });
                 } else {
                   printBarcodeLabel({
@@ -284,6 +288,7 @@ export default function LotDetail() {
                     receivedDate: lot.receivedDate,
                     expiryDate: lot.expiryDate,
                     supplierLot: lot.supplierLot,
+                    templateSettings: rawIntakeTemplate ? parseLabelTemplateSettings(rawIntakeTemplate.settings) : undefined,
                   });
                 }
               }}

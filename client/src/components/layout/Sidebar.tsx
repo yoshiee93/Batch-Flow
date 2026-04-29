@@ -11,6 +11,7 @@ import {
   Calculator,
   ScanSearch,
   LogOut,
+  Tag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -18,13 +19,14 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
-  { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
-  { label: 'Orders', icon: ShoppingCart, href: '/orders' },
-  { label: 'Customers', icon: Users, href: '/customers' },
-  { label: 'Production', icon: Factory, href: '/production' },
-  { label: 'Inventory', icon: Box, href: '/inventory' },
-  { label: 'Tracking', icon: ScanSearch, href: '/traceability' },
-  { label: 'Calculator', icon: Calculator, href: '/calculator' },
+  { label: 'Dashboard', icon: LayoutDashboard, href: '/', adminOnly: false },
+  { label: 'Orders', icon: ShoppingCart, href: '/orders', adminOnly: false },
+  { label: 'Customers', icon: Users, href: '/customers', adminOnly: false },
+  { label: 'Production', icon: Factory, href: '/production', adminOnly: false },
+  { label: 'Inventory', icon: Box, href: '/inventory', adminOnly: false },
+  { label: 'Tracking', icon: ScanSearch, href: '/traceability', adminOnly: false },
+  { label: 'Labels', icon: Tag, href: '/labels', adminOnly: true },
+  { label: 'Calculator', icon: Calculator, href: '/calculator', adminOnly: false },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -41,6 +43,8 @@ export function Sidebar({ className }: { className?: string }) {
   const initials = user
     ? user.fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : '??';
+
+  const isAdmin = user?.role === 'admin';
 
   async function handleLogout() {
     await logout();
@@ -60,7 +64,7 @@ export function Sidebar({ className }: { className?: string }) {
       </div>
       
       <nav className="flex-1 p-4 space-y-1">
-        {navItems.map((item) => {
+        {navItems.filter(item => !item.adminOnly || isAdmin).map((item) => {
           const isActive = location === item.href;
           return (
             <Link key={item.href} href={item.href}>

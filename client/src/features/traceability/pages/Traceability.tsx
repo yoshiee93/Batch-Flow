@@ -18,6 +18,7 @@ import {
 import type { ForwardTraceResponse, BackwardTraceResponse } from '@/features/traceability/api';
 import type { OutputLot } from '@/features/inventory/api';
 import { printBarcodeLabel } from '@/lib/barcodePrint';
+import { useLabelTemplate, parseLabelTemplateSettings } from '@/features/labels/api';
 
 type Candidate =
   | { type: 'lot'; id: string; label: string; sublabel?: string }
@@ -291,6 +292,8 @@ function ForwardTraceView({ trace, materials, products }: {
   const markLotPrinted = useMarkBarcodePrinted();
   const isProducedLot = lotType === 'finished_good' || lotType === 'intermediate';
   const { data: sourceBatchData } = useBatch(isProducedLot && lot.sourceBatchId ? lot.sourceBatchId : '');
+  const { data: rawIntakeTemplate } = useLabelTemplate('raw_intake');
+  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
 
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
@@ -328,6 +331,7 @@ function ForwardTraceView({ trace, materials, products }: {
                         producedDate: lot.producedDate || lot.receivedDate,
                         expiryDate: lot.expiryDate,
                         sourceBatch: sourceBatchData ? (sourceBatchData.batchCode || sourceBatchData.batchNumber) : undefined,
+                        templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
                       });
                     } else {
                       printBarcodeLabel({
@@ -341,6 +345,7 @@ function ForwardTraceView({ trace, materials, products }: {
                         receivedDate: lot.receivedDate,
                         expiryDate: lot.expiryDate,
                         supplierLot: lot.supplierLot,
+                        templateSettings: rawIntakeTemplate ? parseLabelTemplateSettings(rawIntakeTemplate.settings) : undefined,
                       });
                     }
                     markLotPrinted.mutate(lot.id);
@@ -541,6 +546,7 @@ function ForwardTraceView({ trace, materials, products }: {
                             producedDate: outputLot.producedDate,
                             sourceBatch: srcBatchUsage ? (srcBatchUsage.batch.batchCode || srcBatchUsage.batch.batchNumber) : undefined,
                             expiryDate: outputLot.expiryDate,
+                            templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
                           });
                           markLotPrinted.mutate(outputLot.id);
                         }}
@@ -565,6 +571,8 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
   const { data: outputLots = [], isLoading: outputsLoading } = useBatchOutputLots(batchId);
   const markBatchPrinted = useMarkBatchBarcodePrinted();
   const markLotPrinted = useMarkBarcodePrinted();
+  const { data: batchTemplate } = useLabelTemplate('batch');
+  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output');
 
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
@@ -604,6 +612,7 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                       unit: 'KG',
                       productionDate: batch.startDate,
                       status: batch.status,
+                      templateSettings: batchTemplate ? parseLabelTemplateSettings(batchTemplate.settings) : undefined,
                     });
                     markBatchPrinted.mutate(batch.id);
                   }}
@@ -754,6 +763,7 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                             producedDate: batch.endDate,
                             sourceBatch: batch.batchCode || batch.batchNumber,
                             expiryDate: ol.expiryDate,
+                            templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
                           });
                           markLotPrinted.mutate(ol.lotId);
                         }}

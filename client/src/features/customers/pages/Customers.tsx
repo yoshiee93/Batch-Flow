@@ -7,8 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Building2, Mail, Phone } from 'lucide-react';
 import { useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, type Customer } from '@/features/customers/api';
+import { useLabelTemplates } from '@/features/labels/api';
 import { useToast } from '@/hooks/use-toast';
 import { useRole } from '@/contexts/AuthContext';
 
@@ -25,11 +27,13 @@ export default function Customers() {
     phone: '',
     address: '',
     notes: '',
+    defaultLabelTemplateId: '' as string,
   });
 
   const { canManageCustomers } = useRole();
 
   const { data: customers = [], isLoading, isError } = useCustomers();
+  const { data: labelTemplates = [] } = useLabelTemplates();
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
   const deleteCustomer = useDeleteCustomer();
@@ -43,7 +47,7 @@ export default function Customers() {
   );
 
   const resetForm = () => {
-    setFormData({ code: '', name: '', contactName: '', email: '', phone: '', address: '', notes: '' });
+    setFormData({ code: '', name: '', contactName: '', email: '', phone: '', address: '', notes: '', defaultLabelTemplateId: '' });
   };
 
   const handleCreate = async () => {
@@ -80,6 +84,7 @@ export default function Customers() {
       phone: customer.phone || '',
       address: customer.address || '',
       notes: customer.notes || '',
+      defaultLabelTemplateId: customer.defaultLabelTemplateId || '',
     });
     setIsEditDialogOpen(true);
   };
@@ -98,6 +103,7 @@ export default function Customers() {
         phone: formData.phone || null,
         address: formData.address || null,
         notes: formData.notes || null,
+        defaultLabelTemplateId: formData.defaultLabelTemplateId || null,
       });
       toast({ title: "Customer updated", description: `Customer ${formData.name} updated successfully` });
       setIsEditDialogOpen(false);
@@ -436,6 +442,27 @@ export default function Customers() {
                 data-testid="input-edit-customer-notes"
               />
             </div>
+            {labelTemplates.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-label-template">Default Label Template</Label>
+                <Select
+                  value={formData.defaultLabelTemplateId || 'none'}
+                  onValueChange={(val) => setFormData({ ...formData, defaultLabelTemplateId: val === 'none' ? '' : val })}
+                >
+                  <SelectTrigger id="edit-label-template" data-testid="select-customer-label-template">
+                    <SelectValue placeholder="Use system default" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Use system default</SelectItem>
+                    {labelTemplates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name} ({t.labelType.replace(/_/g, ' ')})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedCustomer(null); resetForm(); }}>Cancel</Button>
