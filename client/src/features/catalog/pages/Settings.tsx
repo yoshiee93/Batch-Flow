@@ -13,6 +13,7 @@ import { PROCESS_CODE_MAP, FRUIT_CODE_MAP } from '@shared/batchCodeConfig';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
 import { useRole } from '@/contexts/AuthContext';
+import { queryClient } from '@/lib/queryClient';
 
 export default function Settings() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -116,6 +117,7 @@ export default function Settings() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Import failed');
+      queryClient.clear();
       toast({ title: 'Import complete', description: 'Database restored successfully from backup.' });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Import failed';
