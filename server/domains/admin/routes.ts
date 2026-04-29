@@ -13,6 +13,16 @@ const adminOnly = requireRole("admin");
 
 export const adminRouter = Router();
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+
+function parseDates<T extends Record<string, unknown>>(row: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) {
+    out[k] = typeof v === 'string' && ISO_DATE.test(v) ? new Date(v) : v;
+  }
+  return out as T;
+}
+
 adminRouter.get("/admin/export", adminOnly, asyncHandler(async (_req, res) => {
   const [
     usersData, customersData, categoriesData, productsData, materialsData, lotsData,
@@ -179,21 +189,21 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
       `);
     }
 
-    if (t.customers?.length) await tx.insert(customers).values(t.customers);
-    if (t.categories?.length) await tx.insert(categories).values(t.categories);
-    if (t.products?.length) await tx.insert(products).values(t.products);
-    if (t.materials?.length) await tx.insert(materials).values(t.materials);
-    if (t.lots?.length) await tx.insert(lots).values(t.lots);
-    if (t.recipes?.length) await tx.insert(recipes).values(t.recipes);
-    if (t.recipeItems?.length) await tx.insert(recipeItems).values(t.recipeItems);
-    if (t.batches?.length) await tx.insert(batches).values(t.batches);
-    if (t.batchMaterials?.length) await tx.insert(batchMaterials).values(t.batchMaterials);
-    if (t.batchOutputs?.length) await tx.insert(batchOutputs).values(t.batchOutputs);
-    if (t.orders?.length) await tx.insert(orders).values(t.orders);
-    if (t.orderItems?.length) await tx.insert(orderItems).values(t.orderItems);
-    if (t.qualityChecks?.length) await tx.insert(qualityChecks).values(t.qualityChecks);
-    if (t.stockMovements?.length) await tx.insert(stockMovements).values(t.stockMovements);
-    if (t.auditLogs?.length) await tx.insert(auditLogs).values(t.auditLogs);
+    if (t.customers?.length) await tx.insert(customers).values(t.customers.map(parseDates));
+    if (t.categories?.length) await tx.insert(categories).values(t.categories.map(parseDates));
+    if (t.products?.length) await tx.insert(products).values(t.products.map(parseDates));
+    if (t.materials?.length) await tx.insert(materials).values(t.materials.map(parseDates));
+    if (t.lots?.length) await tx.insert(lots).values(t.lots.map(parseDates));
+    if (t.recipes?.length) await tx.insert(recipes).values(t.recipes.map(parseDates));
+    if (t.recipeItems?.length) await tx.insert(recipeItems).values(t.recipeItems.map(parseDates));
+    if (t.batches?.length) await tx.insert(batches).values(t.batches.map(parseDates));
+    if (t.batchMaterials?.length) await tx.insert(batchMaterials).values(t.batchMaterials.map(parseDates));
+    if (t.batchOutputs?.length) await tx.insert(batchOutputs).values(t.batchOutputs.map(parseDates));
+    if (t.orders?.length) await tx.insert(orders).values(t.orders.map(parseDates));
+    if (t.orderItems?.length) await tx.insert(orderItems).values(t.orderItems.map(parseDates));
+    if (t.qualityChecks?.length) await tx.insert(qualityChecks).values(t.qualityChecks.map(parseDates));
+    if (t.stockMovements?.length) await tx.insert(stockMovements).values(t.stockMovements.map(parseDates));
+    if (t.auditLogs?.length) await tx.insert(auditLogs).values(t.auditLogs.map(parseDates));
   });
 
   res.json({ success: true, message: "Database restored successfully from backup." });

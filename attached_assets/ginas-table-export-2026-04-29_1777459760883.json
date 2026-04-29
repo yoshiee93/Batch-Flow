@@ -1,0 +1,969 @@
+{
+  "version": 1,
+  "exportedAt": "2026-04-29T10:41:31.565Z",
+  "tables": {
+    "users": [
+      {
+        "id": "aad53357-8393-4356-a50d-4c304c06853a",
+        "username": "admin",
+        "password": "$2b$10$0uWInPOCK7bkpd0Pih4As.B8fSa2zlvEreTHvQ93NZIwhW8bk5tze",
+        "fullName": "Admin User",
+        "role": "admin",
+        "active": true,
+        "createdAt": "2026-04-28T16:18:47.865Z"
+      }
+    ],
+    "customers": [
+      {
+        "id": "a31bf30b-51f5-44b9-b7bf-40c96332ac3b",
+        "code": "GTS001",
+        "name": "Doehler",
+        "contactName": null,
+        "email": null,
+        "phone": null,
+        "address": null,
+        "notes": null,
+        "active": true,
+        "defaultLabelTemplateId": null,
+        "createdAt": "2026-04-22T06:00:29.331Z"
+      }
+    ],
+    "categories": [
+      {
+        "id": "327fdddb-e7ca-4ed1-bc28-697e3f140ef1",
+        "name": "Powder",
+        "excludeFromYield": true,
+        "showInTabs": true,
+        "isDefault": false,
+        "sortOrder": 4,
+        "processCode": null,
+        "createdAt": "2026-04-29T10:32:07.542Z"
+      },
+      {
+        "id": "fd2fdfd4-ca6a-4e18-a111-6282e6ee6564",
+        "name": "Raw",
+        "excludeFromYield": false,
+        "showInTabs": true,
+        "isDefault": false,
+        "sortOrder": 0,
+        "processCode": null,
+        "createdAt": "2026-04-29T10:32:26.943Z"
+      },
+      {
+        "id": "faaf4c67-a96b-413d-8658-4ffaacc4c152",
+        "name": "Frozen",
+        "excludeFromYield": false,
+        "showInTabs": true,
+        "isDefault": false,
+        "sortOrder": 1,
+        "processCode": "3",
+        "createdAt": "2026-04-29T01:38:32.689Z"
+      },
+      {
+        "id": "9f6fff4e-354a-4163-892c-506ed35cc2ba",
+        "name": "Freeze-Dried",
+        "excludeFromYield": false,
+        "showInTabs": true,
+        "isDefault": false,
+        "sortOrder": 2,
+        "processCode": "4",
+        "createdAt": "2026-04-29T01:40:09.008Z"
+      }
+    ],
+    "products": [
+      {
+        "id": "f113c48a-0c64-4c93-a403-6660ea21c6a0",
+        "sku": "",
+        "name": "Raspberry Crumble",
+        "description": null,
+        "unit": "KG",
+        "minStock": "0.000",
+        "currentStock": "0.000",
+        "categoryId": "faaf4c67-a96b-413d-8658-4ffaacc4c152",
+        "fruitCode": null,
+        "isReceivable": true,
+        "active": false,
+        "createdAt": "2026-04-29T02:02:22.389Z"
+      },
+      {
+        "id": "c3060010-374e-4c19-8c54-1ee2611ebd60",
+        "sku": "",
+        "name": "Fresh Strawberry",
+        "description": null,
+        "unit": "KG",
+        "minStock": "0.000",
+        "currentStock": "0.000",
+        "categoryId": "fd2fdfd4-ca6a-4e18-a111-6282e6ee6564",
+        "fruitCode": null,
+        "isReceivable": true,
+        "active": false,
+        "createdAt": "2026-04-29T01:47:04.007Z"
+      },
+      {
+        "id": "dd1c5a19-6f78-4b66-b526-03a19a1572a3",
+        "sku": "",
+        "name": "Strawberry",
+        "description": null,
+        "unit": "KG",
+        "minStock": "0.000",
+        "currentStock": "5000.000",
+        "categoryId": "fd2fdfd4-ca6a-4e18-a111-6282e6ee6564",
+        "fruitCode": null,
+        "isReceivable": true,
+        "active": true,
+        "createdAt": "2026-04-29T10:33:46.732Z"
+      },
+      {
+        "id": "9448ec3e-65e8-4935-8bd5-5b46867d89c1",
+        "sku": "",
+        "name": "Sliced Strawberry",
+        "description": null,
+        "unit": "KG",
+        "minStock": "0.000",
+        "currentStock": "0.000",
+        "categoryId": "faaf4c67-a96b-413d-8658-4ffaacc4c152",
+        "fruitCode": "SS",
+        "isReceivable": false,
+        "active": true,
+        "createdAt": "2026-04-29T10:34:03.821Z"
+      },
+      {
+        "id": "4a8b686a-51ae-4bc0-ab85-f62ca97e991b",
+        "sku": "",
+        "name": "Whole Strawberry",
+        "description": null,
+        "unit": "KG",
+        "minStock": "0.000",
+        "currentStock": "0.000",
+        "categoryId": "faaf4c67-a96b-413d-8658-4ffaacc4c152",
+        "fruitCode": "SW",
+        "isReceivable": false,
+        "active": true,
+        "createdAt": "2026-04-29T10:34:19.938Z"
+      },
+      {
+        "id": "50dfe2c8-1931-4fa8-9dab-ba181c02043b",
+        "sku": "",
+        "name": "Raspberry",
+        "description": null,
+        "unit": "KG",
+        "minStock": "0.000",
+        "currentStock": "0.000",
+        "categoryId": "faaf4c67-a96b-413d-8658-4ffaacc4c152",
+        "fruitCode": "RW",
+        "isReceivable": true,
+        "active": true,
+        "createdAt": "2026-04-29T01:45:28.059Z"
+      },
+      {
+        "id": "09a88826-4468-4f4b-9e5c-0406deef8572",
+        "sku": "",
+        "name": "Strawberry Slice",
+        "description": null,
+        "unit": "KG",
+        "minStock": "0.000",
+        "currentStock": "0.000",
+        "categoryId": "9f6fff4e-354a-4163-892c-506ed35cc2ba",
+        "fruitCode": "SS",
+        "isReceivable": false,
+        "active": true,
+        "createdAt": "2026-04-29T10:34:36.155Z"
+      },
+      {
+        "id": "2f4a7a1d-afff-446c-bb7c-f75e12e257c9",
+        "sku": "",
+        "name": "Strawberry Whole",
+        "description": null,
+        "unit": "KG",
+        "minStock": "0.000",
+        "currentStock": "0.000",
+        "categoryId": "9f6fff4e-354a-4163-892c-506ed35cc2ba",
+        "fruitCode": "SW",
+        "isReceivable": false,
+        "active": true,
+        "createdAt": "2026-04-29T10:34:44.217Z"
+      },
+      {
+        "id": "9c944675-51b0-4327-812f-bf8b0330b0fd",
+        "sku": "",
+        "name": "Raspberry Crumble",
+        "description": null,
+        "unit": "KG",
+        "minStock": "50.000",
+        "currentStock": "140.000",
+        "categoryId": "9f6fff4e-354a-4163-892c-506ed35cc2ba",
+        "fruitCode": "RC",
+        "isReceivable": true,
+        "active": true,
+        "createdAt": "2026-04-29T01:58:18.836Z"
+      }
+    ],
+    "materials": [],
+    "lots": [
+      {
+        "id": "c8c604c5-58af-4de4-ad18-435ed59f8c6d",
+        "lotNumber": "FG-260429-0001",
+        "lotType": "finished_good",
+        "status": "active",
+        "barcodeValue": "BCMOJEW2K87047",
+        "materialId": null,
+        "productId": "9c944675-51b0-4327-812f-bf8b0330b0fd",
+        "supplierLot": "2026-04",
+        "supplierName": "Pinata",
+        "sourceName": "Pinata",
+        "sourceType": "supplier",
+        "originalQuantity": "120.000",
+        "quantity": "120.000",
+        "remainingQuantity": "120.000",
+        "expiryDate": null,
+        "receivedDate": "2026-04-29T00:00:00.000Z",
+        "producedDate": null,
+        "sourceBatchId": null,
+        "customerId": null,
+        "barcodePrintedAt": "2026-04-29T02:04:19.802Z",
+        "notes": "2 pallets",
+        "createdAt": "2026-04-29T02:04:14.507Z"
+      },
+      {
+        "id": "9b4d9841-a824-4ac3-b92c-e9bdb452c627",
+        "lotNumber": "FG-260429-0003",
+        "lotType": "finished_good",
+        "status": "active",
+        "barcodeValue": "BCMOJX94E12912",
+        "materialId": null,
+        "productId": "dd1c5a19-6f78-4b66-b526-03a19a1572a3",
+        "supplierLot": null,
+        "supplierName": "SSS",
+        "sourceName": "SSS",
+        "sourceType": "farmer",
+        "originalQuantity": "5000.000",
+        "quantity": "5000.000",
+        "remainingQuantity": "5000.000",
+        "expiryDate": null,
+        "receivedDate": "2026-04-29T00:00:00.000Z",
+        "producedDate": null,
+        "sourceBatchId": null,
+        "customerId": null,
+        "barcodePrintedAt": "2026-04-29T10:38:22.210Z",
+        "notes": null,
+        "createdAt": "2026-04-29T10:38:16.470Z"
+      }
+    ],
+    "recipes": [],
+    "recipeItems": [],
+    "batches": [
+      {
+        "id": "147324ba-77c5-4fe9-a4be-f4263a0795c0",
+        "batchNumber": "SS3261193",
+        "productId": "9448ec3e-65e8-4935-8bd5-5b46867d89c1",
+        "recipeId": null,
+        "status": "in_progress",
+        "plannedQuantity": "0.000",
+        "actualQuantity": null,
+        "wasteQuantity": null,
+        "millingQuantity": null,
+        "wetQuantity": null,
+        "startDate": "2026-04-29T00:00:00.000Z",
+        "endDate": null,
+        "assignedTo": null,
+        "notes": null,
+        "barcodeValue": "SS3261193",
+        "barcodePrintedAt": null,
+        "batchCode": "SS3261193",
+        "createdAt": "2026-04-29T10:40:58.373Z"
+      }
+    ],
+    "batchMaterials": [],
+    "batchOutputs": [],
+    "orders": [],
+    "orderItems": [],
+    "qualityChecks": [],
+    "stockMovements": [
+      {
+        "id": "49551fa7-46a9-4f42-a231-735b18db3f3d",
+        "movementType": "receipt",
+        "materialId": null,
+        "productId": "9c944675-51b0-4327-812f-bf8b0330b0fd",
+        "lotId": "c8c604c5-58af-4de4-ad18-435ed59f8c6d",
+        "batchId": null,
+        "orderId": null,
+        "quantity": "120.000",
+        "reference": "Goods received: FG-260429-0001",
+        "createdBy": null,
+        "createdAt": "2026-04-29T02:04:14.537Z"
+      },
+      {
+        "id": "1a202651-616a-4eb5-9006-f131e534f5ce",
+        "movementType": "receipt",
+        "materialId": null,
+        "productId": "dd1c5a19-6f78-4b66-b526-03a19a1572a3",
+        "lotId": "9b4d9841-a824-4ac3-b92c-e9bdb452c627",
+        "batchId": null,
+        "orderId": null,
+        "quantity": "5000.000",
+        "reference": "Goods received: FG-260429-0003",
+        "createdBy": null,
+        "createdAt": "2026-04-29T10:38:16.484Z"
+      }
+    ],
+    "auditLogs": [
+      {
+        "id": "606573ab-bcf8-47ef-9367-6f606a691f76",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":0}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:33:14.727Z"
+      },
+      {
+        "id": "a2f45d62-abc4-4fff-88bd-31ef4e21a379",
+        "entityType": "order",
+        "entityId": "11379f60-4410-47b9-a667-7876ab7e880d",
+        "action": "create",
+        "changes": "{\"orderNumber\":\"1235\",\"customerId\":\"a31bf30b-51f5-44b9-b7bf-40c96332ac3b\",\"customerName\":\"Doehler\",\"status\":\"pending\",\"priority\":\"normal\",\"dueDate\":\"2026-05-01T00:00:00.000Z\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:34:59.749Z"
+      },
+      {
+        "id": "88cea369-ccf5-487d-9ef7-e89b8f718325",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":1}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:34:59.758Z"
+      },
+      {
+        "id": "872feedd-eb15-40ca-b1fa-1d4fc13c871b",
+        "entityType": "order",
+        "entityId": "11379f60-4410-47b9-a667-7876ab7e880d",
+        "action": "update",
+        "changes": "{\"customerId\":\"a31bf30b-51f5-44b9-b7bf-40c96332ac3b\",\"customerName\":\"Doehler\",\"priority\":\"normal\",\"dueDate\":\"2026-05-01T00:00:00.000Z\",\"notes\":null}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:35:21.156Z"
+      },
+      {
+        "id": "99d87c45-635f-4cf4-b94a-0a8105175188",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":1}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:35:46.206Z"
+      },
+      {
+        "id": "6e432847-4378-4c98-836c-da107e37a5b5",
+        "entityType": "category",
+        "entityId": "faaf4c67-a96b-413d-8658-4ffaacc4c152",
+        "action": "create",
+        "changes": "{\"name\":\"Raspberry Crumble\",\"excludeFromYield\":false,\"showInTabs\":true,\"isDefault\":false,\"sortOrder\":0,\"processCode\":\"3\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:38:32.711Z"
+      },
+      {
+        "id": "833be217-2659-422d-a385-1fed349b39f1",
+        "entityType": "category",
+        "entityId": "faaf4c67-a96b-413d-8658-4ffaacc4c152",
+        "action": "update",
+        "changes": "{\"name\":\"Raspberry Crumble\",\"excludeFromYield\":false,\"showInTabs\":true,\"sortOrder\":0,\"processCode\":\"4\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:38:43.004Z"
+      },
+      {
+        "id": "3bd60257-e176-43fd-9f4a-2d4a8c7fa27f",
+        "entityType": "category",
+        "entityId": "9f6fff4e-354a-4163-892c-506ed35cc2ba",
+        "action": "create",
+        "changes": "{\"name\":\"Raspberry Powder\",\"excludeFromYield\":false,\"showInTabs\":true,\"isDefault\":false,\"sortOrder\":1,\"processCode\":\"4\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:40:09.017Z"
+      },
+      {
+        "id": "b3059074-0e95-49f6-be0d-fdc24a293ca1",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":1}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:43:30.176Z"
+      },
+      {
+        "id": "467346a0-f439-48d7-b942-cec1b9ae18d2",
+        "entityType": "product",
+        "entityId": "50dfe2c8-1931-4fa8-9dab-ba181c02043b",
+        "action": "create",
+        "changes": "{\"sku\":\"RW1260291\",\"name\":\"Frozen Raspberry - Whole\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0\",\"currentStock\":\"0\",\"categoryId\":\"40d061d1-791b-4d7b-8ebe-932b60668c3b\",\"fruitCode\":\"RW\",\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:45:28.089Z"
+      },
+      {
+        "id": "df04ca0e-7a6c-4e2f-b79d-442a45a96dac",
+        "entityType": "category",
+        "entityId": "faaf4c67-a96b-413d-8658-4ffaacc4c152",
+        "action": "update",
+        "changes": "{\"name\":\"Raspberry\",\"excludeFromYield\":false,\"showInTabs\":true,\"sortOrder\":0,\"processCode\":\"4\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:45:51.616Z"
+      },
+      {
+        "id": "f5046f95-ff4a-4d7a-a118-c3dd19d73d67",
+        "entityType": "category",
+        "entityId": "9f6fff4e-354a-4163-892c-506ed35cc2ba",
+        "action": "update",
+        "changes": "{\"name\":\"Strawberry\",\"excludeFromYield\":false,\"showInTabs\":true,\"sortOrder\":1,\"processCode\":\"4\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:46:01.129Z"
+      },
+      {
+        "id": "65018a4e-e6c1-4585-8277-72acc4250a6f",
+        "entityType": "product",
+        "entityId": "50dfe2c8-1931-4fa8-9dab-ba181c02043b",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Frozen Raspberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0.000\",\"currentStock\":\"0.000\",\"categoryId\":\"40d061d1-791b-4d7b-8ebe-932b60668c3b\",\"fruitCode\":\"RW\",\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:46:48.061Z"
+      },
+      {
+        "id": "74e68ab6-315e-4bfc-9c0b-ecb9bce44b97",
+        "entityType": "product",
+        "entityId": "c3060010-374e-4c19-8c54-1ee2611ebd60",
+        "action": "create",
+        "changes": "{\"sku\":\"\",\"name\":\"Strawberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0\",\"currentStock\":\"0\",\"categoryId\":\"40d061d1-791b-4d7b-8ebe-932b60668c3b\",\"fruitCode\":null,\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:47:04.017Z"
+      },
+      {
+        "id": "83d3b1b7-32eb-49ad-b72e-0fefc026dd74",
+        "entityType": "product",
+        "entityId": "c3060010-374e-4c19-8c54-1ee2611ebd60",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Fresh Strawberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0.000\",\"currentStock\":\"0.000\",\"categoryId\":\"40d061d1-791b-4d7b-8ebe-932b60668c3b\",\"fruitCode\":null,\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:47:15.003Z"
+      },
+      {
+        "id": "c897c196-a09a-487b-addd-880182dd597e",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":1}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:49:57.696Z"
+      },
+      {
+        "id": "801d863f-9450-43ca-a7a7-56a5e683ba1c",
+        "entityType": "product",
+        "entityId": "9c944675-51b0-4327-812f-bf8b0330b0fd",
+        "action": "create",
+        "changes": "{\"sku\":\"\",\"name\":\"Raspberry Crumble\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"50\",\"currentStock\":\"110\",\"categoryId\":\"faaf4c67-a96b-413d-8658-4ffaacc4c152\",\"fruitCode\":\"RC\",\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:58:18.865Z"
+      },
+      {
+        "id": "fe3de209-f673-4cb7-9f17-cb4d98a51c3c",
+        "entityType": "product",
+        "entityId": "9c944675-51b0-4327-812f-bf8b0330b0fd",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Raspberry Crumble\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"50.000\",\"currentStock\":\"110.000\",\"categoryId\":\"faaf4c67-a96b-413d-8658-4ffaacc4c152\",\"fruitCode\":\"RC\",\"isReceivable\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T01:59:13.591Z"
+      },
+      {
+        "id": "04523aa0-816b-40d9-9330-259e6f6fa1e0",
+        "entityType": "category",
+        "entityId": "faaf4c67-a96b-413d-8658-4ffaacc4c152",
+        "action": "update",
+        "changes": "{\"name\":\"Frozen\",\"excludeFromYield\":false,\"showInTabs\":true,\"sortOrder\":0,\"processCode\":\"3\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:00:54.699Z"
+      },
+      {
+        "id": "c1458115-58db-4974-8a9b-b0f5a4469f37",
+        "entityType": "category",
+        "entityId": "9f6fff4e-354a-4163-892c-506ed35cc2ba",
+        "action": "update",
+        "changes": "{\"name\":\"Freeze-Dried\",\"excludeFromYield\":false,\"showInTabs\":true,\"sortOrder\":1,\"processCode\":\"4\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:01:05.889Z"
+      },
+      {
+        "id": "e4247573-264c-4166-b48f-7c2d923d8fbd",
+        "entityType": "product",
+        "entityId": "9c944675-51b0-4327-812f-bf8b0330b0fd",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Raspberry Crumble\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"50.000\",\"currentStock\":\"110.000\",\"categoryId\":\"9f6fff4e-354a-4163-892c-506ed35cc2ba\",\"fruitCode\":\"RC\",\"isReceivable\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:01:39.129Z"
+      },
+      {
+        "id": "cac0289b-813d-4f2f-95dc-2e2c70648d66",
+        "entityType": "product",
+        "entityId": "f113c48a-0c64-4c93-a403-6660ea21c6a0",
+        "action": "create",
+        "changes": "{\"sku\":\"\",\"name\":\"Raspberry Crumble\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0\",\"currentStock\":\"0\",\"categoryId\":\"faaf4c67-a96b-413d-8658-4ffaacc4c152\",\"fruitCode\":null,\"isReceivable\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:02:22.401Z"
+      },
+      {
+        "id": "f396175d-3ada-4ab9-afe9-d7eee2959db1",
+        "entityType": "lot",
+        "entityId": "c8c604c5-58af-4de4-ad18-435ed59f8c6d",
+        "action": "received",
+        "changes": "{\"lotNumber\":\"FG-260429-0001\",\"barcodeValue\":\"BCMOJEW2K87047\",\"itemId\":\"9c944675-51b0-4327-812f-bf8b0330b0fd\",\"itemType\":\"product\",\"quantity\":\"120\",\"supplierName\":\"Pinata\",\"supplierLot\":\"2026-04\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:04:14.548Z"
+      },
+      {
+        "id": "aa2bbc58-6005-4c75-af89-3d4dd5859c6a",
+        "entityType": "lot",
+        "entityId": "c8c604c5-58af-4de4-ad18-435ed59f8c6d",
+        "action": "barcode_printed",
+        "changes": "{\"barcodePrintedAt\":\"2026-04-29T02:04:19.802Z\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:04:19.809Z"
+      },
+      {
+        "id": "009a5b5f-fa93-4c49-917d-c521f16b9a32",
+        "entityType": "batch",
+        "entityId": "a746a8e2-f6b9-4e73-827f-2af856519000",
+        "action": "create",
+        "changes": "{\"batchNumber\":\"RC4261091\",\"productId\":\"9c944675-51b0-4327-812f-bf8b0330b0fd\",\"status\":\"in_progress\",\"plannedQuantity\":\"0\",\"startDate\":\"2026-04-27T00:00:00.000Z\",\"barcodeValue\":\"RC4261171\",\"batchCode\":\"RC4261171\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:06:43.279Z"
+      },
+      {
+        "id": "7fcf8c45-1d18-4261-9344-839c995d0126",
+        "entityType": "batch",
+        "entityId": "a746a8e2-f6b9-4e73-827f-2af856519000",
+        "action": "product_input_recorded",
+        "changes": "{\"productId\":\"9c944675-51b0-4327-812f-bf8b0330b0fd\",\"quantity\":\"30\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:07:34.512Z"
+      },
+      {
+        "id": "80bb8931-f1b2-48c1-b382-52a9d4b2a7ba",
+        "entityType": "batch",
+        "entityId": "a746a8e2-f6b9-4e73-827f-2af856519000",
+        "action": "output_added",
+        "changes": "{\"productId\":\"9c944675-51b0-4327-812f-bf8b0330b0fd\",\"quantity\":\"10\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:08:05.701Z"
+      },
+      {
+        "id": "a9f4248c-4b5c-47de-8988-33d21309c6e3",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":1}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:08:05.706Z"
+      },
+      {
+        "id": "55226408-3829-493d-b4c9-c6792f5ee363",
+        "entityType": "batch",
+        "entityId": "a746a8e2-f6b9-4e73-827f-2af856519000",
+        "action": "updated",
+        "changes": "{\"totalOutput\":10,\"wasteQuantity\":\"0\",\"millingQuantity\":\"0\",\"wetQuantity\":\"0\",\"markCompleted\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:08:25.063Z"
+      },
+      {
+        "id": "d9ac4326-387b-4ade-a93a-8b0189b395e0",
+        "entityType": "lot",
+        "entityId": "dbbef81c-9852-4a8f-bb8b-a8dacf0e8290",
+        "action": "finished_lot_created",
+        "changes": "{\"lotNumber\":\"FG-260429-0002\",\"barcodeValue\":\"BCMOJF1IFH3089\",\"productId\":\"9c944675-51b0-4327-812f-bf8b0330b0fd\",\"quantity\":\"10.000\",\"sourceBatchId\":\"a746a8e2-f6b9-4e73-827f-2af856519000\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:08:28.322Z"
+      },
+      {
+        "id": "45d239cb-e547-4204-bcd3-87d99fd59584",
+        "entityType": "batch",
+        "entityId": "a746a8e2-f6b9-4e73-827f-2af856519000",
+        "action": "completed",
+        "changes": "{\"totalOutput\":10,\"wasteQuantity\":\"0.000\",\"millingQuantity\":\"0.000\",\"wetQuantity\":\"0.000\",\"markCompleted\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:08:28.327Z"
+      },
+      {
+        "id": "7b7e527c-4da3-477d-a42a-0df4eef54409",
+        "entityType": "lot",
+        "entityId": "dbbef81c-9852-4a8f-bb8b-a8dacf0e8290",
+        "action": "barcode_printed",
+        "changes": "{\"barcodePrintedAt\":\"2026-04-29T02:08:35.269Z\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:08:35.276Z"
+      },
+      {
+        "id": "b4f57fcb-c318-419d-bb35-61de5876d7b0",
+        "entityType": "lot",
+        "entityId": "dbbef81c-9852-4a8f-bb8b-a8dacf0e8290",
+        "action": "barcode_printed",
+        "changes": "{\"barcodePrintedAt\":\"2026-04-29T02:09:52.343Z\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:09:52.350Z"
+      },
+      {
+        "id": "59210fb5-94f7-4049-ba4b-e91afe6cd8e0",
+        "entityType": "batch",
+        "entityId": "5bcae426-84d8-43e6-ab7e-495c32f5b23b",
+        "action": "create",
+        "changes": "{\"batchNumber\":\"RC4261193\",\"productId\":\"9c944675-51b0-4327-812f-bf8b0330b0fd\",\"status\":\"in_progress\",\"plannedQuantity\":\"0\",\"startDate\":\"2026-04-29T00:00:00.000Z\",\"barcodeValue\":\"RC4261193\",\"batchCode\":\"RC4261193\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:13:32.943Z"
+      },
+      {
+        "id": "5d1501f0-479e-4185-bf78-d166f02dacd8",
+        "entityType": "batch",
+        "entityId": "5bcae426-84d8-43e6-ab7e-495c32f5b23b",
+        "action": "product_input_recorded",
+        "changes": "{\"productId\":\"9c944675-51b0-4327-812f-bf8b0330b0fd\",\"quantity\":\"60\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:13:56.063Z"
+      },
+      {
+        "id": "63494194-90f6-4945-8141-cb12dc6b74ff",
+        "entityType": "lot",
+        "entityId": "dbbef81c-9852-4a8f-bb8b-a8dacf0e8290",
+        "action": "barcode_printed",
+        "changes": "{\"barcodePrintedAt\":\"2026-04-29T02:15:55.676Z\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:15:55.700Z"
+      },
+      {
+        "id": "7fbc6853-6e4a-4e2d-b0b1-a7fb9a2ef9b5",
+        "entityType": "lot",
+        "entityId": "dbbef81c-9852-4a8f-bb8b-a8dacf0e8290",
+        "action": "barcode_printed",
+        "changes": "{\"barcodePrintedAt\":\"2026-04-29T02:17:22.759Z\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:17:22.784Z"
+      },
+      {
+        "id": "bbc6e505-398e-428b-afd6-5b5bbc092b1e",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":1}",
+        "userId": null,
+        "createdAt": "2026-04-29T02:24:09.018Z"
+      },
+      {
+        "id": "5a793c63-6ff0-4bce-918b-b14950873e0d",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":1}",
+        "userId": null,
+        "createdAt": "2026-04-29T04:48:09.607Z"
+      },
+      {
+        "id": "5cb408cb-85b1-4d8a-b8ff-20a0ed52bf00",
+        "entityType": "order",
+        "entityId": "11379f60-4410-47b9-a667-7876ab7e880d",
+        "action": "update",
+        "changes": "{\"status\":\"cancelled\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T04:48:31.589Z"
+      },
+      {
+        "id": "a3391635-3423-4cc2-8879-214e7d433641",
+        "entityType": "order",
+        "entityId": "11379f60-4410-47b9-a667-7876ab7e880d",
+        "action": "delete",
+        "changes": "{\"deleted\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T04:48:35.673Z"
+      },
+      {
+        "id": "8e09b896-9f3b-485e-b6f5-0d8b89b5f24f",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":0}",
+        "userId": null,
+        "createdAt": "2026-04-29T04:48:35.677Z"
+      },
+      {
+        "id": "08b4959f-073b-4895-b2dc-af01b2ac52f5",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":0}",
+        "userId": null,
+        "createdAt": "2026-04-29T04:48:38.496Z"
+      },
+      {
+        "id": "eeab3a79-7485-4f00-8d3c-fbadc816b8c8",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":0}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:31:23.779Z"
+      },
+      {
+        "id": "564ce47a-a044-4235-bd0a-24ba386fb208",
+        "entityType": "category",
+        "entityId": "327fdddb-e7ca-4ed1-bc28-697e3f140ef1",
+        "action": "create",
+        "changes": "{\"name\":\"Powder\",\"excludeFromYield\":true,\"showInTabs\":true,\"isDefault\":false,\"sortOrder\":4,\"processCode\":null}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:32:07.553Z"
+      },
+      {
+        "id": "1430abc3-e468-4448-ae0d-3e00bd563fa1",
+        "entityType": "category",
+        "entityId": "fd2fdfd4-ca6a-4e18-a111-6282e6ee6564",
+        "action": "create",
+        "changes": "{\"name\":\"Raw\",\"excludeFromYield\":false,\"showInTabs\":true,\"isDefault\":false,\"sortOrder\":0,\"processCode\":null}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:32:26.951Z"
+      },
+      {
+        "id": "19d09a47-0afe-4fa2-a8ad-eb9e38b8fa5d",
+        "entityType": "product",
+        "entityId": "c3060010-374e-4c19-8c54-1ee2611ebd60",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Fresh Strawberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0.000\",\"currentStock\":\"0.000\",\"categoryId\":\"fd2fdfd4-ca6a-4e18-a111-6282e6ee6564\",\"fruitCode\":null,\"isReceivable\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:33:06.051Z"
+      },
+      {
+        "id": "aabdb7c3-7a5f-47f3-9d8f-b03d74d47944",
+        "entityType": "product",
+        "entityId": "50dfe2c8-1931-4fa8-9dab-ba181c02043b",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Frozen Raspberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0.000\",\"currentStock\":\"0.000\",\"categoryId\":\"faaf4c67-a96b-413d-8658-4ffaacc4c152\",\"fruitCode\":\"RW\",\"isReceivable\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:33:16.180Z"
+      },
+      {
+        "id": "29baeb25-24a7-4b75-a4c0-151187a3ba63",
+        "entityType": "product",
+        "entityId": "50dfe2c8-1931-4fa8-9dab-ba181c02043b",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Raspberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0.000\",\"currentStock\":\"0.000\",\"categoryId\":\"faaf4c67-a96b-413d-8658-4ffaacc4c152\",\"fruitCode\":\"RW\",\"isReceivable\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:33:34.221Z"
+      },
+      {
+        "id": "714afc88-56bf-45cd-a033-685910d006ba",
+        "entityType": "product",
+        "entityId": "f113c48a-0c64-4c93-a403-6660ea21c6a0",
+        "action": "delete",
+        "changes": "{\"active\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:33:36.200Z"
+      },
+      {
+        "id": "982584da-1dc5-4e69-8481-a8eb50aa1091",
+        "entityType": "product",
+        "entityId": "dd1c5a19-6f78-4b66-b526-03a19a1572a3",
+        "action": "create",
+        "changes": "{\"sku\":\"\",\"name\":\"Strawberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0\",\"currentStock\":\"0\",\"categoryId\":\"fd2fdfd4-ca6a-4e18-a111-6282e6ee6564\",\"fruitCode\":null,\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:33:46.742Z"
+      },
+      {
+        "id": "54652dc2-5970-4939-ad3d-90377d2270e4",
+        "entityType": "product",
+        "entityId": "9448ec3e-65e8-4935-8bd5-5b46867d89c1",
+        "action": "create",
+        "changes": "{\"sku\":\"\",\"name\":\"Sliced Strawberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0\",\"currentStock\":\"0\",\"categoryId\":\"faaf4c67-a96b-413d-8658-4ffaacc4c152\",\"fruitCode\":null,\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:34:03.831Z"
+      },
+      {
+        "id": "b412c3c3-cec4-4f23-97a7-cbaacb7ba3f0",
+        "entityType": "product",
+        "entityId": "4a8b686a-51ae-4bc0-ab85-f62ca97e991b",
+        "action": "create",
+        "changes": "{\"sku\":\"\",\"name\":\"Whole Strawberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0\",\"currentStock\":\"0\",\"categoryId\":\"faaf4c67-a96b-413d-8658-4ffaacc4c152\",\"fruitCode\":null,\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:34:19.946Z"
+      },
+      {
+        "id": "d2d98cdd-9dab-4b15-a6f1-8f392625bc52",
+        "entityType": "product",
+        "entityId": "09a88826-4468-4f4b-9e5c-0406deef8572",
+        "action": "create",
+        "changes": "{\"sku\":\"\",\"name\":\"Strawberry Slice\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0\",\"currentStock\":\"0\",\"categoryId\":\"9f6fff4e-354a-4163-892c-506ed35cc2ba\",\"fruitCode\":null,\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:34:36.165Z"
+      },
+      {
+        "id": "c9e73f1d-57ae-4bce-941d-c9ff450ffb7a",
+        "entityType": "product",
+        "entityId": "2f4a7a1d-afff-446c-bb7c-f75e12e257c9",
+        "action": "create",
+        "changes": "{\"sku\":\"\",\"name\":\"Strawberry Whole\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0\",\"currentStock\":\"0\",\"categoryId\":\"9f6fff4e-354a-4163-892c-506ed35cc2ba\",\"fruitCode\":null,\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:34:44.225Z"
+      },
+      {
+        "id": "8b1e5b82-37f4-47b6-a850-067b272f9571",
+        "entityType": "product",
+        "entityId": "c3060010-374e-4c19-8c54-1ee2611ebd60",
+        "action": "delete",
+        "changes": "{\"active\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:35:18.701Z"
+      },
+      {
+        "id": "13be1bcf-3c32-47be-9435-69b54a9117ea",
+        "entityType": "product",
+        "entityId": "dd1c5a19-6f78-4b66-b526-03a19a1572a3",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Strawberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0.000\",\"currentStock\":\"0.000\",\"categoryId\":\"fd2fdfd4-ca6a-4e18-a111-6282e6ee6564\",\"fruitCode\":null,\"isReceivable\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:35:20.858Z"
+      },
+      {
+        "id": "8c8fec6e-970b-4f2e-8a06-7e9a1d450f3a",
+        "entityType": "category",
+        "entityId": "faaf4c67-a96b-413d-8658-4ffaacc4c152",
+        "action": "update",
+        "changes": "{\"name\":\"Frozen\",\"excludeFromYield\":false,\"showInTabs\":true,\"sortOrder\":1,\"processCode\":\"3\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:36:26.793Z"
+      },
+      {
+        "id": "408da0fd-d33a-4873-affc-f147bfa45758",
+        "entityType": "category",
+        "entityId": "40d061d1-791b-4d7b-8ebe-932b60668c3b",
+        "action": "delete",
+        "changes": "{\"deleted\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:36:30.111Z"
+      },
+      {
+        "id": "61fb8818-31e3-4201-ad0e-9daa6d0c85eb",
+        "entityType": "category",
+        "entityId": "9f6fff4e-354a-4163-892c-506ed35cc2ba",
+        "action": "update",
+        "changes": "{\"name\":\"Freeze-Dried\",\"excludeFromYield\":false,\"showInTabs\":true,\"sortOrder\":2,\"processCode\":\"4\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:36:39.069Z"
+      },
+      {
+        "id": "f5de6313-0fcf-4639-872e-94f15857a200",
+        "entityType": "lot",
+        "entityId": "9b4d9841-a824-4ac3-b92c-e9bdb452c627",
+        "action": "received",
+        "changes": "{\"lotNumber\":\"FG-260429-0003\",\"barcodeValue\":\"BCMOJX94E12912\",\"itemId\":\"dd1c5a19-6f78-4b66-b526-03a19a1572a3\",\"itemType\":\"product\",\"quantity\":\"5000\",\"supplierName\":\"SSS\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:38:16.492Z"
+      },
+      {
+        "id": "80ddc1f0-6f26-4d91-bbe9-583c588ea20b",
+        "entityType": "lot",
+        "entityId": "9b4d9841-a824-4ac3-b92c-e9bdb452c627",
+        "action": "barcode_printed",
+        "changes": "{\"barcodePrintedAt\":\"2026-04-29T10:38:22.210Z\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:38:22.217Z"
+      },
+      {
+        "id": "67c70a83-d704-4e24-b52d-1733fd9dde75",
+        "entityType": "batch",
+        "entityId": "5bcae426-84d8-43e6-ab7e-495c32f5b23b",
+        "action": "delete",
+        "changes": "{\"deleted\":true,\"outputsReversed\":0,\"materialsRestored\":1}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:39:25.522Z"
+      },
+      {
+        "id": "baebf610-7d04-47c1-8e36-bb227c1134aa",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":0}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:39:25.572Z"
+      },
+      {
+        "id": "18b9ffd3-2c55-4ff0-9190-45a9be200025",
+        "entityType": "batch",
+        "entityId": "a746a8e2-f6b9-4e73-827f-2af856519000",
+        "action": "delete",
+        "changes": "{\"deleted\":true,\"outputsReversed\":1,\"materialsRestored\":1}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:39:29.821Z"
+      },
+      {
+        "id": "02c269f2-3474-4e46-b988-cd51be3f28e5",
+        "entityType": "system",
+        "entityId": "allocation",
+        "action": "run_allocation",
+        "changes": "{\"ordersProcessed\":0}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:39:29.873Z"
+      },
+      {
+        "id": "66b45412-266c-40e5-9763-27e39bb269a7",
+        "entityType": "product",
+        "entityId": "9448ec3e-65e8-4935-8bd5-5b46867d89c1",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Sliced Strawberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0.000\",\"currentStock\":\"0.000\",\"categoryId\":\"faaf4c67-a96b-413d-8658-4ffaacc4c152\",\"fruitCode\":\"SS\",\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:40:17.623Z"
+      },
+      {
+        "id": "346ea2af-ef04-4d27-97c6-855e1f3d7092",
+        "entityType": "product",
+        "entityId": "4a8b686a-51ae-4bc0-ab85-f62ca97e991b",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Whole Strawberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0.000\",\"currentStock\":\"0.000\",\"categoryId\":\"faaf4c67-a96b-413d-8658-4ffaacc4c152\",\"fruitCode\":\"SW\",\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:40:21.154Z"
+      },
+      {
+        "id": "7e64a527-4d8f-4f78-8527-a1e593e4aa4a",
+        "entityType": "product",
+        "entityId": "50dfe2c8-1931-4fa8-9dab-ba181c02043b",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Raspberry\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0.000\",\"currentStock\":\"0.000\",\"categoryId\":\"faaf4c67-a96b-413d-8658-4ffaacc4c152\",\"fruitCode\":\"RW\",\"isReceivable\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:40:24.148Z"
+      },
+      {
+        "id": "6a48ac50-55dd-46e9-bb5c-c2d58146dfb9",
+        "entityType": "product",
+        "entityId": "09a88826-4468-4f4b-9e5c-0406deef8572",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Strawberry Slice\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0.000\",\"currentStock\":\"0.000\",\"categoryId\":\"9f6fff4e-354a-4163-892c-506ed35cc2ba\",\"fruitCode\":\"SS\",\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:40:28.916Z"
+      },
+      {
+        "id": "483eda15-0e56-4b9e-bc53-9986a89748ad",
+        "entityType": "product",
+        "entityId": "9c944675-51b0-4327-812f-bf8b0330b0fd",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Raspberry Crumble\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"50.000\",\"currentStock\":\"140.000\",\"categoryId\":\"9f6fff4e-354a-4163-892c-506ed35cc2ba\",\"fruitCode\":\"RC\",\"isReceivable\":true}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:40:34.645Z"
+      },
+      {
+        "id": "018f8a74-0d5e-4b86-9f92-4741c1d9f9ae",
+        "entityType": "product",
+        "entityId": "2f4a7a1d-afff-446c-bb7c-f75e12e257c9",
+        "action": "update",
+        "changes": "{\"sku\":\"\",\"name\":\"Strawberry Whole\",\"description\":null,\"unit\":\"KG\",\"minStock\":\"0.000\",\"currentStock\":\"0.000\",\"categoryId\":\"9f6fff4e-354a-4163-892c-506ed35cc2ba\",\"fruitCode\":\"SW\",\"isReceivable\":false}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:40:32.254Z"
+      },
+      {
+        "id": "884837c0-880d-433f-a800-eadd0426dac6",
+        "entityType": "batch",
+        "entityId": "147324ba-77c5-4fe9-a4be-f4263a0795c0",
+        "action": "create",
+        "changes": "{\"batchNumber\":\"SS3261193\",\"productId\":\"9448ec3e-65e8-4935-8bd5-5b46867d89c1\",\"status\":\"in_progress\",\"plannedQuantity\":\"0\",\"startDate\":\"2026-04-29T00:00:00.000Z\",\"barcodeValue\":\"SS3261193\",\"batchCode\":\"SS3261193\"}",
+        "userId": null,
+        "createdAt": "2026-04-29T10:40:58.385Z"
+      }
+    ]
+  }
+}
