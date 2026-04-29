@@ -21,11 +21,12 @@ export async function deriveLotNumber(
       const base = `${fruitCode}${body}`;
       const first = await db.execute(sql`SELECT 1 FROM lots WHERE lot_number = ${base} LIMIT 1`);
       if (first.rows.length === 0) return base;
-      for (let i = 2; i <= 100; i++) {
+      for (let i = 2; i <= 999; i++) {
         const candidate = `${base}-${i}`;
         const check = await db.execute(sql`SELECT 1 FROM lots WHERE lot_number = ${candidate} LIMIT 1`);
         if (check.rows.length === 0) return candidate;
       }
+      throw new Error(`Unable to derive unique lot number for batch code "${batchCode}" after 999 attempts`);
     }
   }
   return generateLotNumber("FG");
