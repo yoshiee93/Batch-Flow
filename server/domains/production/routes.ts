@@ -173,7 +173,7 @@ productionRouter.post("/batches/:id/finalize", productionOrAdmin, asyncHandler(a
     millingQuantity || "0",
     wetQuantity || "0",
     cleaningTime || null,
-    numberOfStaff ? parseInt(numberOfStaff) : null,
+    numberOfStaff != null ? Number(numberOfStaff) : null,
     markCompleted || false
   ));
 }));

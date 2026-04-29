@@ -430,7 +430,7 @@ export const productionService = {
       millingQuantity,
       wetQuantity,
       cleaningTime: cleaningTime || null,
-      numberOfStaff: numberOfStaff || null,
+      numberOfStaff: numberOfStaff != null ? numberOfStaff : null,
     };
     if (markCompleted) {
       updateData.status = "completed";

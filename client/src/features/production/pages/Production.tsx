@@ -1356,7 +1356,7 @@ function BatchOutputsEditor({
   const [millingQuantity, setMillingQuantity] = useState(initialMilling);
   const [wetQuantity, setWetQuantity] = useState(initialWet);
   const [cleaningTime, setCleaningTime] = useState(initialCleaningTime || '');
-  const [numberOfStaff, setNumberOfStaff] = useState(initialNumberOfStaff ? String(initialNumberOfStaff) : '');
+  const [numberOfStaff, setNumberOfStaff] = useState(initialNumberOfStaff != null ? String(initialNumberOfStaff) : '');
   const [markCompleted, setMarkCompleted] = useState(false);
   const [finalizeResult, setFinalizeResult] = useState<FinalizeResult | null>(null);
   const [summaryBatchPrintedAt, setSummaryBatchPrintedAt] = useState<string | null>(null);
@@ -1371,7 +1371,7 @@ function BatchOutputsEditor({
     setMillingQuantity(initialMilling);
     setWetQuantity(initialWet);
     setCleaningTime(initialCleaningTime || '');
-    setNumberOfStaff(initialNumberOfStaff ? String(initialNumberOfStaff) : '');
+    setNumberOfStaff(initialNumberOfStaff != null ? String(initialNumberOfStaff) : '');
     setMarkCompleted(false);
   }, [batchId, initialWaste, initialMilling, initialWet, initialCleaningTime, initialNumberOfStaff]);
   
