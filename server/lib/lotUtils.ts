@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db";
 
-type CountRow = { cnt: number };
 type IdRow = { id: string };
 
 export async function generateLotNumber(prefix: string = "LOT"): Promise<string> {
@@ -12,13 +11,28 @@ export async function generateLotNumber(prefix: string = "LOT"): Promise<string>
   const dateStr = `${year}${month}${day}`;
   const pattern = `${prefix}-${dateStr}-%`;
 
+  // Find the highest existing sequence number for today to avoid gaps causing collisions
   const result = await db.execute(
-    sql`SELECT COUNT(*)::int AS cnt FROM lots WHERE lot_number LIKE ${pattern}`
+    sql`SELECT lot_number FROM lots WHERE lot_number LIKE ${pattern} ORDER BY lot_number DESC LIMIT 1`
   );
-  const row = result.rows[0] as CountRow;
-  const count = row.cnt + 1;
-  const seq = count.toString().padStart(4, "0");
-  return `${prefix}-${dateStr}-${seq}`;
+  let next = 1;
+  if (result.rows.length > 0) {
+    const last = (result.rows[0] as { lot_number: string }).lot_number;
+    const parts = last.split("-");
+    const lastSeq = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(lastSeq)) next = lastSeq + 1;
+  }
+
+  // Retry until we find a number not already taken
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const candidate = `${prefix}-${dateStr}-${next.toString().padStart(4, "0")}`;
+    const check = await db.execute(
+      sql`SELECT 1 FROM lots WHERE lot_number = ${candidate} LIMIT 1`
+    );
+    if (check.rows.length === 0) return candidate;
+    next++;
+  }
+  throw new Error("Unable to generate unique lot number after retries");
 }
 
 export async function generateBarcodeValue(): Promise<string> {
