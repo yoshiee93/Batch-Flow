@@ -27,7 +27,7 @@ import {
   useBatches, useBatch, useProducts, useRecipes, useMaterials, useLots, useCategories,
   useUpdateBatch, useCreateBatch, useDeleteBatch,
   useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useUpdateBatchMaterial, useRecordBatchOutput,
-  useBatchOutputs, useBatchOutputLots, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch, useMarkBarcodePrinted, useMarkBatchBarcodePrinted,
+  useBatchOutputs, useBatchOutputLots, useAddBatchOutput, useRemoveBatchOutput, useFinalizeBatch, useMarkBarcodePrinted, useMarkBatchBarcodePrinted, useRegenerateOutputLots,
   fetchLotByBarcode,
   type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput, type Category, type LotWithDetails, type FinalizeResult, type OutputLot
 } from '@/lib/api';
@@ -106,6 +106,7 @@ export default function Production() {
   const deleteBatch = useDeleteBatch();
   const recordBatchInput = useRecordBatchInput();
   const recordBatchOutput = useRecordBatchOutput();
+  const finalizeBatchQuick = useFinalizeBatch();
   const { toast } = useToast();
 
   // Group products by category for dropdown display
@@ -335,12 +336,14 @@ export default function Production() {
 
   const handleMarkComplete = async (batch: Batch) => {
     try {
-      await updateBatch.mutateAsync({
-        id: batch.id,
-        status: 'completed',
-        endDate: new Date().toISOString(),
+      await finalizeBatchQuick.mutateAsync({
+        batchId: batch.id,
+        wasteQuantity: batch.wasteQuantity || "0",
+        millingQuantity: batch.millingQuantity || "0",
+        wetQuantity: batch.wetQuantity || "0",
+        markCompleted: true,
       });
-      toast({ title: "Batch completed", description: `Batch ${batch.batchNumber} marked as completed` });
+      toast({ title: "Batch completed", description: `Batch ${batch.batchNumber} marked as completed and output lot generated` });
     } catch (error) {
       toast({ title: "Error", description: "Failed to complete batch", variant: "destructive" });
     }
@@ -1445,6 +1448,7 @@ function BatchOutputsEditor({
   const addBatchOutput = useAddBatchOutput();
   const removeBatchOutput = useRemoveBatchOutput();
   const finalizeBatch = useFinalizeBatch();
+  const regenerateOutputLots = useRegenerateOutputLots();
   const { toast } = useToast();
 
   // Group products by category for dropdown display
@@ -1720,7 +1724,28 @@ function BatchOutputsEditor({
               <Loader2 className="h-4 w-4 animate-spin" />
             </div>
           ) : outputLots.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">No output lots found for this batch.</p>
+            <div className="py-3 space-y-2">
+              <p className="text-sm text-muted-foreground">No output lots found for this batch.</p>
+              {batchData && parseFloat(batchData.actualQuantity || "0") > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await regenerateOutputLots.mutateAsync(batchId);
+                      toast({ title: "Output lot generated", description: "Finished goods lot created — you can now print the label." });
+                    } catch (e: any) {
+                      toast({ title: "Error", description: e.message || "Failed to generate lot", variant: "destructive" });
+                    }
+                  }}
+                  disabled={regenerateOutputLots.isPending}
+                  data-testid="button-regenerate-lots"
+                >
+                  {regenerateOutputLots.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Generate Output Lot
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="space-y-2">
               {outputLots.map((ol: OutputLot) => (

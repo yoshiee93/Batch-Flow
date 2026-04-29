@@ -347,30 +347,55 @@ export const productionService = {
 
     if (markCompleted) {
       const now = new Date();
-      for (const output of outputs) {
-        const existingLots = await repo.getLotsForBatchAndProduct(batchId, output.productId);
-        if (existingLots.length === 0) {
-          const lotNumber = await generateLotNumber("FG");
-          const barcodeValue = await generateBarcodeValue();
-          const finishedLot = await repo.insertLot({
-            lotNumber,
-            lotType: "finished_good",
-            status: "active",
-            barcodeValue,
-            productId: output.productId,
-            originalQuantity: output.quantity,
-            quantity: output.quantity,
-            remainingQuantity: output.quantity,
-            producedDate: now,
-            sourceBatchId: batchId,
-          });
-          await createStockMovement({ movementType: "production_output", productId: output.productId, lotId: finishedLot.id, batchId, quantity: output.quantity, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
-          await createAuditLog({ entityType: "lot", entityId: finishedLot.id, action: "finished_lot_created", changes: JSON.stringify({ lotNumber, barcodeValue, productId: output.productId, quantity: output.quantity, sourceBatchId: batchId }) });
-        } else {
-          const existingLot = existingLots[0];
-          if (!existingLot.barcodeValue) {
+      if (outputs.length > 0) {
+        for (const output of outputs) {
+          const existingLots = await repo.getLotsForBatchAndProduct(batchId, output.productId);
+          if (existingLots.length === 0) {
+            const lotNumber = await generateLotNumber("FG");
             const barcodeValue = await generateBarcodeValue();
-            await repo.updateLotFields(existingLot.id, { lotType: "finished_good", barcodeValue, producedDate: now });
+            const finishedLot = await repo.insertLot({
+              lotNumber,
+              lotType: "finished_good",
+              status: "active",
+              barcodeValue,
+              productId: output.productId,
+              originalQuantity: output.quantity,
+              quantity: output.quantity,
+              remainingQuantity: output.quantity,
+              producedDate: now,
+              sourceBatchId: batchId,
+            });
+            await createStockMovement({ movementType: "production_output", productId: output.productId, lotId: finishedLot.id, batchId, quantity: output.quantity, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
+            await createAuditLog({ entityType: "lot", entityId: finishedLot.id, action: "finished_lot_created", changes: JSON.stringify({ lotNumber, barcodeValue, productId: output.productId, quantity: output.quantity, sourceBatchId: batchId }) });
+          } else {
+            const existingLot = existingLots[0];
+            if (!existingLot.barcodeValue) {
+              const barcodeValue = await generateBarcodeValue();
+              await repo.updateLotFields(existingLot.id, { lotType: "finished_good", barcodeValue, producedDate: now });
+            }
+          }
+        }
+      } else {
+        const qty = parseFloat(updated.actualQuantity || "0");
+        if (qty > 0) {
+          const existingLots = await repo.getLotsForBatch(batchId);
+          if (existingLots.length === 0) {
+            const lotNumber = await generateLotNumber("FG");
+            const barcodeValue = await generateBarcodeValue();
+            const finishedLot = await repo.insertLot({
+              lotNumber,
+              lotType: "finished_good",
+              status: "active",
+              barcodeValue,
+              productId: batch.productId,
+              originalQuantity: updated.actualQuantity!,
+              quantity: updated.actualQuantity!,
+              remainingQuantity: updated.actualQuantity!,
+              producedDate: now,
+              sourceBatchId: batchId,
+            });
+            await createStockMovement({ movementType: "production_output", productId: batch.productId, lotId: finishedLot.id, batchId, quantity: updated.actualQuantity!, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
+            await createAuditLog({ entityType: "lot", entityId: finishedLot.id, action: "finished_lot_created", changes: JSON.stringify({ lotNumber, barcodeValue, productId: batch.productId, quantity: updated.actualQuantity, sourceBatchId: batchId }) });
           }
         }
       }
@@ -446,6 +471,52 @@ export const productionService = {
   },
 
   async getBatchOutputLots(batchId: string): Promise<BatchOutputLotEntry[]> {
+    return inventoryRepository.getBatchOutputLots(batchId);
+  },
+
+  async regenerateOutputLots(batchId: string): Promise<BatchOutputLotEntry[]> {
+    const batch = await repo.getBatch(batchId);
+    if (!batch) throw new Error("Batch not found");
+    if (batch.status !== "completed") throw new Error("Batch is not yet completed");
+
+    const existingLots = await repo.getLotsForBatch(batchId);
+    if (existingLots.length > 0) {
+      return inventoryRepository.getBatchOutputLots(batchId);
+    }
+
+    const outputs = await repo.getBatchOutputs(batchId);
+    const now = new Date();
+
+    if (outputs.length > 0) {
+      for (const output of outputs) {
+        const existing = await repo.getLotsForBatchAndProduct(batchId, output.productId);
+        if (existing.length === 0) {
+          const lotNumber = await generateLotNumber("FG");
+          const barcodeValue = await generateBarcodeValue();
+          const finishedLot = await repo.insertLot({
+            lotNumber, lotType: "finished_good", status: "active", barcodeValue,
+            productId: output.productId, originalQuantity: output.quantity, quantity: output.quantity,
+            remainingQuantity: output.quantity, producedDate: now, sourceBatchId: batchId,
+          });
+          await createStockMovement({ movementType: "production_output", productId: output.productId, lotId: finishedLot.id, batchId, quantity: output.quantity, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
+          await createAuditLog({ entityType: "lot", entityId: finishedLot.id, action: "finished_lot_created", changes: JSON.stringify({ lotNumber, barcodeValue, productId: output.productId, quantity: output.quantity, sourceBatchId: batchId, regenerated: true }) });
+        }
+      }
+    } else {
+      const qty = parseFloat(batch.actualQuantity || "0");
+      if (qty > 0) {
+        const lotNumber = await generateLotNumber("FG");
+        const barcodeValue = await generateBarcodeValue();
+        const finishedLot = await repo.insertLot({
+          lotNumber, lotType: "finished_good", status: "active", barcodeValue,
+          productId: batch.productId, originalQuantity: batch.actualQuantity!, quantity: batch.actualQuantity!,
+          remainingQuantity: batch.actualQuantity!, producedDate: now, sourceBatchId: batchId,
+        });
+        await createStockMovement({ movementType: "production_output", productId: batch.productId, lotId: finishedLot.id, batchId, quantity: batch.actualQuantity!, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
+        await createAuditLog({ entityType: "lot", entityId: finishedLot.id, action: "finished_lot_created", changes: JSON.stringify({ lotNumber, barcodeValue, productId: batch.productId, quantity: batch.actualQuantity, sourceBatchId: batchId, regenerated: true }) });
+      }
+    }
+
     return inventoryRepository.getBatchOutputLots(batchId);
   },
 };

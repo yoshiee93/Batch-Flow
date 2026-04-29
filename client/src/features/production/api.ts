@@ -272,3 +272,16 @@ export function useBatchOutputLots(batchId: string, options?: { enabled?: boolea
     enabled: !!batchId && (options?.enabled ?? true),
   });
 }
+
+export function useRegenerateOutputLots() {
+  const queryClient = useQueryClient();
+  return useMutation<OutputLot[], Error, string>({
+    mutationFn: (batchId: string) =>
+      fetchApi<OutputLot[]>(`/batches/${batchId}/regenerate-lots`, { method: "POST" }),
+    onSuccess: (_data, batchId) => {
+      queryClient.invalidateQueries({ queryKey: ["batchOutputLots", batchId] });
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+    },
+  });
+}

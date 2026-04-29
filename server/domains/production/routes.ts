@@ -163,6 +163,10 @@ productionRouter.post("/batches/:id/finalize", productionOrAdmin, asyncHandler(a
   ));
 }));
 
+productionRouter.post("/batches/:id/regenerate-lots", productionOrAdmin, asyncHandler(async (req, res) => {
+  res.json(await svc.regenerateOutputLots(req.params.id));
+}));
+
 productionRouter.post("/batches/:id/lot-input", productionOrAdmin, asyncHandler(async (req, res) => {
   const { lotId, quantity } = req.body;
   if (!lotId || !quantity) {
