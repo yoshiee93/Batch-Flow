@@ -274,11 +274,17 @@ export default function Production() {
 
     try {
       if (inputType === 'material') {
+        const scannedLotId = lotId || scannedLot?.id;
+        const effectiveMaterialId = scannedLot?.materialId || materialId || undefined;
+        const effectiveProductId = !effectiveMaterialId ? (scannedLot?.productId || undefined) : undefined;
+
         await recordBatchInput.mutateAsync({
           batchId: selectedBatch.id,
-          materialId: scannedLot?.materialId || materialId,
+          materialId: effectiveMaterialId,
+          productId: effectiveProductId,
           quantity,
-          lotId: lotId || scannedLot?.id,
+          lotId: effectiveMaterialId ? scannedLotId : undefined,
+          sourceLotId: effectiveProductId ? scannedLotId : undefined,
         });
         toast({ title: "Input recorded", description: `Lot ${scannedLot?.lotNumber} consumed — deducted from inventory` });
       } else {
