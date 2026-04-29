@@ -1,0 +1,146 @@
+Task: Add customer-specific label templates, category-separated receive stock, and a dedicated label management section
+
+Before making changes:
+- Inspect the current barcode/label print utility, lot detail page, batch detail page, receive stock workflow, inventory module, customer module, category model, and settings/admin pages
+- Reuse the current barcode generation and print/reprint system
+- Extend existing logic instead of creating a second label system
+
+Business goal:
+ClearTrace needs more flexible label handling and a cleaner receive stock workflow.
+
+We need:
+1. label designs/templates by customer
+2. toggleable label fields such as Production Date and Made in Australia
+3. Receive Stock items separated/grouped by category
+4. a dedicated Label section for managing templates and printing rules
+
+Required scope:
+
+1. Customer-specific label templates
+Add support for label templates that can be assigned to a customer.
+
+Required behavior:
+- each customer can have a default label template
+- if no customer-specific template exists, use a system default template
+- label templates should support different layouts/settings for:
+  - raw intake labels
+  - finished output labels
+  - batch labels if currently supported
+- preserve current barcode print/reprint behavior
+
+2. Toggleable label fields
+Add template settings so specific label elements can be shown/hidden.
+
+At minimum support toggles for:
+- show/hide Production Date
+- show/hide Made in Australia
+
+Also structure it so more toggles can be added later, for example:
+- supplier/source
+- supplier lot
+- expiry date
+- batch code
+- quantity
+- customer name
+- barcode text
+
+Required behavior:
+- when a field is disabled in the template, it should not appear on the printed label
+- toggles should apply consistently to print and reprint
+- do not remove the underlying data from lots/batches; only control display on labels
+
+3. Label template model/settings
+Add a maintainable way to store label template settings.
+
+Suggested structure:
+- labelTemplates table or equivalent model
+- fields such as:
+  - id
+  - name
+  - customerId nullable
+  - labelType: raw_intake | finished_output | batch
+  - isDefault
+  - settings JSON for toggles/layout options
+  - createdAt
+  - updatedAt
+
+If the current architecture prefers config-based settings first, implement it cleanly but keep it easy to move to DB later.
+
+4. Dedicated Label section
+Add a new section/page in the app navigation called “Labels” or “Label Templates”.
+
+This page should allow users to:
+- view existing label templates
+- create/edit template settings
+- assign a template to a customer where applicable
+- choose label type
+- toggle fields on/off
+- preview a label using sample data if practical
+- save changes
+
+Keep the first version simple but usable.
+
+5. Apply correct template automatically
+When printing labels:
+- raw stock intake should use the raw intake template
+- finished goods output should use the finished output template
+- batch labels should use the batch template if implemented
+- if the related customer has a template, use that template
+- otherwise use the default system template for that label type
+
+Important:
+Do not generate new barcodes during reprint.
+Reprints must always use stored barcode values.
+
+6. Receive Stock separated by category
+Update Receive Stock item selection so receivable items are grouped or filtered by category.
+
+Required behavior:
+- the Receive Stock form should not show one long flat list
+- show items grouped by category, or provide a category filter above the item dropdown
+- category should work for both materials and receivable finished goods
+- newly created receivable items in a category should appear correctly
+- keep support for the receivable flag if already implemented
+
+Preferred UX:
+- first select category
+- then select item within that category
+OR
+- grouped dropdown with category headings
+
+Choose the approach that fits the current UI components best.
+
+7. Add label print options to receive stock
+In the Receive Stock flow, add a clear label section.
+
+Required behavior:
+- after receiving stock, show the generated lot and barcode
+- show which label template will be used
+- allow print/reprint immediately
+- if possible, allow user to choose another template before printing
+- label should respect the template toggles
+
+8. Preserve existing workflows
+Do not break:
+- lot creation
+- barcode generation
+- barcode reprint
+- batch output label printing
+- tracking/traceability
+- production completion
+
+Implementation rules:
+- centralize label template logic
+- do not hardcode label layouts separately across multiple pages
+- keep existing barcode utilities where possible
+- keep the new label system modular for future customer-specific requirements
+- do not create duplicate item/category models
+
+Acceptance criteria:
+- labels can be configured per customer
+- Production Date and Made in Australia can be toggled on/off per template
+- labels print/reprint using the correct template
+- Receive Stock item selection is separated/grouped by category
+- Receive Stock has a clear label section after lot creation
+- raw intake and finished output labels can have different designs/settings
+- existing barcode and traceability workflows continue to work
