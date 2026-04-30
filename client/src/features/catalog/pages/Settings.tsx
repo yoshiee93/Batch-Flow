@@ -662,7 +662,7 @@ export default function Settings() {
             </div>
             <div className="space-y-1">
               <Label className="text-sm font-medium">Section Visibility</Label>
-              <p className="text-xs text-muted-foreground">Control where this category appears across the system</p>
+              <p className="text-xs text-muted-foreground">Control where this category appears across the system. These flags only affect where items show up in forms and dropdowns — existing stock, lots, and traceability records are never affected.</p>
               <div className="rounded-md border divide-y mt-1">
                 <div className="flex items-center justify-between px-3 py-2">
                   <Label htmlFor="create-showInTabs" className="font-normal text-sm cursor-pointer">Inventory tabs</Label>
@@ -758,7 +758,7 @@ export default function Settings() {
             </div>
             <div className="space-y-1">
               <Label className="text-sm font-medium">Section Visibility</Label>
-              <p className="text-xs text-muted-foreground">Control where this category appears across the system</p>
+              <p className="text-xs text-muted-foreground">Control where this category appears across the system. These flags only affect where items show up in forms and dropdowns — existing stock, lots, and traceability records are never affected.</p>
               <div className="rounded-md border divide-y mt-1">
                 <div className="flex items-center justify-between px-3 py-2">
                   <Label htmlFor="edit-showInTabs" className="font-normal text-sm cursor-pointer">Inventory tabs</Label>

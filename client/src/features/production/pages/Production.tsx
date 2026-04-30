@@ -284,6 +284,16 @@ export default function Production() {
       toast({ title: "Missing product", description: "Please select a product", variant: "destructive" });
       return;
     }
+    if (inputType === 'product' && productId) {
+      const inputProduct = products.find(p => p.id === productId);
+      if (inputProduct?.categoryId) {
+        const inputCat = categories.find(c => c.id === inputProduct.categoryId);
+        if (inputCat && !inputCat.showInProductionInputs) {
+          toast({ title: "Category not allowed", description: `Category "${inputCat.name}" is not configured for production inputs.`, variant: "destructive" });
+          return;
+        }
+      }
+    }
 
     try {
       if (inputType === 'material') {
