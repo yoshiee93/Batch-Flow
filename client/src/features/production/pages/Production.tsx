@@ -211,6 +211,19 @@ export default function Production() {
         setBarcodeError(statusMessages[lot.status ?? ''] || `Lot status is "${lot.status}" — only active lots can be consumed.`);
         return;
       }
+      // Check if the lot's category is visible in production inputs
+      const lotCategoryId = lot.materialId
+        ? materials.find(m => m.id === lot.materialId)?.categoryId
+        : lot.productId
+          ? products.find(p => p.id === lot.productId)?.categoryId
+          : null;
+      if (lotCategoryId) {
+        const lotCategory = categories.find(c => c.id === lotCategoryId);
+        if (lotCategory && !lotCategory.showInProductionInputs) {
+          setBarcodeError(`Category "${lotCategory.name}" is not configured for production inputs. Update category settings in Settings if needed.`);
+          return;
+        }
+      }
       setScannedLot(lot);
       setRecordInputForm(prev => ({
         ...prev,
@@ -241,6 +254,21 @@ export default function Production() {
         setBarcodeError(msg);
         toast({ title: "No lot scanned", description: msg, variant: "destructive" });
         return;
+      }
+      // Guard: verify the lot's category is still visible in production inputs
+      const guardCategoryId = scannedLot?.materialId
+        ? materials.find(m => m.id === scannedLot.materialId)?.categoryId
+        : scannedLot?.productId
+          ? products.find(p => p.id === scannedLot.productId)?.categoryId
+          : null;
+      if (guardCategoryId) {
+        const guardCategory = categories.find(c => c.id === guardCategoryId);
+        if (guardCategory && !guardCategory.showInProductionInputs) {
+          const msg = `Category "${guardCategory.name}" is not configured for production inputs.`;
+          setBarcodeError(msg);
+          toast({ title: "Category not allowed", description: msg, variant: "destructive" });
+          return;
+        }
       }
       const availableQty = parseFloat(scannedLot?.remainingQuantity || '0');
       const consumeQty = parseFloat(quantity);

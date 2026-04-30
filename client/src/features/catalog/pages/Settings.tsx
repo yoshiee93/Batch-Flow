@@ -669,10 +669,6 @@ export default function Settings() {
                   <Switch id="create-showInTabs" checked={formData.showInTabs} onCheckedChange={(checked) => setFormData({ ...formData, showInTabs: checked })} data-testid="switch-show-in-tabs" />
                 </div>
                 <div className="flex items-center justify-between px-3 py-2">
-                  <Label htmlFor="create-showInInventory" className="font-normal text-sm cursor-pointer">Inventory page</Label>
-                  <Switch id="create-showInInventory" checked={formData.showInInventory} onCheckedChange={(checked) => setFormData({ ...formData, showInInventory: checked })} data-testid="switch-show-in-inventory" />
-                </div>
-                <div className="flex items-center justify-between px-3 py-2">
                   <Label htmlFor="create-showInReceiveStock" className="font-normal text-sm cursor-pointer">Receive Stock form</Label>
                   <Switch id="create-showInReceiveStock" checked={formData.showInReceiveStock} onCheckedChange={(checked) => setFormData({ ...formData, showInReceiveStock: checked })} data-testid="switch-show-in-receive-stock" />
                 </div>
@@ -767,10 +763,6 @@ export default function Settings() {
                 <div className="flex items-center justify-between px-3 py-2">
                   <Label htmlFor="edit-showInTabs" className="font-normal text-sm cursor-pointer">Inventory tabs</Label>
                   <Switch id="edit-showInTabs" checked={formData.showInTabs} onCheckedChange={(checked) => setFormData({ ...formData, showInTabs: checked })} data-testid="switch-edit-show-in-tabs" />
-                </div>
-                <div className="flex items-center justify-between px-3 py-2">
-                  <Label htmlFor="edit-showInInventory" className="font-normal text-sm cursor-pointer">Inventory page</Label>
-                  <Switch id="edit-showInInventory" checked={formData.showInInventory} onCheckedChange={(checked) => setFormData({ ...formData, showInInventory: checked })} data-testid="switch-edit-show-in-inventory" />
                 </div>
                 <div className="flex items-center justify-between px-3 py-2">
                   <Label htmlFor="edit-showInReceiveStock" className="font-normal text-sm cursor-pointer">Receive Stock form</Label>
