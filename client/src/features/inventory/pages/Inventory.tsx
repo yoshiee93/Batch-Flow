@@ -107,7 +107,7 @@ export default function Inventory() {
   const isLoading = materialsLoading || productsLoading || lotsLoading;
   const hasError = materialsError || productsError;
 
-  const visibleCategories = categories.filter(c => c.showInTabs && c.showInInventory);
+  const visibleCategories = categories.filter(c => c.showInTabs);
 
   useEffect(() => {
     if (visibleCategories.length > 0 && !activeTab) {
@@ -838,30 +838,36 @@ export default function Inventory() {
                     No receivable items configured. Mark materials or products as receivable in their settings.
                   </p>
                 ) : (() => {
+                  // Filter receivable items: exclude items whose category has showInReceiveStock === false
+                  const visibleReceivableItems = receivableItems.filter(i => {
+                    if (!i.categoryId) return true;
+                    const cat = categories.find(c => c.id === i.categoryId);
+                    return !cat || cat.showInReceiveStock;
+                  });
                   const receivableCategories = categories.filter(c =>
-                    c.showInReceiveStock && receivableItems.some(i => i.categoryId === c.id)
+                    c.showInReceiveStock && visibleReceivableItems.some(i => i.categoryId === c.id)
                   );
-                  const hasUncategorised = receivableItems.some(i => !i.categoryId);
+                  const hasUncategorised = visibleReceivableItems.some(i => !i.categoryId);
                   const filteredItems = receiveCategoryFilter === 'all'
-                    ? receivableItems
+                    ? visibleReceivableItems
                     : receiveCategoryFilter === 'uncategorised'
-                      ? receivableItems.filter(i => !i.categoryId)
-                      : receivableItems.filter(i => i.categoryId === receiveCategoryFilter);
+                      ? visibleReceivableItems.filter(i => !i.categoryId)
+                      : visibleReceivableItems.filter(i => i.categoryId === receiveCategoryFilter);
 
                   const buildGroups = () => {
                     if (receiveCategoryFilter !== 'all') {
                       return [{ label: null, items: filteredItems }];
                     }
-                    const groups: { label: string | null; items: typeof receivableItems }[] = [];
+                    const groups: { label: string | null; items: typeof visibleReceivableItems }[] = [];
                     for (const cat of receivableCategories) {
-                      const catItems = receivableItems.filter(i => i.categoryId === cat.id);
+                      const catItems = visibleReceivableItems.filter(i => i.categoryId === cat.id);
                       if (catItems.length > 0) groups.push({ label: cat.name, items: catItems });
                     }
                     if (hasUncategorised) {
-                      const uncatItems = receivableItems.filter(i => !i.categoryId);
+                      const uncatItems = visibleReceivableItems.filter(i => !i.categoryId);
                       if (uncatItems.length > 0) groups.push({ label: 'Uncategorised', items: uncatItems });
                     }
-                    return groups.length > 0 ? groups : [{ label: null, items: receivableItems }];
+                    return groups;
                   };
 
                   return (
@@ -871,10 +877,10 @@ export default function Inventory() {
                           setReceiveCategoryFilter(v);
                           if (receiveForm.itemId) {
                             const stillVisible = (v === 'all'
-                              ? receivableItems
+                              ? visibleReceivableItems
                               : v === 'uncategorised'
-                                ? receivableItems.filter(i => !i.categoryId)
-                                : receivableItems.filter(i => i.categoryId === v)
+                                ? visibleReceivableItems.filter(i => !i.categoryId)
+                                : visibleReceivableItems.filter(i => i.categoryId === v)
                             ).some(i => i.id === receiveForm.itemId);
                             if (!stillVisible) setReceiveForm({ ...receiveForm, itemId: '', itemType: '' as '' | 'material' | 'product' });
                           }

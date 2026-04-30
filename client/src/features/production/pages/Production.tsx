@@ -786,6 +786,27 @@ export default function Production() {
                             </CommandGroup>
                           );
                         })}
+                        {(() => {
+                          const uncatInputProducts = products.filter(p => !p.categoryId && parseFloat(p.currentStock || '0') > 0);
+                          if (uncatInputProducts.length === 0) return null;
+                          return (
+                            <CommandGroup heading="Uncategorized">
+                              {uncatInputProducts.map(product => (
+                                <CommandItem
+                                  key={product.id}
+                                  value={`Uncategorized ${product.sku} ${product.name}`}
+                                  onSelect={() => {
+                                    setRecordInputForm({ ...recordInputForm, productId: product.id });
+                                    setInputProductSearchOpen(false);
+                                  }}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", recordInputForm.productId === product.id ? "opacity-100" : "opacity-0")} />
+                                  {product.sku ? `${product.sku} - ` : ''}{product.name} ({product.currentStock} {product.unit})
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          );
+                        })()}
                       </CommandList>
                     </Command>
                   </PopoverContent>
