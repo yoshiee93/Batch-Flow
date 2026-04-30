@@ -85,6 +85,8 @@ export default function Production() {
   const [isLookingUpBarcode, setIsLookingUpBarcode] = useState(false);
   const barcodeScanRef = useRef<HTMLInputElement>(null);
   const [createProductSearchOpen, setCreateProductSearchOpen] = useState(false);
+  const [createBatchCategoryFilter, setCreateBatchCategoryFilter] = useState<string>('all');
+  const [inputProductCategoryFilter, setInputProductCategoryFilter] = useState<string>('all');
   
   const { canManageBatches } = useRole();
 
@@ -190,6 +192,7 @@ export default function Production() {
     setBarcodeInput('');
     setScannedLot(null);
     setBarcodeError('');
+    setInputProductCategoryFilter('all');
     setIsRecordInputOpen(true);
   };
 
@@ -414,6 +417,7 @@ export default function Production() {
           if (!open) {
             setNewBatch({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
             setBatchNumberEdited(false);
+            setCreateBatchCategoryFilter('all');
           }
         } : undefined}>
           {canManageBatches && (
@@ -431,6 +435,32 @@ export default function Production() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="product">Product *</Label>
+                {productsByCategory.length > 0 && (
+                  <Select value={createBatchCategoryFilter} onValueChange={(v) => {
+                    setCreateBatchCategoryFilter(v);
+                    if (newBatch.productId) {
+                      const inFilter = v === 'all'
+                        ? true
+                        : v === 'uncategorized'
+                          ? !products.find(p => p.id === newBatch.productId)?.categoryId
+                          : products.find(p => p.id === newBatch.productId)?.categoryId === v;
+                      if (!inFilter) setNewBatch({ ...newBatch, productId: '' });
+                    }
+                  }}>
+                    <SelectTrigger data-testid="select-create-batch-category-filter">
+                      <SelectValue placeholder="All categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All categories</SelectItem>
+                      {productsByCategory.map(({ category }) => (
+                        <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                      ))}
+                      {uncategorizedProducts.length > 0 && (
+                        <SelectItem value="uncategorized">Uncategorized</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
                 <Popover open={createProductSearchOpen} onOpenChange={setCreateProductSearchOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -449,9 +479,9 @@ export default function Production() {
                   <PopoverContent className="w-full p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Search products..." />
-                      <CommandList>
+                      <CommandList className="max-h-[260px] overflow-y-auto">
                         <CommandEmpty>No product found.</CommandEmpty>
-                        {productsByCategory.map(({ category, products: categoryProducts }) => (
+                        {(createBatchCategoryFilter === 'all' ? productsByCategory : productsByCategory.filter(g => g.category.id === createBatchCategoryFilter)).map(({ category, products: categoryProducts }) => (
                           <CommandGroup key={category.id} heading={category.name}>
                             {categoryProducts.map(product => (
                               <CommandItem
@@ -468,7 +498,7 @@ export default function Production() {
                             ))}
                           </CommandGroup>
                         ))}
-                        {uncategorizedProducts.length > 0 && (
+                        {(createBatchCategoryFilter === 'all' || createBatchCategoryFilter === 'uncategorized') && uncategorizedProducts.length > 0 && (
                           <CommandGroup heading="Uncategorized">
                             {uncategorizedProducts.map(product => (
                               <CommandItem
@@ -783,6 +813,30 @@ export default function Production() {
             ) : (
               <div className="space-y-2">
                 <Label htmlFor="input-product">Product *</Label>
+                {(() => {
+                  const inputCategories = categories.filter(c => !c.excludeFromYield && c.showInProductionInputs && products.some(p => p.categoryId === c.id && parseFloat(p.currentStock || '0') > 0));
+                  const hasUncatInput = products.some(p => !p.categoryId && parseFloat(p.currentStock || '0') > 0);
+                  if (inputCategories.length === 0 && !hasUncatInput) return null;
+                  return (
+                    <Select value={inputProductCategoryFilter} onValueChange={(v) => {
+                      setInputProductCategoryFilter(v);
+                      if (recordInputForm.productId) {
+                        const sel = products.find(p => p.id === recordInputForm.productId);
+                        const inFilter = v === 'all' ? true : v === 'uncategorized' ? !sel?.categoryId : sel?.categoryId === v;
+                        if (!inFilter) setRecordInputForm({ ...recordInputForm, productId: '' });
+                      }
+                    }}>
+                      <SelectTrigger data-testid="select-input-product-category-filter">
+                        <SelectValue placeholder="All categories" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All categories</SelectItem>
+                        {inputCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {hasUncatInput && <SelectItem value="uncategorized">Uncategorized</SelectItem>}
+                      </SelectContent>
+                    </Select>
+                  );
+                })()}
                 <Popover open={inputProductSearchOpen} onOpenChange={setInputProductSearchOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -801,9 +855,9 @@ export default function Production() {
                   <PopoverContent className="w-full p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Search products..." />
-                      <CommandList>
+                      <CommandList className="max-h-[260px] overflow-y-auto">
                         <CommandEmpty>No product found.</CommandEmpty>
-                        {categories.filter(c => !c.excludeFromYield && c.showInProductionInputs).map(category => {
+                        {categories.filter(c => !c.excludeFromYield && c.showInProductionInputs && (inputProductCategoryFilter === 'all' || inputProductCategoryFilter === c.id)).map(category => {
                           const categoryProducts = products.filter(p => p.categoryId === category.id && parseFloat(p.currentStock || '0') > 0);
                           if (categoryProducts.length === 0) return null;
                           return (
@@ -824,7 +878,7 @@ export default function Production() {
                             </CommandGroup>
                           );
                         })}
-                        {(() => {
+                        {(inputProductCategoryFilter === 'all' || inputProductCategoryFilter === 'uncategorized') && (() => {
                           const uncatInputProducts = products.filter(p => !p.categoryId && parseFloat(p.currentStock || '0') > 0);
                           if (uncatInputProducts.length === 0) return null;
                           return (
@@ -877,7 +931,7 @@ export default function Production() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsRecordInputOpen(false); setBarcodeInput(''); setScannedLot(null); setBarcodeError(''); }}>Close</Button>
+            <Button variant="outline" onClick={() => { setIsRecordInputOpen(false); setBarcodeInput(''); setScannedLot(null); setBarcodeError(''); setInputProductCategoryFilter('all'); }}>Close</Button>
             <Button onClick={handleRecordInput} disabled={recordBatchInput.isPending} data-testid="button-add-input">
               {recordBatchInput.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add to Batch
@@ -1651,7 +1705,7 @@ function BatchOutputsEditor({
               <PopoverContent className="w-full p-0" align="start">
                 <Command>
                   <CommandInput placeholder="Search products..." />
-                  <CommandList>
+                  <CommandList className="max-h-[260px] overflow-y-auto">
                     <CommandEmpty>No product found.</CommandEmpty>
                     {productsByCategory.map(({ category, products: categoryProducts }) => (
                       <CommandGroup key={category.id} heading={category.name}>
