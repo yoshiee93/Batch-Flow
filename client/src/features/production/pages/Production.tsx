@@ -100,8 +100,8 @@ export default function Production() {
   const recordBatchInput = useRecordBatchInput();
   const { toast } = useToast();
 
-  // Group products by category for dropdown display
-  const productsByCategory = categories.map(category => ({
+  // Group products by category for dropdown display (only categories visible in production batch form)
+  const productsByCategory = categories.filter(c => c.showInProductionBatch).map(category => ({
     category,
     products: products.filter(p => p.categoryId === category.id)
   })).filter(group => group.products.length > 0);
@@ -765,7 +765,7 @@ export default function Production() {
                       <CommandInput placeholder="Search products..." />
                       <CommandList>
                         <CommandEmpty>No product found.</CommandEmpty>
-                        {categories.filter(c => !c.excludeFromYield).map(category => {
+                        {categories.filter(c => !c.excludeFromYield && c.showInProductionInputs).map(category => {
                           const categoryProducts = products.filter(p => p.categoryId === category.id && parseFloat(p.currentStock || '0') > 0);
                           if (categoryProducts.length === 0) return null;
                           return (
@@ -1389,7 +1389,7 @@ function BatchOutputsEditor({
   const regenerateOutputLots = useRegenerateOutputLots();
   const { toast } = useToast();
 
-  const productsByCategory = allCategories.map(category => ({
+  const productsByCategory = allCategories.filter(c => c.showInProductionOutputs).map(category => ({
     category,
     products: allProducts.filter(p => p.categoryId === category.id)
   })).filter(group => group.products.length > 0);

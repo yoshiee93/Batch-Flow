@@ -107,7 +107,7 @@ export default function Inventory() {
   const isLoading = materialsLoading || productsLoading || lotsLoading;
   const hasError = materialsError || productsError;
 
-  const visibleCategories = categories.filter(c => c.showInTabs);
+  const visibleCategories = categories.filter(c => c.showInTabs && c.showInInventory);
 
   useEffect(() => {
     if (visibleCategories.length > 0 && !activeTab) {
@@ -839,7 +839,7 @@ export default function Inventory() {
                   </p>
                 ) : (() => {
                   const receivableCategories = categories.filter(c =>
-                    receivableItems.some(i => i.categoryId === c.id)
+                    c.showInReceiveStock && receivableItems.some(i => i.categoryId === c.id)
                   );
                   const hasUncategorised = receivableItems.some(i => !i.categoryId);
                   const filteredItems = receiveCategoryFilter === 'all'

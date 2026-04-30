@@ -23,6 +23,11 @@ export default function Settings() {
     name: '',
     excludeFromYield: false,
     showInTabs: true,
+    showInInventory: true,
+    showInReceiveStock: true,
+    showInProductionBatch: true,
+    showInProductionInputs: true,
+    showInProductionOutputs: true,
     sortOrder: 0,
     processCode: '',
   });
@@ -129,7 +134,7 @@ export default function Settings() {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', excludeFromYield: false, showInTabs: true, sortOrder: 0, processCode: '' });
+    setFormData({ name: '', excludeFromYield: false, showInTabs: true, showInInventory: true, showInReceiveStock: true, showInProductionBatch: true, showInProductionInputs: true, showInProductionOutputs: true, sortOrder: 0, processCode: '' });
   };
 
   const handleCreate = async () => {
@@ -142,6 +147,11 @@ export default function Settings() {
         name: formData.name,
         excludeFromYield: formData.excludeFromYield,
         showInTabs: formData.showInTabs,
+        showInInventory: formData.showInInventory,
+        showInReceiveStock: formData.showInReceiveStock,
+        showInProductionBatch: formData.showInProductionBatch,
+        showInProductionInputs: formData.showInProductionInputs,
+        showInProductionOutputs: formData.showInProductionOutputs,
         isDefault: false,
         sortOrder: formData.sortOrder,
         processCode: formData.processCode || null,
@@ -160,6 +170,11 @@ export default function Settings() {
       name: category.name,
       excludeFromYield: category.excludeFromYield,
       showInTabs: category.showInTabs,
+      showInInventory: category.showInInventory,
+      showInReceiveStock: category.showInReceiveStock,
+      showInProductionBatch: category.showInProductionBatch,
+      showInProductionInputs: category.showInProductionInputs,
+      showInProductionOutputs: category.showInProductionOutputs,
       sortOrder: category.sortOrder,
       processCode: category.processCode || '',
     });
@@ -177,6 +192,11 @@ export default function Settings() {
         name: formData.name,
         excludeFromYield: formData.excludeFromYield,
         showInTabs: formData.showInTabs,
+        showInInventory: formData.showInInventory,
+        showInReceiveStock: formData.showInReceiveStock,
+        showInProductionBatch: formData.showInProductionBatch,
+        showInProductionInputs: formData.showInProductionInputs,
+        showInProductionOutputs: formData.showInProductionOutputs,
         sortOrder: formData.sortOrder,
         processCode: formData.processCode || null,
       });
@@ -640,17 +660,35 @@ export default function Settings() {
               />
               <p className="text-xs text-muted-foreground">Lower numbers appear first in lists</p>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="create-showInTabs">Show in Inventory Tabs</Label>
-                <p className="text-xs text-muted-foreground">Display this category as a tab on the Inventory page</p>
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Section Visibility</Label>
+              <p className="text-xs text-muted-foreground">Control where this category appears across the system</p>
+              <div className="rounded-md border divide-y mt-1">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="create-showInTabs" className="font-normal text-sm cursor-pointer">Inventory tabs</Label>
+                  <Switch id="create-showInTabs" checked={formData.showInTabs} onCheckedChange={(checked) => setFormData({ ...formData, showInTabs: checked })} data-testid="switch-show-in-tabs" />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="create-showInInventory" className="font-normal text-sm cursor-pointer">Inventory page</Label>
+                  <Switch id="create-showInInventory" checked={formData.showInInventory} onCheckedChange={(checked) => setFormData({ ...formData, showInInventory: checked })} data-testid="switch-show-in-inventory" />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="create-showInReceiveStock" className="font-normal text-sm cursor-pointer">Receive Stock form</Label>
+                  <Switch id="create-showInReceiveStock" checked={formData.showInReceiveStock} onCheckedChange={(checked) => setFormData({ ...formData, showInReceiveStock: checked })} data-testid="switch-show-in-receive-stock" />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="create-showInProductionBatch" className="font-normal text-sm cursor-pointer">Create Batch product list</Label>
+                  <Switch id="create-showInProductionBatch" checked={formData.showInProductionBatch} onCheckedChange={(checked) => setFormData({ ...formData, showInProductionBatch: checked })} data-testid="switch-show-in-production-batch" />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="create-showInProductionInputs" className="font-normal text-sm cursor-pointer">Batch inputs (product type)</Label>
+                  <Switch id="create-showInProductionInputs" checked={formData.showInProductionInputs} onCheckedChange={(checked) => setFormData({ ...formData, showInProductionInputs: checked })} data-testid="switch-show-in-production-inputs" />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="create-showInProductionOutputs" className="font-normal text-sm cursor-pointer">Batch outputs</Label>
+                  <Switch id="create-showInProductionOutputs" checked={formData.showInProductionOutputs} onCheckedChange={(checked) => setFormData({ ...formData, showInProductionOutputs: checked })} data-testid="switch-show-in-production-outputs" />
+                </div>
               </div>
-              <Switch
-                id="create-showInTabs"
-                checked={formData.showInTabs}
-                onCheckedChange={(checked) => setFormData({ ...formData, showInTabs: checked })}
-                data-testid="switch-show-in-tabs"
-              />
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -722,17 +760,35 @@ export default function Settings() {
               />
               <p className="text-xs text-muted-foreground">Lower numbers appear first in lists</p>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="edit-showInTabs">Show in Inventory Tabs</Label>
-                <p className="text-xs text-muted-foreground">Display this category as a tab on the Inventory page</p>
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Section Visibility</Label>
+              <p className="text-xs text-muted-foreground">Control where this category appears across the system</p>
+              <div className="rounded-md border divide-y mt-1">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="edit-showInTabs" className="font-normal text-sm cursor-pointer">Inventory tabs</Label>
+                  <Switch id="edit-showInTabs" checked={formData.showInTabs} onCheckedChange={(checked) => setFormData({ ...formData, showInTabs: checked })} data-testid="switch-edit-show-in-tabs" />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="edit-showInInventory" className="font-normal text-sm cursor-pointer">Inventory page</Label>
+                  <Switch id="edit-showInInventory" checked={formData.showInInventory} onCheckedChange={(checked) => setFormData({ ...formData, showInInventory: checked })} data-testid="switch-edit-show-in-inventory" />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="edit-showInReceiveStock" className="font-normal text-sm cursor-pointer">Receive Stock form</Label>
+                  <Switch id="edit-showInReceiveStock" checked={formData.showInReceiveStock} onCheckedChange={(checked) => setFormData({ ...formData, showInReceiveStock: checked })} data-testid="switch-edit-show-in-receive-stock" />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="edit-showInProductionBatch" className="font-normal text-sm cursor-pointer">Create Batch product list</Label>
+                  <Switch id="edit-showInProductionBatch" checked={formData.showInProductionBatch} onCheckedChange={(checked) => setFormData({ ...formData, showInProductionBatch: checked })} data-testid="switch-edit-show-in-production-batch" />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="edit-showInProductionInputs" className="font-normal text-sm cursor-pointer">Batch inputs (product type)</Label>
+                  <Switch id="edit-showInProductionInputs" checked={formData.showInProductionInputs} onCheckedChange={(checked) => setFormData({ ...formData, showInProductionInputs: checked })} data-testid="switch-edit-show-in-production-inputs" />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="edit-showInProductionOutputs" className="font-normal text-sm cursor-pointer">Batch outputs</Label>
+                  <Switch id="edit-showInProductionOutputs" checked={formData.showInProductionOutputs} onCheckedChange={(checked) => setFormData({ ...formData, showInProductionOutputs: checked })} data-testid="switch-edit-show-in-production-outputs" />
+                </div>
               </div>
-              <Switch
-                id="edit-showInTabs"
-                checked={formData.showInTabs}
-                onCheckedChange={(checked) => setFormData({ ...formData, showInTabs: checked })}
-                data-testid="switch-edit-show-in-tabs"
-              />
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">

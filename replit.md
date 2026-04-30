@@ -64,7 +64,7 @@ Domain routing map:
 - **Migrations**: Drizzle Kit
 
 **Key Database Tables**:
-- `categories`: Dynamic product categorization.
+- `categories`: Dynamic product categorization. Has per-section visibility booleans: `showInInventory`, `showInReceiveStock`, `showInProductionBatch`, `showInProductionInputs`, `showInProductionOutputs` (plus existing `showInTabs`, `excludeFromYield`).
 - `products`: Finished goods with stock and category.
 - `materials`: Raw materials with stock and category.
 - `lots`: Lot tracking for raw materials, intermediates, and finished goods, including traceability data.

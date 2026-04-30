@@ -6,6 +6,11 @@ export interface Category {
   name: string;
   excludeFromYield: boolean;
   showInTabs: boolean;
+  showInInventory: boolean;
+  showInReceiveStock: boolean;
+  showInProductionBatch: boolean;
+  showInProductionInputs: boolean;
+  showInProductionOutputs: boolean;
   isDefault: boolean;
   sortOrder: number;
   processCode: string | null;
