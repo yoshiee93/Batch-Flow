@@ -1,0 +1,84 @@
+Review the current category system and extend it so categories can control where they appear.
+
+Current behaviour:
+- Receive Stock already groups/filter items by category.
+- Batch Create product selection is grouped by category.
+- Production outputs are grouped by category.
+- Categories currently only have showInTabs / excludeFromYield.
+
+Required change:
+Add category visibility controls per section.
+
+1. Update shared/schema.ts categories table:
+Add boolean fields:
+- showInInventory default true
+- showInReceiveStock default true
+- showInProductionBatch default true
+- showInProductionInputs default true
+- showInProductionOutputs default true
+
+Keep existing showInTabs for backwards compatibility, or migrate it into showInInventory.
+
+2. Update Category type in:
+- client/src/features/catalog/api.ts
+
+3. Update Settings category create/edit forms:
+File:
+- client/src/features/catalog/pages/Settings.tsx
+
+Add checkboxes:
+- Show in Inventory
+- Show in Receive Stock
+- Show in Production Batch Form
+- Show in Production Inputs
+- Show in Production Outputs
+- Exclude from Yield
+
+Make it clear these only control visibility, not whether existing stock or traceability remains valid.
+
+4. Update Receive Stock:
+File:
+- client/src/features/inventory/pages/Inventory.tsx
+
+Only show categories/items where:
+category.showInReceiveStock === true
+
+Uncategorised items can still show.
+
+5. Update Create Batch form:
+File:
+- client/src/features/production/pages/Production.tsx
+
+Product dropdown should only show products where their category has:
+showInProductionBatch === true
+
+This is the section where we want the category layout to work the same as Receive Stock.
+
+6. Update Production Inputs:
+In the Add Input dialog, only show materials/products where their category has:
+showInProductionInputs === true
+
+This lets us hide categories that should never be consumed as production inputs.
+
+7. Update Production Outputs:
+In the output/finalize dialog, only show products where their category has:
+showInProductionOutputs === true
+
+This lets us hide raw/input-only categories from finished output selection.
+
+8. Backend:
+Update insertCategorySchema handling automatically through schema if possible.
+Make sure PATCH /categories/:id accepts the new booleans.
+Add migration / drizzle push.
+
+9. Data migration/backwards compatibility:
+For existing categories, default all new visibility fields to true so nothing disappears unexpectedly.
+
+10. Test:
+- Create/edit category visibility settings.
+- Hide a category from Production Batch Form and confirm products in that category do not appear when creating a batch.
+- Hide a category from Production Inputs and confirm it does not appear in Add Input.
+- Hide a category from Production Outputs and confirm it does not appear when completing/outputting production.
+- Hide a category from Receive Stock and confirm it does not appear there.
+- Confirm Inventory tabs still work.
+- Run npm run check and npm run build.
