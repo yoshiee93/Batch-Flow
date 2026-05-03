@@ -597,6 +597,8 @@ export const productionService = {
     return inventoryRepository.getBatchInputLots(batchId);
   },
 
+  getBatchTimeline: repo.getBatchTimeline.bind(repo),
+
   async getBatchOutputLots(batchId: string): Promise<BatchOutputLotEntry[]> {
     return inventoryRepository.getBatchOutputLots(batchId);
   },

@@ -69,6 +69,10 @@ productionRouter.get("/batches/:id/output-lots", asyncHandler(async (req, res) =
   res.json(await svc.getBatchOutputLots(req.params.id));
 }));
 
+productionRouter.get("/batches/:id/timeline", asyncHandler(async (req, res) => {
+  res.json(await svc.getBatchTimeline(req.params.id));
+}));
+
 productionRouter.get("/batches/barcode/:value", asyncHandler(async (req, res) => {
   const batch = await svc.getBatchByBarcode(req.params.value);
   if (!batch) return res.status(404).json({ error: "Batch not found for barcode" });

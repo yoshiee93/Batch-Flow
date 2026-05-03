@@ -14,7 +14,7 @@ import {
   ArrowLeft, Package, Factory, Box, ChevronRight, Loader2,
   ClipboardList, Calendar, AlertCircle, CheckCircle, Scale,
   TrendingDown, ArrowRightLeft, ExternalLink, Printer, History, User,
-  ShieldCheck, Plus, XCircle, FlaskConical,
+  ShieldCheck, Plus, XCircle, FlaskConical, GanttChart,
 } from 'lucide-react';
 import {
   useBatch, useProducts, useBatchInputLots, useBatchOutputLots, useStockMovements, useRecipes,
@@ -331,6 +331,12 @@ export default function BatchDetail() {
           </Card>
 
           <div className="flex flex-col gap-2">
+            <Link href={`/batches/${batch.id}/timeline`}>
+              <Button variant="outline" className="w-full" data-testid="button-view-timeline">
+                <GanttChart className="mr-2 h-4 w-4" />
+                View Timeline
+              </Button>
+            </Link>
             <Link href={`/traceability?batch=${batch.batchNumber}`}>
               <Button variant="outline" className="w-full" data-testid="button-view-traceability">
                 <ClipboardList className="mr-2 h-4 w-4" />

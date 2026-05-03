@@ -293,6 +293,25 @@ export function useBatchOutputLots(batchId: string, options?: { enabled?: boolea
   });
 }
 
+export interface TimelineEvent {
+  at: string;
+  kind: "created" | "started" | "input" | "qc" | "output" | "output_lot" | "status" | "print" | "finalize" | "completed" | "audit";
+  title: string;
+  detail?: string;
+  userId?: string | null;
+  userName?: string | null;
+  link?: { href: string; label: string };
+  meta?: Record<string, unknown>;
+}
+
+export function useBatchTimeline(batchId: string) {
+  return useQuery<TimelineEvent[]>({
+    queryKey: ["batchTimeline", batchId],
+    queryFn: () => fetchApi<TimelineEvent[]>(`/batches/${batchId}/timeline`),
+    enabled: !!batchId,
+  });
+}
+
 export function useRegenerateOutputLots() {
   const queryClient = useQueryClient();
   return useMutation<OutputLot[], Error, string>({

@@ -91,7 +91,8 @@ Domain routing map:
 - Category management (`GET/POST/PATCH/DELETE /api/categories`).
 
 ### Pages
-- **BatchDetail** (`/batches/:id`): Shows batch overview (dates, quantities, yield), all input lots consumed (lot number, supplier, expiry, barcode), all output products, and links to full lot traceability. Accessible via "View Detail" from Production page dropdown.
+- **BatchDetail** (`/batches/:id`): Shows batch overview (dates, quantities, yield), all input lots consumed (lot number, supplier, expiry, barcode), all output products, and links to full lot traceability. Accessible via "View Detail" from Production page dropdown. Header has a "View Timeline" button linking to `/batches/:id/timeline`.
+- **BatchTimeline** (`/batches/:id/timeline`): Vertical chronological event list aggregating batch lifecycle (created/started/completed), material & product consumption (`batch_materials`), QC checks, output recording (`batch_outputs`), output lot creation (`lots.sourceBatchId`), label prints (`print_history` + lot/batch `barcodePrintedAt` fallback), and status/finalize events from `audit_logs`. Powered by single aggregator endpoint `GET /api/batches/:id/timeline` returning a sorted `TimelineEvent[]` with `{ at, kind, title, detail?, userId?, userName?, link?, meta? }`. Resolved user names are joined server-side. Mobile-friendly.
 
 ### UI/UX Decisions
 - Responsive design for mobile, tablet, and desktop.

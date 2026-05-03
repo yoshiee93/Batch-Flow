@@ -16,6 +16,7 @@ import Settings from "@/features/catalog/pages/Settings";
 import Calculator from "@/pages/Calculator";
 import NotFound from "@/pages/not-found";
 import BatchDetail from "@/features/production/pages/BatchDetail";
+import BatchTimeline from "@/features/production/pages/BatchTimeline";
 import LotDetail from "@/features/inventory/pages/LotDetail";
 import Login from "@/pages/Login";
 import { Loader2 } from "lucide-react";
@@ -58,6 +59,7 @@ function Router() {
               <Route path="/orders" component={Orders} />
               <Route path="/customers" component={Customers} />
               <Route path="/production" component={Production} />
+              <Route path="/batches/:id/timeline" component={BatchTimeline} />
               <Route path="/batches/:id" component={BatchDetail} />
               <Route path="/lots/:id" component={LotDetail} />
               <Route path="/inventory" component={Inventory} />
