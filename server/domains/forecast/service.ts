@@ -37,7 +37,7 @@ export const forecastService = {
     await createAuditLog({ entityType: "forecast_order", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
   },
 
-  async history(opts: { productId?: string; monthsBack: number }) {
+  async history(opts: { productId?: string; customerId?: string; monthsBack: number }) {
     const monthsBack = Math.max(1, Math.min(24, opts.monthsBack));
     const now = new Date();
     const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
@@ -45,7 +45,7 @@ export const forecastService = {
 
     const [pastForecasts, pastOrders, pastOutputs] = await Promise.all([
       repo.getForecastsInRange(opts.productId, from, to),
-      repo.getOrdersInRange(opts.productId, from, to),
+      repo.getOrdersInRange(opts.productId, from, to, opts.customerId),
       repo.getOutputsInRange(opts.productId, from, to),
     ]);
 

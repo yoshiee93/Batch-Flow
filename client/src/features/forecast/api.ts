@@ -101,10 +101,11 @@ export interface ForecastHistory {
   months: ForecastHistoryMonth[];
 }
 
-export function useForecastHistory(productId: string | undefined, monthsBack: number) {
+export function useForecastHistory(productId: string | undefined, monthsBack: number, customerId?: string) {
   return useQuery<ForecastHistory>({
-    queryKey: ["forecastHistory", productId ?? "all", monthsBack],
-    queryFn: () => fetchApi(`/forecast/history?monthsBack=${monthsBack}${productId ? `&productId=${productId}` : ""}`),
+    queryKey: ["forecastHistory", productId ?? "all", customerId ?? "all", monthsBack],
+    queryFn: () => fetchApi(`/forecast/history?monthsBack=${monthsBack}${productId ? `&productId=${productId}` : ""}${customerId ? `&customerId=${customerId}` : ""}`),
+    enabled: true,
   });
 }
 

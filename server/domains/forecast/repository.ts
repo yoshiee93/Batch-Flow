@@ -70,11 +70,12 @@ export const forecastRepository = {
     return row;
   },
 
-  async getOrdersInRange(productId: string | undefined, from: Date, to: Date): Promise<{ productId: string; createdAt: Date; quantity: string }[]> {
+  async getOrdersInRange(productId: string | undefined, from: Date, to: Date, customerId?: string): Promise<{ productId: string; createdAt: Date; quantity: string; customerId: string | null; orderNumber: string }[]> {
     const conds = [gte(orders.createdAt, from), lte(orders.createdAt, to)] as any[];
     if (productId) conds.push(eq(orderItems.productId, productId));
+    if (customerId) conds.push(eq(orders.customerId, customerId));
     const rows = await db
-      .select({ productId: orderItems.productId, createdAt: orders.createdAt, quantity: orderItems.quantity })
+      .select({ productId: orderItems.productId, createdAt: orders.createdAt, quantity: orderItems.quantity, customerId: orders.customerId, orderNumber: orders.orderNumber })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
       .where(and(...conds));

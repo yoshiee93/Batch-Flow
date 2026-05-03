@@ -32,8 +32,9 @@ forecastRouter.get("/forecast/summary", adminOnly, asyncHandler(async (req, res)
 
 forecastRouter.get("/forecast/history", adminOnly, asyncHandler(async (req, res) => {
   const productId = typeof req.query.productId === "string" && req.query.productId ? req.query.productId : undefined;
+  const customerId = typeof req.query.customerId === "string" && req.query.customerId ? req.query.customerId : undefined;
   const monthsBack = req.query.monthsBack ? Math.max(1, Math.min(24, Number(req.query.monthsBack) || 6)) : 6;
-  res.json(await svc.history({ productId, monthsBack }));
+  res.json(await svc.history({ productId, customerId, monthsBack }));
 }));
 
 forecastRouter.post("/forecast", adminOnly, asyncHandler(async (req, res) => {

@@ -11,8 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Switch } from "@/components/ui/switch";
 import { Plus, Loader2, Pencil, Trash2, ArrowRightLeft, AlertTriangle, ExternalLink } from "lucide-react";
-import { format, isSameDay, parseISO } from "date-fns";
+import { format, isSameDay, parseISO, subYears } from "date-fns";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useCustomers } from "@/features/customers/api";
@@ -37,6 +38,8 @@ export default function Forecast() {
   const [view, setView] = useState<"list" | "calendar" | "history">("list");
   const [range, setRange] = useState<ForecastRange>(3);
   const [calendarDay, setCalendarDay] = useState<Date | undefined>(new Date());
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareProductId, setCompareProductId] = useState<string>("");
   const [historyProductId, setHistoryProductId] = useState<string>("");
   const [historyMonths, setHistoryMonths] = useState<number>(6);
   const [createOpen, setCreateOpen] = useState(false);
@@ -58,6 +61,24 @@ export default function Forecast() {
   const convertMut = useConvertForecast();
 
   const { data: history } = useForecastHistory(historyProductId || undefined, historyMonths);
+  const { data: compareHistory } = useForecastHistory(compareProductId || undefined, 18);
+
+  const compareRows = useMemo(() => {
+    if (!compareMode || !compareProductId || !compareHistory) return [] as Array<{ date: string; forecastQty: number; lastYearMonthQty: number; monthLabel: string }>;
+    const productForecasts = forecasts.filter(f => f.productId === compareProductId);
+    const monthMap = new Map(compareHistory.months.map(m => [m.month, m.orderQty] as const));
+    return productForecasts.map(f => {
+      const d = parseISO(f.expectedDate);
+      const lastYr = subYears(d, 1);
+      const key = `${lastYr.getUTCFullYear()}-${String(lastYr.getUTCMonth() + 1).padStart(2, "0")}`;
+      return {
+        date: f.expectedDate,
+        forecastQty: parseFloat(f.quantity),
+        lastYearMonthQty: monthMap.get(key) ?? 0,
+        monthLabel: format(lastYr, "MMM yyyy"),
+      };
+    }).sort((a, b) => a.date.localeCompare(b.date));
+  }, [compareMode, compareProductId, compareHistory, forecasts]);
 
   const forecastDates = useMemo(() => forecasts.map(f => parseISO(f.expectedDate)), [forecasts]);
   const dayForecasts = useMemo(() => {
@@ -325,7 +346,29 @@ export default function Forecast() {
       )}
         </TabsContent>
 
-        <TabsContent value="calendar" className="mt-4">
+        <TabsContent value="calendar" className="mt-4 space-y-4">
+          <Card className="p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Switch id="compare-toggle" checked={compareMode} onCheckedChange={setCompareMode} data-testid="switch-compare-history" />
+                <Label htmlFor="compare-toggle" className="text-sm">Compare to history</Label>
+              </div>
+              {compareMode && (
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm text-muted-foreground">Product</Label>
+                  <Select value={compareProductId || "none"} onValueChange={(v) => setCompareProductId(v === "none" ? "" : v)}>
+                    <SelectTrigger className="w-[220px]" data-testid="select-compare-product"><SelectValue placeholder="Pick product" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— Pick a product —</SelectItem>
+                      {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">Compares each forecast to real orders for the same month last year.</p>
+            </div>
+          </Card>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="p-4">
               <CalendarPicker
@@ -337,6 +380,28 @@ export default function Forecast() {
                 data-testid="calendar-forecast"
               />
               <p className="text-xs text-muted-foreground mt-2">Days with forecasts are highlighted. Pick the months range above to widen the view.</p>
+
+              {compareMode && compareProductId && (
+                <div className="mt-4 border-t pt-3">
+                  <h4 className="text-sm font-semibold mb-2" data-testid="heading-compare-strip">Forecast vs same month last year</h4>
+                  {compareRows.length === 0 ? (
+                    <p className="text-xs text-muted-foreground" data-testid="text-compare-empty">No forecasts for this product in the selected range.</p>
+                  ) : (
+                    <ul className="space-y-1 text-xs">
+                      {compareRows.map(r => {
+                        const delta = r.forecastQty - r.lastYearMonthQty;
+                        const sign = delta > 0 ? "+" : "";
+                        return (
+                          <li key={r.date} className="flex justify-between gap-2 font-mono" data-testid={`row-compare-${r.date}`}>
+                            <span>{format(parseISO(r.date), "d MMM")}</span>
+                            <span>Forecast: {r.forecastQty.toFixed(2)} · {r.monthLabel}: {r.lastYearMonthQty.toFixed(2)} ({sign}{delta.toFixed(2)})</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
             </Card>
             <Card className="p-4">
               <h3 className="font-semibold mb-3" data-testid="heading-calendar-day">
@@ -345,7 +410,7 @@ export default function Forecast() {
               {dayForecasts.length === 0 ? (
                 <p className="text-sm text-muted-foreground" data-testid="text-day-empty">No forecasts on this day.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {dayForecasts.map(f => (
                     <div key={f.id} className="border rounded-md p-3" data-testid={`card-day-forecast-${f.id}`}>
                       <div className="flex items-center justify-between gap-2">
@@ -359,6 +424,7 @@ export default function Forecast() {
                         </div>
                       </div>
                       {f.notes && <div className="text-xs text-muted-foreground mt-2">{f.notes}</div>}
+                      <ForecastHistoryPanel customerId={f.customerId} productId={f.productId} unit={f.productUnit} />
                     </div>
                   ))}
                 </div>
@@ -524,6 +590,31 @@ export default function Forecast() {
         description="This permanently removes the forecast entry."
         onConfirm={submitDelete}
       />
+    </div>
+  );
+}
+
+function ForecastHistoryPanel({ customerId, productId, unit }: { customerId: string; productId: string; unit: string }) {
+  const { data, isLoading } = useForecastHistory(productId, 12, customerId);
+  if (isLoading) {
+    return <div className="mt-2 text-xs text-muted-foreground" data-testid={`text-history-loading-${customerId}-${productId}`}>Loading history…</div>;
+  }
+  if (!data) return null;
+  const totalOrders = data.months.reduce((s, m) => s + m.orderQty, 0);
+  const totalProduced = data.months.reduce((s, m) => s + m.producedQty, 0);
+  const recent = data.months.slice(-3);
+  return (
+    <div className="mt-3 border-t pt-2 text-xs space-y-1" data-testid={`panel-history-${customerId}-${productId}`}>
+      <div className="font-semibold">Past 12 months</div>
+      <div className="flex gap-4 text-muted-foreground">
+        <span data-testid={`text-history-customer-orders-${customerId}-${productId}`}>Customer orders: <span className="font-mono text-foreground">{totalOrders.toFixed(2)} {unit}</span></span>
+        <span data-testid={`text-history-product-produced-${customerId}-${productId}`}>Produced: <span className="font-mono text-foreground">{totalProduced.toFixed(2)} {unit}</span></span>
+      </div>
+      {recent.length > 0 && (
+        <div className="text-muted-foreground">
+          Recent: {recent.map(m => `${m.month}: ${m.orderQty.toFixed(0)}o/${m.producedQty.toFixed(0)}p`).join(" · ")}
+        </div>
+      )}
     </div>
   );
 }
