@@ -1,0 +1,262 @@
+Review this ClearTrace / Gina’s Table application and audit ALL tasks below.
+
+For EACH task:
+
+* Mark as: **Implemented / Partially Implemented / Missing**
+* Briefly explain what exists vs what is missing
+* Reference relevant files/components if possible
+* Do NOT make changes — audit only
+
+---
+
+# 🔧 CORE SYSTEM TASKS (FROM DEVELOPMENT PLAN)
+
+## 1. Settings Restructure
+
+* Move Label Templates into Settings
+* Remove Labels from main sidebar
+* Create structured sections:
+
+  * General
+  * Production
+  * Labels
+  * Data
+  * Security (placeholder)
+* Ensure existing config pages are correctly grouped
+
+---
+
+## 2. Label System Improvements
+
+* Label Templates accessible inside Settings
+* Custom Label Builder placeholder exists
+* Print Custom Label placeholder exists
+* Extend templates to support optional layout JSON (future builder support)
+* Maintain backward compatibility with existing field-toggle templates
+
+---
+
+## 3. Print Again Functionality
+
+* “Print Again” button available on:
+
+  * Batch detail
+  * Inventory item
+  * Production outputs
+* Reuses existing label print logic
+* Prefills correct data
+
+---
+
+## 4. Validation & Error-Proofing
+
+* Required field validation across:
+
+  * Batches
+  * Products
+  * Inventory
+  * Production
+* Inline error messages
+* Prevent invalid submission
+* Confirmation dialogs for destructive actions
+* Backend validation aligned with frontend
+
+---
+
+## 5. Global Search (Command Palette)
+
+* Backend: GET /api/search?q=
+* Searches:
+
+  * batches
+  * products
+  * customers
+  * inventory
+* Frontend:
+
+  * Ctrl+K / Cmd+K command palette
+  * Grouped results
+  * Navigation on selection
+  * Loading/empty states
+
+---
+
+## 6. Dashboard
+
+* Simple dashboard page
+* Shows:
+
+  * Batches created today
+  * Labels printed today
+  * Low stock items
+* Clean, minimal UI
+
+---
+
+## 7. Batch Timeline / Traceability
+
+* Endpoint: GET /api/batches/:id/timeline
+* Shows:
+
+  * Inputs
+  * Production steps
+  * Outputs
+  * Inventory movement
+  * Labels printed
+  * Customer/output links
+* Chronological UI view
+* Linked records
+
+---
+
+## 8. Activity Log
+
+* activity_logs table exists
+* Logs:
+
+  * batch create/update
+  * product create/update
+  * inventory changes
+  * label printing
+* UI:
+
+  * visible on batch detail
+  * global activity view in Settings
+
+---
+
+## 9. Role-Based UI (Basic)
+
+* Admin vs user roles enforced
+* Settings hidden for non-admin
+* Dangerous actions restricted
+* Backend protections exist
+
+---
+
+## 10. Template System Foundation
+
+* Structure supports future templates:
+
+  * batch templates
+  * product templates
+* Label templates extended safely
+* Backward compatibility preserved
+
+---
+
+# 🏭 CLIENT-SPECIFIC REQUIREMENTS (GINA’S TABLE)
+
+## 11. Received Stock Enhancements
+
+* Product Temperature field
+* Visual Inspection field
+* Received By field
+* Remarks field
+* Camera/photo upload capability
+* Freight field
+* Stored and visible in received stock history
+
+---
+
+## 12. Production Workflow Improvements
+
+* Batch number auto-generated (product + date)
+* Start time captured
+* Finish time captured
+* Completion popup replaces “Add Output”
+* Completion captures:
+
+  * number of staff
+  * cleaning time
+* Product Assessment field/workflow
+
+---
+
+## 13. Shipping Lock (Testing Requirement)
+
+* Ability to lock batches/orders for specific clients
+* Prevent shipping until testing is completed
+* UI clearly shows locked/unlocked status
+* Backend enforces restriction
+
+---
+
+## 14. Orders Enhancements
+
+* Remove hardcoded “KG”
+* Use dynamic product units
+* Add fields:
+
+  * Custom Batch Number
+  * PO Number
+  * Freight
+* Fields visible in create/edit/view order screens
+
+---
+
+## 15. Forecast System
+
+* Create potential (unconfirmed) orders
+* Support 3 / 6 / 12 month forecasting
+* Show required stock
+* Ability to convert forecast → real order
+
+---
+
+## 16. Forecast Calendar / Planner
+
+* Calendar view for potential orders
+* Shows future demand visually
+* Includes previous history context
+
+---
+
+## 17. Reporting (YTD Production)
+
+* Year-to-date production view
+* Grouped by product or category
+* Simple dashboard-style reporting
+
+---
+
+# 🧠 ADDITIONAL UX / SYSTEM IMPROVEMENTS
+
+## 18. Quick Actions
+
+* Global “+ New” button
+* Quick create:
+
+  * batch
+  * product
+  * label
+  * inventory
+
+---
+
+## 19. Label Preview
+
+* Show label preview where labels are referenced
+* e.g. batch, inventory, templates
+
+---
+
+## 20. Smart Defaults
+
+* Auto-fill common values:
+
+  * last used supplier
+  * default templates
+  * default categories
+
+---
+
+## 21. Error Handling / Stability
+
+* API error handling is robust
+* UI gracefully handles failures
+* No silent failures
+
+---
+
+END OF AUDIT
