@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,13 +8,24 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList, Leaf, Database, Download, Upload, ShieldAlert } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList, Leaf, Database, Download, Upload, ShieldAlert, Tag, Wrench, ShieldCheck, Construction, Printer } from 'lucide-react';
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useProducts, useUpdateProduct, type Category, type Product } from '@/features/catalog/api';
 import { PROCESS_CODE_MAP, FRUIT_CODE_MAP } from '@shared/batchCodeConfig';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
 import { useRole } from '@/contexts/AuthContext';
 import { queryClient } from '@/lib/queryClient';
+import LabelTemplatesPanel from '@/features/labels/pages/Labels';
+
+const TAB_VALUES = ['general', 'production', 'labels', 'data', 'security'] as const;
+type TabValue = typeof TAB_VALUES[number];
+
+function getInitialTab(): TabValue {
+  if (typeof window === 'undefined') return 'general';
+  const t = new URLSearchParams(window.location.search).get('tab');
+  return (TAB_VALUES as readonly string[]).includes(t ?? '') ? (t as TabValue) : 'general';
+}
 
 export default function Settings() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -43,6 +55,28 @@ export default function Settings() {
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
 
   const { canManageSettings, isAdmin } = useRole();
+  const [, navigate] = useLocation();
+  const [activeTab, setActiveTab] = useState<TabValue>(getInitialTab);
+
+  useEffect(() => {
+    const onPop = () => setActiveTab(getInitialTab());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const handleTabChange = (value: string) => {
+    if (!(TAB_VALUES as readonly string[]).includes(value)) return;
+    const next = value as TabValue;
+    setActiveTab(next);
+    const params = new URLSearchParams(window.location.search);
+    if (next === 'general') {
+      params.delete('tab');
+    } else {
+      params.set('tab', next);
+    }
+    const qs = params.toString();
+    navigate(`/settings${qs ? `?${qs}` : ''}`, { replace: true });
+  };
 
   const { data: categories = [], isLoading, isError } = useCategories();
   const { data: products = [] } = useProducts();
@@ -248,7 +282,32 @@ export default function Settings() {
         </div>
       </div>
 
-      <Card>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
+          <TabsList className="grid grid-cols-3 sm:grid-cols-5 w-full">
+            <TabsTrigger value="general" data-testid="tab-general">
+              <Settings2 className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              General
+            </TabsTrigger>
+            <TabsTrigger value="production" data-testid="tab-production">
+              <Wrench className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              Production
+            </TabsTrigger>
+            <TabsTrigger value="labels" data-testid="tab-labels">
+              <Tag className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              Labels
+            </TabsTrigger>
+            <TabsTrigger value="data" data-testid="tab-data">
+              <Database className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              Data
+            </TabsTrigger>
+            <TabsTrigger value="security" data-testid="tab-security">
+              <ShieldCheck className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              Security
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="general" className="space-y-6 mt-4">
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <LayoutList className="h-5 w-5" />
@@ -275,8 +334,134 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+          </TabsContent>
 
-      <Card>
+          <TabsContent value="production" className="space-y-6 mt-4">
+        <Card>
+        <CardHeader>
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Leaf className="h-5 w-5" />
+              SOP Fruit Codes
+            </CardTitle>
+            <CardDescription>
+              Assign a fruit code to each product for SOP batch code generation. Codes must be 1–5 alphanumeric characters (e.g. SW = Strawberry Whole).
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {products.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Leaf className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No products defined yet</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[160px]">Product</TableHead>
+                    <TableHead className="min-w-[80px]">SKU</TableHead>
+                    <TableHead className="text-center min-w-[120px]">Fruit Code</TableHead>
+                    <TableHead className="text-right min-w-[80px]">Edit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {products.map((product) => (
+                    <TableRow key={product.id} data-testid={`row-product-fruitcode-${product.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-product-name-fruitcode-${product.id}`}>{product.name}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{product.sku}</TableCell>
+                      <TableCell className="text-center">
+                        {product.fruitCode ? (
+                          <span className="font-mono font-medium text-primary">
+                            {product.fruitCode}
+                            <span className="text-muted-foreground font-normal text-xs ml-1">
+                              — {FRUIT_CODE_MAP[product.fruitCode] || ''}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {canManageSettings && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleFruitCodeEdit(product)}
+                            data-testid={`button-edit-fruitcode-${product.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+          </TabsContent>
+
+          <TabsContent value="labels" className="space-y-6 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Tag className="h-5 w-5" />
+                  Label Templates
+                </CardTitle>
+                <CardDescription>
+                  Configure which fields appear on printed labels for raw intake, finished outputs, and batches. Templates can be customer-specific or system-wide defaults.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <LabelTemplatesPanel />
+              </CardContent>
+            </Card>
+
+            {isAdmin && (
+              <Card data-testid="card-custom-label-builder">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Construction className="h-5 w-5" />
+                    Custom Label Builder
+                  </CardTitle>
+                  <CardDescription>
+                    Drag-and-drop layout designer for fully custom label artwork. Coming soon.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border border-dashed bg-muted/40 p-6 text-center text-sm text-muted-foreground">
+                    Visual label builder is in development. The current Label Templates above already control which fields are printed.
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {isAdmin && (
+              <Card data-testid="card-print-custom-label">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Printer className="h-5 w-5" />
+                    Print Custom Label
+                  </CardTitle>
+                  <CardDescription>
+                    Print a one-off label using a custom layout. Coming soon.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border border-dashed bg-muted/40 p-6 text-center text-sm text-muted-foreground">
+                    This will let you print a single ad-hoc label without creating a full template.
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="data" className="space-y-6 mt-4">
+        <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -399,74 +584,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Leaf className="h-5 w-5" />
-              SOP Fruit Codes
-            </CardTitle>
-            <CardDescription>
-              Assign a fruit code to each product for SOP batch code generation. Codes must be 1–5 alphanumeric characters (e.g. SW = Strawberry Whole).
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {products.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Leaf className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No products defined yet</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[160px]">Product</TableHead>
-                    <TableHead className="min-w-[80px]">SKU</TableHead>
-                    <TableHead className="text-center min-w-[120px]">Fruit Code</TableHead>
-                    <TableHead className="text-right min-w-[80px]">Edit</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.map((product) => (
-                    <TableRow key={product.id} data-testid={`row-product-fruitcode-${product.id}`}>
-                      <TableCell className="font-medium" data-testid={`text-product-name-fruitcode-${product.id}`}>{product.name}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{product.sku}</TableCell>
-                      <TableCell className="text-center">
-                        {product.fruitCode ? (
-                          <span className="font-mono font-medium text-primary">
-                            {product.fruitCode}
-                            <span className="text-muted-foreground font-normal text-xs ml-1">
-                              — {FRUIT_CODE_MAP[product.fruitCode] || ''}
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {canManageSettings && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleFruitCodeEdit(product)}
-                            data-testid={`button-edit-fruitcode-${product.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {isAdmin && (
+        {isAdmin && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -533,6 +651,27 @@ export default function Settings() {
           </CardContent>
         </Card>
       )}
+          </TabsContent>
+
+          <TabsContent value="security" className="space-y-6 mt-4">
+            <Card data-testid="card-security-placeholder">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5" />
+                  Security
+                </CardTitle>
+                <CardDescription>
+                  User accounts, role assignments, and audit settings. Coming soon.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border border-dashed bg-muted/40 p-6 text-center text-sm text-muted-foreground">
+                  Security and access controls will appear here.
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
       <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
         <AlertDialogContent>
