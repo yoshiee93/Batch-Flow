@@ -13,13 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Loader2, Pencil, Trash2, ArrowRightLeft, AlertTriangle, ExternalLink } from "lucide-react";
-import { format, isSameDay, parseISO, subYears } from "date-fns";
+import { format, isSameDay, parseISO, subYears, startOfMonth, endOfMonth, addMonths } from "date-fns";
+import { CalendarDayButton } from "@/components/ui/calendar";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useCustomers } from "@/features/customers/api";
 import { useProducts } from "@/features/catalog/api";
 import {
-  useForecasts, useForecastSummary, useCreateForecast, useUpdateForecast, useDeleteForecast, useConvertForecast, useForecastHistory,
+  useForecasts, useForecastSummary, useCreateForecast, useUpdateForecast, useDeleteForecast, useConvertForecast, useForecastHistory, useForecastHistoryRange,
   type ForecastOrder, type ForecastRange,
 } from "@/features/forecast/api";
 import { ApiValidationError } from "@/lib/fetchApi";
@@ -38,6 +39,8 @@ export default function Forecast() {
   const [view, setView] = useState<"list" | "calendar" | "history">("list");
   const [range, setRange] = useState<ForecastRange>(3);
   const [calendarDay, setCalendarDay] = useState<Date | undefined>(new Date());
+  const [calendarMonth, setCalendarMonth] = useState<Date>(startOfMonth(new Date()));
+  const [calendarRange, setCalendarRange] = useState<"month" | "3months">("month");
   const [compareMode, setCompareMode] = useState(false);
   const [compareProductId, setCompareProductId] = useState<string>("");
   const [historyProductId, setHistoryProductId] = useState<string>("");
@@ -61,24 +64,45 @@ export default function Forecast() {
   const convertMut = useConvertForecast();
 
   const { data: history } = useForecastHistory(historyProductId || undefined, historyMonths);
-  const { data: compareHistory } = useForecastHistory(compareProductId || undefined, 18);
 
-  const compareRows = useMemo(() => {
-    if (!compareMode || !compareProductId || !compareHistory) return [] as Array<{ date: string; forecastQty: number; lastYearMonthQty: number; monthLabel: string }>;
-    const productForecasts = forecasts.filter(f => f.productId === compareProductId);
-    const monthMap = new Map(compareHistory.months.map(m => [m.month, m.orderQty] as const));
-    return productForecasts.map(f => {
-      const d = parseISO(f.expectedDate);
-      const lastYr = subYears(d, 1);
-      const key = `${lastYr.getUTCFullYear()}-${String(lastYr.getUTCMonth() + 1).padStart(2, "0")}`;
-      return {
-        date: f.expectedDate,
-        forecastQty: parseFloat(f.quantity),
-        lastYearMonthQty: monthMap.get(key) ?? 0,
-        monthLabel: format(lastYr, "MMM yyyy"),
-      };
-    }).sort((a, b) => a.date.localeCompare(b.date));
-  }, [compareMode, compareProductId, compareHistory, forecasts]);
+  const calendarVisibleEnd = useMemo(() =>
+    calendarRange === "3months" ? endOfMonth(addMonths(calendarMonth, 2)) : endOfMonth(calendarMonth),
+    [calendarMonth, calendarRange]
+  );
+  const calendarVisibleStart = useMemo(() => startOfMonth(calendarMonth), [calendarMonth]);
+
+  const compareFrom = useMemo(() => subYears(calendarVisibleStart, 1).toISOString(), [calendarVisibleStart]);
+  const compareTo = useMemo(() => subYears(calendarVisibleEnd, 1).toISOString(), [calendarVisibleEnd]);
+  const { data: compareHistory } = useForecastHistoryRange({
+    productId: compareProductId || undefined,
+    from: compareFrom,
+    to: compareTo,
+    enabled: compareMode && !!compareProductId,
+  });
+
+  const lastYearWeeks = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!compareHistory) return m;
+    for (const w of compareHistory.weeks) m.set(w.weekStart, w.orderQty);
+    return m;
+  }, [compareHistory]);
+
+  const weekStartKey = (d: Date): string => {
+    const u = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    const dow = u.getUTCDay() || 7;
+    u.setUTCDate(u.getUTCDate() - (dow - 1));
+    return u.toISOString().slice(0, 10);
+  };
+
+  const forecastByDay = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of forecasts) {
+      if (compareProductId && f.productId !== compareProductId) continue;
+      const k = f.expectedDate.slice(0, 10);
+      m.set(k, (m.get(k) ?? 0) + parseFloat(f.quantity));
+    }
+    return m;
+  }, [forecasts, compareProductId]);
 
   const forecastDates = useMemo(() => forecasts.map(f => parseISO(f.expectedDate)), [forecasts]);
   const dayForecasts = useMemo(() => {
@@ -348,7 +372,16 @@ export default function Forecast() {
 
         <TabsContent value="calendar" className="mt-4 space-y-4">
           <Card className="p-3">
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm text-muted-foreground">View</Label>
+                <Tabs value={calendarRange} onValueChange={(v) => setCalendarRange(v as "month" | "3months")}>
+                  <TabsList>
+                    <TabsTrigger value="month" data-testid="tab-cal-range-month">Month</TabsTrigger>
+                    <TabsTrigger value="3months" data-testid="tab-cal-range-3months">3 months</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
               <div className="flex items-center gap-2">
                 <Switch id="compare-toggle" checked={compareMode} onCheckedChange={setCompareMode} data-testid="switch-compare-history" />
                 <Label htmlFor="compare-toggle" className="text-sm">Compare to history</Label>
@@ -365,43 +398,46 @@ export default function Forecast() {
                   </Select>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground">Compares each forecast to real orders for the same month last year.</p>
+              <p className="text-xs text-muted-foreground ml-auto">Each day cell shows the forecast and last-year same-week real orders.</p>
             </div>
           </Card>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-4">
+            <Card className="p-4 overflow-x-auto">
               <CalendarPicker
                 mode="single"
                 selected={calendarDay}
                 onSelect={setCalendarDay}
+                month={calendarMonth}
+                onMonthChange={setCalendarMonth}
+                numberOfMonths={calendarRange === "3months" ? 3 : 1}
                 modifiers={{ hasForecast: forecastDates }}
                 modifiersClassNames={{ hasForecast: "bg-primary/15 font-semibold text-primary" }}
+                className="[--cell-size:3.25rem]"
+                components={{
+                  DayButton: (btnProps) => {
+                    const date = btnProps.day.date;
+                    const dayKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                    const fQty = forecastByDay.get(dayKey) ?? 0;
+                    const lyKey = weekStartKey(subYears(date, 1));
+                    const lyQty = compareMode && compareProductId ? (lastYearWeeks.get(lyKey) ?? 0) : 0;
+                    const showOverlay = (fQty > 0) || (compareMode && compareProductId && lyQty > 0);
+                    return (
+                      <CalendarDayButton {...btnProps}>
+                        <span className="text-xs leading-none">{date.getDate()}</span>
+                        {showOverlay && (
+                          <span className="text-[9px] leading-tight text-muted-foreground" data-testid={`overlay-day-${dayKey}`}>
+                            {fQty > 0 && <span className="block text-primary">F:{fQty.toFixed(0)}</span>}
+                            {compareMode && compareProductId && lyQty > 0 && <span className="block">LY:{lyQty.toFixed(0)}</span>}
+                          </span>
+                        )}
+                      </CalendarDayButton>
+                    );
+                  },
+                }}
                 data-testid="calendar-forecast"
               />
-              <p className="text-xs text-muted-foreground mt-2">Days with forecasts are highlighted. Pick the months range above to widen the view.</p>
-
-              {compareMode && compareProductId && (
-                <div className="mt-4 border-t pt-3">
-                  <h4 className="text-sm font-semibold mb-2" data-testid="heading-compare-strip">Forecast vs same month last year</h4>
-                  {compareRows.length === 0 ? (
-                    <p className="text-xs text-muted-foreground" data-testid="text-compare-empty">No forecasts for this product in the selected range.</p>
-                  ) : (
-                    <ul className="space-y-1 text-xs">
-                      {compareRows.map(r => {
-                        const delta = r.forecastQty - r.lastYearMonthQty;
-                        const sign = delta > 0 ? "+" : "";
-                        return (
-                          <li key={r.date} className="flex justify-between gap-2 font-mono" data-testid={`row-compare-${r.date}`}>
-                            <span>{format(parseISO(r.date), "d MMM")}</span>
-                            <span>Forecast: {r.forecastQty.toFixed(2)} · {r.monthLabel}: {r.lastYearMonthQty.toFixed(2)} ({sign}{delta.toFixed(2)})</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              )}
+              <p className="text-xs text-muted-foreground mt-2">F = forecast on this day. {compareMode && compareProductId ? "LY = orders for the same week last year." : "Toggle Compare to history to overlay last year's orders."}</p>
             </Card>
             <Card className="p-4">
               <h3 className="font-semibold mb-3" data-testid="heading-calendar-day">

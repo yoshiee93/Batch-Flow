@@ -92,6 +92,13 @@ export interface ForecastHistoryMonth {
   producedQty: number;
 }
 
+export interface ForecastHistoryWeek {
+  weekStart: string;
+  forecastQty: number;
+  orderQty: number;
+  producedQty: number;
+}
+
 export interface ForecastHistory {
   productId: string | null;
   productName: string | null;
@@ -99,6 +106,7 @@ export interface ForecastHistory {
   from: string;
   to: string;
   months: ForecastHistoryMonth[];
+  weeks: ForecastHistoryWeek[];
 }
 
 export function useForecastHistory(productId: string | undefined, monthsBack: number, customerId?: string) {
@@ -106,6 +114,20 @@ export function useForecastHistory(productId: string | undefined, monthsBack: nu
     queryKey: ["forecastHistory", productId ?? "all", customerId ?? "all", monthsBack],
     queryFn: () => fetchApi(`/forecast/history?monthsBack=${monthsBack}${productId ? `&productId=${productId}` : ""}${customerId ? `&customerId=${customerId}` : ""}`),
     enabled: true,
+  });
+}
+
+export function useForecastHistoryRange(opts: { productId?: string; customerId?: string; from?: string; to?: string; enabled?: boolean }) {
+  const { productId, customerId, from, to, enabled = true } = opts;
+  const params = new URLSearchParams();
+  if (productId) params.set("productId", productId);
+  if (customerId) params.set("customerId", customerId);
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  return useQuery<ForecastHistory>({
+    queryKey: ["forecastHistoryRange", productId ?? "all", customerId ?? "all", from ?? "", to ?? ""],
+    queryFn: () => fetchApi(`/forecast/history?${params.toString()}`),
+    enabled,
   });
 }
 

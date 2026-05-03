@@ -37,11 +37,18 @@ export const forecastService = {
     await createAuditLog({ entityType: "forecast_order", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
   },
 
-  async history(opts: { productId?: string; customerId?: string; monthsBack: number }) {
-    const monthsBack = Math.max(1, Math.min(24, opts.monthsBack));
-    const now = new Date();
-    const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
-    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - monthsBack, 1, 0, 0, 0, 0));
+  async history(opts: { productId?: string; customerId?: string; monthsBack?: number; from?: Date; to?: Date }) {
+    let from: Date;
+    let to: Date;
+    if (opts.from && opts.to) {
+      from = opts.from;
+      to = opts.to;
+    } else {
+      const monthsBack = Math.max(1, Math.min(24, opts.monthsBack ?? 6));
+      const now = new Date();
+      to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+      from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - monthsBack, 1, 0, 0, 0, 0));
+    }
 
     const [pastForecasts, pastOrders, pastOutputs] = await Promise.all([
       repo.getForecastsInRange(opts.productId, from, to),
@@ -64,6 +71,22 @@ export const forecastService = {
     for (const o of pastOrders) ensure(monthKey(new Date(o.createdAt))).orderQty += parseFloat(o.quantity);
     for (const b of pastOutputs) ensure(monthKey(new Date(b.addedAt))).producedQty += parseFloat(b.quantity);
 
+    // Weekly buckets keyed by ISO week start (Monday) in UTC
+    const weekStart = (d: Date): string => {
+      const u = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      const dow = u.getUTCDay() || 7;
+      u.setUTCDate(u.getUTCDate() - (dow - 1));
+      return u.toISOString().slice(0, 10);
+    };
+    const weeks = new Map<string, { weekStart: string; forecastQty: number; orderQty: number; producedQty: number }>();
+    const ensureW = (k: string) => {
+      if (!weeks.has(k)) weeks.set(k, { weekStart: k, forecastQty: 0, orderQty: 0, producedQty: 0 });
+      return weeks.get(k)!;
+    };
+    for (const f of pastForecasts) ensureW(weekStart(new Date(f.expectedDate))).forecastQty += parseFloat(f.quantity);
+    for (const o of pastOrders) ensureW(weekStart(new Date(o.createdAt))).orderQty += parseFloat(o.quantity);
+    for (const b of pastOutputs) ensureW(weekStart(new Date(b.addedAt))).producedQty += parseFloat(b.quantity);
+
     const product = opts.productId ? await repo.getProduct(opts.productId) : undefined;
     return {
       productId: opts.productId ?? null,
@@ -72,6 +95,7 @@ export const forecastService = {
       from: from.toISOString(),
       to: to.toISOString(),
       months: Array.from(buckets.values()).sort((a, b) => a.month.localeCompare(b.month)),
+      weeks: Array.from(weeks.values()).sort((a, b) => a.weekStart.localeCompare(b.weekStart)),
     };
   },
 
