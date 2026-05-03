@@ -1,8 +1,8 @@
-import { eq, and, desc, isNotNull } from "drizzle-orm";
+import { eq, and, or, desc, isNotNull, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import {
   batches, batchMaterials, batchOutputs, lots, products, materials, stockMovements,
-  qualityChecks, auditLogs, printHistory, users,
+  qualityChecks, auditLogs, printHistory, users, orders, customers,
   type Batch, type InsertBatch,
   type BatchMaterial, type InsertBatchMaterial,
   type BatchOutput, type InsertBatchOutput,
@@ -20,7 +20,30 @@ export type TimelineEventKind =
   | "print"
   | "finalize"
   | "completed"
+  | "movement"
+  | "allocation"
   | "audit";
+
+interface AuditChanges {
+  status?: string;
+  cleaningTime?: string | number | null;
+  numberOfStaff?: number | null;
+  markCompleted?: boolean;
+  totalOutput?: string | number;
+  productId?: string;
+  quantity?: string | number;
+  [key: string]: unknown;
+}
+
+function parseAuditChanges(raw: string | null): AuditChanges | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw);
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as AuditChanges) : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface TimelineEvent {
   at: string;
@@ -315,6 +338,53 @@ export const productionRepository = {
       });
     }
 
+    // Stock movements: directly tied to batch, plus movements against any output lot
+    const outputLotIds = outputLotRows.map(r => r.lot.id);
+    const movementRows = await db
+      .select({ sm: stockMovements, lot: lots, product: products, material: materials, order: orders, customer: customers, user: users })
+      .from(stockMovements)
+      .leftJoin(lots, eq(stockMovements.lotId, lots.id))
+      .leftJoin(products, eq(stockMovements.productId, products.id))
+      .leftJoin(materials, eq(stockMovements.materialId, materials.id))
+      .leftJoin(orders, eq(stockMovements.orderId, orders.id))
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .leftJoin(users, eq(stockMovements.createdBy, users.id))
+      .where(
+        outputLotIds.length
+          ? or(eq(stockMovements.batchId, batchId), inArray(stockMovements.lotId, outputLotIds))!
+          : eq(stockMovements.batchId, batchId)
+      );
+
+    for (const r of movementRows) {
+      const itemName = r.product?.name ?? r.material?.name ?? "stock";
+      const qty = parseFloat(r.sm.quantity).toFixed(2);
+      const isAllocation = !!r.sm.orderId;
+      if (isAllocation) {
+        const customerLabel = r.customer?.name ? ` (${r.customer.name})` : "";
+        events.push({
+          at: r.sm.createdAt.toISOString(),
+          kind: "allocation",
+          title: `Allocated ${qty} KG of ${itemName} to order ${r.order?.orderNumber ?? ""}${customerLabel}`.trim(),
+          detail: r.lot ? `Lot ${r.lot.lotNumber}` : undefined,
+          userId: r.user?.id ?? null,
+          userName: r.user?.fullName ?? null,
+          link: r.order ? { href: `/orders`, label: r.order.orderNumber } : undefined,
+          meta: { movementType: r.sm.movementType, orderId: r.sm.orderId },
+        });
+      } else {
+        events.push({
+          at: r.sm.createdAt.toISOString(),
+          kind: "movement",
+          title: `Stock ${r.sm.movementType.replace(/_/g, " ")}: ${qty} KG of ${itemName}`,
+          detail: [r.lot ? `Lot ${r.lot.lotNumber}` : null, r.sm.reference].filter(Boolean).join(" · ") || undefined,
+          userId: r.user?.id ?? null,
+          userName: r.user?.fullName ?? null,
+          link: r.lot ? { href: `/lots/${r.lot.id}`, label: r.lot.lotNumber } : undefined,
+          meta: { movementType: r.sm.movementType },
+        });
+      }
+    }
+
     for (const r of outputLotRows) {
       if (r.lot.producedDate) {
         const name = r.product?.name ?? "output";
@@ -349,31 +419,28 @@ export const productionRepository = {
       const action = r.log.action;
       if (SKIP_CREATE_ACTIONS.has(action)) continue;
 
-      let parsed: any = null;
-      if (r.log.changes) {
-        try { parsed = JSON.parse(r.log.changes); } catch { /* ignore */ }
-      }
+      const parsed = parseAuditChanges(r.log.changes);
 
       let title = action.replace(/_/g, " ");
       let detail: string | undefined;
       let kind: TimelineEventKind = "audit";
 
-      const looksLikeFinalize = parsed && typeof parsed === "object" &&
+      const looksLikeFinalize = !!parsed &&
         ("cleaningTime" in parsed || "numberOfStaff" in parsed || "markCompleted" in parsed);
 
       if (action === "completed" && looksLikeFinalize) {
         // Skip — endDate already emits a `completed` event
         continue;
-      } else if (looksLikeFinalize) {
+      } else if (looksLikeFinalize && parsed) {
         kind = "finalize";
         title = "Batch finalized";
         const parts: string[] = [];
         if (parsed.cleaningTime != null && parsed.cleaningTime !== "") parts.push(`Cleaning: ${parsed.cleaningTime} min`);
-        if (parsed.numberOfStaff != null && parsed.numberOfStaff !== "") parts.push(`Staff: ${parsed.numberOfStaff}`);
+        if (parsed.numberOfStaff != null) parts.push(`Staff: ${parsed.numberOfStaff}`);
         if (parsed.totalOutput) parts.push(`Output: ${parsed.totalOutput} KG`);
         if (parts.length) detail = parts.join(" · ");
-      } else if (action === "update" && parsed && typeof parsed === "object") {
-        if ("status" in parsed) {
+      } else if (action === "update" && parsed) {
+        if (typeof parsed.status === "string") {
           kind = "status";
           title = `Status changed to ${parsed.status}`;
         } else {
@@ -389,8 +456,8 @@ export const productionRepository = {
       } else if (action === "output_removed") {
         kind = "output";
         title = "Output removed";
-        if (parsed?.productId && parsed?.quantity) {
-          detail = `${parseFloat(parsed.quantity).toFixed(2)} KG removed`;
+        if (parsed?.quantity != null) {
+          detail = `${parseFloat(String(parsed.quantity)).toFixed(2)} KG removed`;
         }
       }
 

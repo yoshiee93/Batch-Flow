@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   ArrowLeft, ChevronRight, Loader2, AlertCircle, Sparkles, Play, Box, ShieldCheck,
   Package, ArrowRightLeft, Printer, CheckCircle2, Flag, History, User, ExternalLink,
+  Truck, ShoppingCart,
 } from 'lucide-react';
 import { useBatch, useBatchTimeline, type TimelineEvent } from '@/features/production/api';
 import { format } from 'date-fns';
@@ -20,6 +21,8 @@ const ICONS: Record<TimelineEvent['kind'], typeof Sparkles> = {
   print: Printer,
   finalize: CheckCircle2,
   completed: Flag,
+  movement: Truck,
+  allocation: ShoppingCart,
   audit: History,
 };
 
@@ -34,6 +37,8 @@ const ICON_BG: Record<TimelineEvent['kind'], string> = {
   print: 'bg-sky-100 text-sky-700',
   finalize: 'bg-teal-100 text-teal-700',
   completed: 'bg-green-100 text-green-700',
+  movement: 'bg-orange-100 text-orange-700',
+  allocation: 'bg-pink-100 text-pink-700',
   audit: 'bg-gray-100 text-gray-600',
 };
 
