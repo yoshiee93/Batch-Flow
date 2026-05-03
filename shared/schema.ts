@@ -232,8 +232,22 @@ export const lots = pgTable("lots", {
   customerId: varchar("customer_id").references(() => customers.id),
   barcodePrintedAt: timestamp("barcode_printed_at"),
   notes: text("notes"),
+  productTemperature: decimal("product_temperature", { precision: 5, scale: 2 }),
+  visualInspection: varchar("visual_inspection", { length: 20 }),
+  receivedById: varchar("received_by_id").references(() => users.id),
+  freight: text("freight"),
+  photos: jsonb("photos").$type<LotPhoto[]>().notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export type LotPhoto = {
+  dataUrl: string;
+  name?: string;
+  size?: number;
+};
+
+export const VISUAL_INSPECTION_VALUES = ["pass", "fail", "conditional"] as const;
+export type VisualInspection = typeof VISUAL_INSPECTION_VALUES[number];
 
 export const recipes = pgTable("recipes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -450,7 +464,14 @@ export const insertCustomerSchema = createInsertSchema(customers).omit({ id: tru
 export const insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
 export const insertMaterialSchema = createInsertSchema(materials).omit({ id: true, createdAt: true });
-export const insertLotSchema = createInsertSchema(lots).omit({ id: true, createdAt: true });
+export const lotPhotoSchema = z.object({
+  dataUrl: z.string(),
+  name: z.string().optional(),
+  size: z.number().optional(),
+});
+export const insertLotSchema = createInsertSchema(lots).omit({ id: true, createdAt: true }).extend({
+  photos: z.array(lotPhotoSchema).optional(),
+});
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true });
 export const insertRecipeItemSchema = createInsertSchema(recipeItems).omit({ id: true });
 export const insertBatchSchema = createInsertSchema(batches).omit({ id: true, createdAt: true }).extend({

@@ -69,7 +69,7 @@ Domain routing map:
 - `categories`: Dynamic product categorization. Has per-section visibility booleans: `showInInventory`, `showInReceiveStock`, `showInProductionBatch`, `showInProductionInputs`, `showInProductionOutputs` (plus existing `showInTabs`, `excludeFromYield`).
 - `products`: Finished goods with stock and category.
 - `materials`: Raw materials with stock and category.
-- `lots`: Lot tracking for raw materials, intermediates, and finished goods, including traceability data.
+- `lots`: Lot tracking for raw materials, intermediates, and finished goods, including traceability data. Receiving QA fields: `productTemperature` (decimal °C), `visualInspection` (`pass`/`fail`/`conditional`), `receivedById` (FK users), `freight` (text), `photos` (jsonb `LotPhoto[]`, base64 data URLs, ≤1MB each / ≤5MB total / ≤8 photos, validated server-side against `^data:image/...;base64,` regex). Captured during Receive Stock; surfaced as a "Receiving QA" section on Lot Detail and as inspection badge + camera icon on the Inventory Lots tab.
 - `recipes`: Versioned product formulations.
 - `recipeItems`: Bill of materials for recipes.
 - `batches`: Production batches with status workflows. Includes optional `cleaningTime` (decimal, mins) and `numberOfStaff` (int) labour fields captured during finalize.

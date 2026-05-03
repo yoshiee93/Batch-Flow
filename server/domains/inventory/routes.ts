@@ -9,6 +9,16 @@ const inventoryOrAdmin = requireRole("inventory", "admin");
 
 export const inventoryRouter = Router();
 
+const PHOTO_DATA_URL_RE = /^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/;
+const photoSchema = z.object({
+  dataUrl: z.string()
+    .min(1)
+    .max(1_500_000, "Photo too large (max ~1MB each)")
+    .regex(PHOTO_DATA_URL_RE, "Photo must be a base64 image data URL"),
+  name: z.string().max(255).optional(),
+  size: z.number().int().nonnegative().optional(),
+});
+
 const receiveStockSchema = z.object({
   itemId: z.string().min(1, "Item is required"),
   itemType: z.enum(["material", "product"]),
@@ -26,6 +36,19 @@ const receiveStockSchema = z.object({
     .transform(v => typeof v === "string" ? new Date(v) : v)
     .optional(),
   notes: z.string().optional(),
+  productTemperature: z.union([z.string(), z.number()])
+    .transform(v => typeof v === "number" ? String(v) : v)
+    .refine(v => v === "" || !isNaN(parseFloat(v)), { message: "Temperature must be a number" })
+    .optional(),
+  visualInspection: z.enum(["pass", "fail", "conditional"]).optional(),
+  receivedById: z.string().optional(),
+  freight: z.string().optional(),
+  photos: z.array(photoSchema)
+    .max(8, "At most 8 photos")
+    .refine(arr => arr.reduce((s, p) => s + p.dataUrl.length, 0) <= 7_500_000, {
+      message: "Photos exceed 5MB total",
+    })
+    .optional(),
 });
 
 inventoryRouter.get("/receivable-items", asyncHandler(async (_req, res) => {

@@ -14,8 +14,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { applyServerFieldErrors } from '@/lib/applyServerFieldErrors';
 import { ApiValidationError } from '@/lib/fetchApi';
-import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Package, Box, Layers, Printer, QrCode, CheckCircle2, Download } from 'lucide-react';
+import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Package, Box, Layers, Printer, QrCode, CheckCircle2, Download, Camera, X as XIcon, ImageIcon, ThermometerSnowflake } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -27,7 +28,10 @@ import {
   useCreateProduct, useUpdateProduct, useDeleteProduct,
   useReceiveStock, useReceivableItems, useMarkBarcodePrinted,
   type Material, type Product, type Category, type Lot, type LotWithDetails, type ReceivableItem,
+  type LotPhoto, type VisualInspection,
 } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUsers } from '@/features/quality/api';
 import { fetchLabelTemplate, useRecordPrint } from '@/features/labels/api';
 import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
@@ -44,7 +48,38 @@ const EMPTY_RECEIVE_FORM = {
   receivedDate: format(new Date(), 'yyyy-MM-dd'),
   expiryDate: '',
   notes: '',
+  productTemperature: '',
+  visualInspection: '' as '' | 'pass' | 'fail' | 'conditional',
+  receivedById: '',
+  freight: '',
+  photos: [] as LotPhoto[],
 };
+
+const PHOTO_MAX_BYTES = 1_000_000;
+const PHOTOS_TOTAL_MAX_BYTES = 5_000_000;
+const VISUAL_INSPECTION_OPTIONS: { value: VisualInspection; label: string; className: string }[] = [
+  { value: 'pass',        label: 'Pass',        className: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'conditional', label: 'Conditional', className: 'bg-amber-100 text-amber-800 border-amber-300' },
+  { value: 'fail',        label: 'Fail',        className: 'bg-red-100 text-red-800 border-red-300' },
+];
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function getInspectionBadgeClass(v: VisualInspection | null | undefined) {
+  return VISUAL_INSPECTION_OPTIONS.find(o => o.value === v)?.className
+    ?? 'bg-gray-100 text-gray-700 border-gray-300';
+}
+
+function getInspectionLabel(v: VisualInspection | null | undefined) {
+  return VISUAL_INSPECTION_OPTIONS.find(o => o.value === v)?.label ?? null;
+}
 
 function getLotStatusBadge(status: string | null) {
   switch (status) {
@@ -116,6 +151,17 @@ export default function Inventory() {
     receivedDate: z.string().optional().or(z.literal('')),
     expiryDate: z.string().optional().or(z.literal('')),
     notes: z.string().optional().or(z.literal('')),
+    productTemperature: z.string().refine((v) => v === '' || !isNaN(parseFloat(v)), { message: 'Temperature must be a number' }),
+    visualInspection: z.union([z.literal(''), z.enum(['pass', 'fail', 'conditional'])]),
+    receivedById: z.string(),
+    freight: z.string(),
+    photos: z.array(z.object({
+      dataUrl: z.string().min(1),
+      name: z.string().optional(),
+      size: z.number().optional(),
+    }))
+      .max(8, 'At most 8 photos')
+      .refine((arr) => arr.reduce((s, p) => s + p.dataUrl.length, 0) <= 7_500_000, { message: 'Photos exceed 5 MB total' }),
   });
   type ReceiveFormValues = {
     itemId: string;
@@ -128,6 +174,11 @@ export default function Inventory() {
     receivedDate: string;
     expiryDate: string;
     notes: string;
+    productTemperature: string;
+    visualInspection: '' | 'pass' | 'fail' | 'conditional';
+    receivedById: string;
+    freight: string;
+    photos: LotPhoto[];
   };
   const receiveRhf = useForm<ReceiveFormValues>({
     resolver: zodResolver(receiveSchema),
@@ -152,6 +203,8 @@ export default function Inventory() {
   const [recentReceivePrints, setRecentReceivePrints] = useState<RecentReceivePrint[]>([]);
 
   const { canReceiveStock, canManageSettings } = useRole();
+  const { user: currentUser } = useAuth();
+  const { data: usersList = [] } = useUsers();
 
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
@@ -418,6 +471,11 @@ export default function Inventory() {
         receivedDate: values.receivedDate || undefined,
         expiryDate: values.expiryDate || undefined,
         notes: values.notes || undefined,
+        productTemperature: values.productTemperature || undefined,
+        visualInspection: (values.visualInspection || undefined) as VisualInspection | undefined,
+        receivedById: values.receivedById || undefined,
+        freight: values.freight || undefined,
+        photos: values.photos.length > 0 ? values.photos : undefined,
       });
       const selectedItem = receivableItems.find(i => i.id === values.itemId);
       const itemName = selectedItem?.name || 'item';
@@ -432,7 +490,7 @@ export default function Inventory() {
       });
     } catch (error: unknown) {
       if (error instanceof ApiValidationError) {
-        const unmatched = applyServerFieldErrors(error, receiveRhf.setError, ['itemId','itemType','quantity','supplierName','supplierLot','sourceType','receivedDate','expiryDate','notes']);
+        const unmatched = applyServerFieldErrors(error, receiveRhf.setError, ['itemId','itemType','quantity','supplierName','supplierLot','sourceType','receivedDate','expiryDate','notes','productTemperature','visualInspection','receivedById','freight','photos']);
         if (!unmatched.handled) toast({ title: "Error", description: error.message || "Failed to receive stock", variant: "destructive" });
       } else {
         const msg = error instanceof Error ? error.message : 'Failed to receive stock';
@@ -468,7 +526,10 @@ export default function Inventory() {
   }
 
   const handleOpenReceive = () => {
-    receiveRhf.reset(EMPTY_RECEIVE_FORM as unknown as ReceiveFormValues);
+    receiveRhf.reset({
+      ...(EMPTY_RECEIVE_FORM as unknown as ReceiveFormValues),
+      receivedById: currentUser?.id ?? '',
+    });
     setReceivedLot(null);
     setReceivedTemplateName(null);
     setReceiveCategoryFilter('all');
@@ -627,8 +688,20 @@ export default function Inventory() {
           )}
         </TableCell>
         <TableCell>
-          <div className="font-medium">{itemName}</div>
-          {getLotTypeBadge(lot.lotType)}
+          <div className="font-medium flex items-center gap-1.5">
+            {itemName}
+            {lot.photos && lot.photos.length > 0 && (
+              <Camera className="h-3.5 w-3.5 text-muted-foreground" data-testid={`icon-photos-${lot.id}`} aria-label={`${lot.photos.length} photo(s)`} />
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {getLotTypeBadge(lot.lotType)}
+            {lot.visualInspection && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${getInspectionBadgeClass(lot.visualInspection as VisualInspection)}`} data-testid={`badge-inspection-${lot.id}`}>
+                {getInspectionLabel(lot.visualInspection as VisualInspection)}
+              </span>
+            )}
+          </div>
         </TableCell>
         <TableCell className="text-center">{getLotStatusBadge(lot.status)}</TableCell>
         <TableCell className="text-right font-mono">
@@ -1160,12 +1233,151 @@ export default function Inventory() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <ThermometerSnowflake className="h-3.5 w-3.5" />
+                    Product Temperature (°C)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g. 4.2"
+                    value={receiveForm.productTemperature}
+                    onChange={(e) => setReceiveForm({ ...receiveForm, productTemperature: e.target.value })}
+                    data-testid="input-receive-temperature"
+                  />
+                  {receiveRhf.formState.errors.productTemperature && (
+                    <p className="text-sm text-destructive" data-testid="error-receive-temperature">{receiveRhf.formState.errors.productTemperature.message}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Visual Inspection</Label>
+                  <Select
+                    value={receiveForm.visualInspection}
+                    onValueChange={(v) => setReceiveForm({ ...receiveForm, visualInspection: v as typeof receiveForm.visualInspection })}
+                  >
+                    <SelectTrigger data-testid="select-receive-visual-inspection">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VISUAL_INSPECTION_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value} data-testid={`option-visual-inspection-${o.value}`}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Received By</Label>
+                  <Select
+                    value={receiveForm.receivedById}
+                    onValueChange={(v) => setReceiveForm({ ...receiveForm, receivedById: v })}
+                  >
+                    <SelectTrigger data-testid="select-receive-received-by">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {usersList.map((u) => (
+                        <SelectItem key={u.id} value={u.id} data-testid={`option-received-by-${u.id}`}>
+                          {u.fullName || u.username}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Freight / Carrier</Label>
+                  <Input
+                    placeholder="e.g. DHL · AWB 1234"
+                    value={receiveForm.freight}
+                    onChange={(e) => setReceiveForm({ ...receiveForm, freight: e.target.value })}
+                    data-testid="input-receive-freight"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label>Notes (optional)</Label>
-                <Input
+                <Label className="flex items-center gap-1.5">
+                  <Camera className="h-3.5 w-3.5" />
+                  Photos ({receiveForm.photos.length}/8)
+                </Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {receiveForm.photos.map((p, idx) => (
+                    <div key={idx} className="relative w-20 h-20 rounded border overflow-hidden bg-muted" data-testid={`thumb-receive-photo-${idx}`}>
+                      <img src={p.dataUrl} alt={p.name || `photo-${idx + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        className="absolute top-0.5 right-0.5 rounded-full bg-black/60 text-white p-0.5 hover:bg-black/80"
+                        onClick={() => setReceiveForm({ ...receiveForm, photos: receiveForm.photos.filter((_, i) => i !== idx) })}
+                        aria-label="Remove photo"
+                        data-testid={`button-remove-photo-${idx}`}
+                      >
+                        <XIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {receiveForm.photos.length < 8 && (
+                    <label className="w-20 h-20 rounded border-2 border-dashed flex flex-col items-center justify-center gap-1 cursor-pointer text-muted-foreground hover:bg-accent text-xs" data-testid="button-add-photo">
+                      <Camera className="h-5 w-5" />
+                      <span>Add</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        multiple
+                        className="hidden"
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files || []);
+                          e.target.value = '';
+                          if (files.length === 0) return;
+                          const next = [...receiveForm.photos];
+                          let totalBytes = next.reduce((s, p) => s + (p.size ?? p.dataUrl.length), 0);
+                          for (const f of files) {
+                            if (next.length >= 8) {
+                              toast({ title: 'Photo limit', description: 'You can attach at most 8 photos.', variant: 'destructive' });
+                              break;
+                            }
+                            if (f.size > PHOTO_MAX_BYTES) {
+                              toast({ title: 'Photo too large', description: `${f.name} is over 1 MB.`, variant: 'destructive' });
+                              continue;
+                            }
+                            if (totalBytes + f.size > PHOTOS_TOTAL_MAX_BYTES) {
+                              toast({ title: 'Photo total too large', description: 'Total photo size exceeds 5 MB.', variant: 'destructive' });
+                              break;
+                            }
+                            try {
+                              const dataUrl = await readFileAsDataUrl(f);
+                              next.push({ dataUrl, name: f.name, size: f.size });
+                              totalBytes += f.size;
+                            } catch {
+                              toast({ title: 'Could not read photo', description: f.name, variant: 'destructive' });
+                            }
+                          }
+                          setReceiveForm({ ...receiveForm, photos: next });
+                        }}
+                        data-testid="input-receive-photos"
+                      />
+                    </label>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Max 1 MB per image, 5 MB total. Tap to use camera on mobile.</p>
+                {receiveRhf.formState.errors.photos && (
+                  <p className="text-sm text-destructive" data-testid="error-receive-photos">{(receiveRhf.formState.errors.photos as { message?: string }).message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Remarks / Notes (optional)</Label>
+                <Textarea
                   placeholder="Any additional notes..."
                   value={receiveForm.notes}
                   onChange={(e) => setReceiveForm({ ...receiveForm, notes: e.target.value })}
+                  rows={2}
                   data-testid="input-receive-notes"
                 />
               </div>
@@ -1175,7 +1387,7 @@ export default function Inventory() {
           {!receivedLot && (
             <DialogFooter>
               <Button variant="outline" onClick={handleCloseReceive}>Cancel</Button>
-              <Button onClick={handleReceiveStock} disabled={!receiveRhf.formState.isValid || receiveStock.isPending} data-testid="button-submit-receive">
+              <Button onClick={handleReceiveStock} disabled={receiveStock.isPending} data-testid="button-submit-receive">
                 {receiveStock.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Receive Stock
               </Button>

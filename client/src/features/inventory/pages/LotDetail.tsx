@@ -8,12 +8,13 @@ import { Separator } from '@/components/ui/separator';
 import {
   ArrowLeft, ChevronRight, Loader2, AlertCircle, Package, Factory,
   Tag, Truck, ArrowRight, ArrowUpRight, ClipboardList, Calendar,
-  Hash, Barcode, ExternalLink, Printer
+  Hash, Barcode, ExternalLink, Printer, ThermometerSnowflake, Eye, User as UserIcon, Camera
 } from 'lucide-react';
 import {
   useLotById, useLotUsage, useLotLineage, useMaterials, useProducts, useBatch,
-  type LotUsageEntry, type OutputLot
+  type LotUsageEntry, type OutputLot, type VisualInspection
 } from '@/lib/api';
+import { useUsers } from '@/features/quality/api';
 import { format } from 'date-fns';
 import { useRecordPrint } from '@/features/labels/api';
 import { printAndRecord } from '@/lib/printAndRecord';
@@ -80,6 +81,7 @@ function SourceBatchCard({ batchId }: { batchId: string }) {
 export default function LotDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: lot, isLoading: lotLoading, isError } = useLotById(id!);
+  const { data: usersList = [] } = useUsers();
   const { data: materials = [] } = useMaterials();
   const { data: products = [] } = useProducts();
   const { data: usage = [], isLoading: usageLoading } = useLotUsage(id!);
@@ -223,6 +225,73 @@ export default function LotDetail() {
                 <div>
                   <div className="text-muted-foreground text-xs uppercase font-medium mb-1">Notes</div>
                   <p className="text-sm">{lot.notes}</p>
+                </div>
+              </>
+            )}
+            {(lot.productTemperature || lot.visualInspection || lot.receivedById || lot.freight || (lot.photos && lot.photos.length > 0)) && (
+              <>
+                <Separator className="my-4" />
+                <div data-testid="section-receiving-qa">
+                  <div className="text-muted-foreground text-xs uppercase font-medium mb-3">Receiving QA</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-sm">
+                    {lot.productTemperature && (
+                      <div>
+                        <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5 flex items-center gap-1">
+                          <ThermometerSnowflake className="h-3 w-3" /> Temp
+                        </div>
+                        <div className="font-mono" data-testid="text-qa-temp">{lot.productTemperature} °C</div>
+                      </div>
+                    )}
+                    {lot.visualInspection && (
+                      <div>
+                        <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5 flex items-center gap-1">
+                          <Eye className="h-3 w-3" /> Inspection
+                        </div>
+                        <div className="capitalize" data-testid="text-qa-inspection">{lot.visualInspection}</div>
+                      </div>
+                    )}
+                    {lot.receivedById && (() => {
+                      const u = usersList.find((x) => x.id === lot.receivedById);
+                      const name = u ? (u.fullName || u.username) : lot.receivedById;
+                      return (
+                        <div>
+                          <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5 flex items-center gap-1">
+                            <UserIcon className="h-3 w-3" /> Received By
+                          </div>
+                          <div data-testid="text-qa-received-by">{name}</div>
+                        </div>
+                      );
+                    })()}
+                    {lot.freight && (
+                      <div>
+                        <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5 flex items-center gap-1">
+                          <Truck className="h-3 w-3" /> Freight
+                        </div>
+                        <div data-testid="text-qa-freight">{lot.freight}</div>
+                      </div>
+                    )}
+                  </div>
+                  {lot.photos && lot.photos.length > 0 && (
+                    <div className="mt-4">
+                      <div className="text-muted-foreground text-xs uppercase font-medium mb-2 flex items-center gap-1">
+                        <Camera className="h-3 w-3" /> Photos ({lot.photos.length})
+                      </div>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                        {lot.photos.map((p, idx) => (
+                          <a
+                            key={idx}
+                            href={p.dataUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block aspect-square rounded border overflow-hidden bg-muted hover:opacity-90"
+                            data-testid={`qa-photo-${idx}`}
+                          >
+                            <img src={p.dataUrl} alt={p.name || `photo-${idx + 1}`} className="w-full h-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}

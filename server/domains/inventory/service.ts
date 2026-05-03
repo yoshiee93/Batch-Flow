@@ -1,7 +1,8 @@
 import { inventoryRepository as repo, type BatchInputLotEntry, type BatchOutputLotEntry } from "./repository";
 import { createAuditLog } from "../../lib/auditLog";
 import { generateLotNumber, generateBarcodeValue } from "../../lib/lotUtils";
-import type { InsertLot, InsertStockMovement, Lot, StockMovement, Batch } from "@shared/schema";
+import { getCurrentUserId } from "../../lib/requestContext";
+import type { InsertLot, InsertStockMovement, Lot, StockMovement, Batch, LotPhoto, VisualInspection } from "@shared/schema";
 import type { LotUsageEntry } from "./repository";
 
 export type LotLineageNode = {
@@ -23,6 +24,11 @@ export type ReceiveStockInput = {
   receivedDate?: Date;
   expiryDate?: Date;
   notes?: string;
+  productTemperature?: string;
+  visualInspection?: VisualInspection;
+  receivedById?: string;
+  freight?: string;
+  photos?: LotPhoto[];
 };
 
 export const inventoryService = {
@@ -82,8 +88,16 @@ export const inventoryService = {
   },
 
   async receiveStock(data: ReceiveStockInput): Promise<{ lot: Lot; movement: StockMovement }> {
-    const { itemId, itemType, quantity, supplierName, sourceName, supplierLot, sourceType, receivedDate, expiryDate, notes } = data;
+    const {
+      itemId, itemType, quantity, supplierName, sourceName, supplierLot, sourceType,
+      receivedDate, expiryDate, notes,
+      productTemperature, visualInspection, receivedById, freight, photos,
+    } = data;
     const quantityNum = parseFloat(quantity);
+    const effectiveReceivedById = receivedById || getCurrentUserId() || null;
+    const tempStr = productTemperature !== undefined && productTemperature !== ""
+      ? String(productTemperature)
+      : null;
 
     let lotType: "raw_material" | "finished_good";
     let lotPrefix: string;
@@ -131,6 +145,11 @@ export const inventoryService = {
       receivedDate: receivedDate || new Date(),
       expiryDate: expiryDate || null,
       notes: notes || null,
+      productTemperature: tempStr,
+      visualInspection: visualInspection || null,
+      receivedById: effectiveReceivedById,
+      freight: freight || null,
+      photos: photos ?? [],
     });
 
     const newStock = (parseFloat(currentStock || "0") + quantityNum).toFixed(3);
@@ -153,7 +172,12 @@ export const inventoryService = {
       entityType: "lot",
       entityId: lot.id,
       action: "received",
-      changes: JSON.stringify({ lotNumber, barcodeValue, itemId, itemType, quantity, supplierName, supplierLot }),
+      changes: JSON.stringify({
+        lotNumber, barcodeValue, itemId, itemType, quantity, supplierName, supplierLot,
+        productTemperature: tempStr, visualInspection: visualInspection || null,
+        receivedById: effectiveReceivedById, freight: freight || null,
+        photoCount: photos?.length ?? 0,
+      }),
     });
 
     return { lot, movement };

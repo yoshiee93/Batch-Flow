@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/fetchApi";
-import type { LotType, LotStatus, SourceType } from "@shared/schema";
+import type { LotType, LotStatus, SourceType, LotPhoto, VisualInspection } from "@shared/schema";
 
-export type { LotType, LotStatus, SourceType };
+export type { LotType, LotStatus, SourceType, LotPhoto, VisualInspection };
 
 export interface Lot {
   id: string;
@@ -26,6 +26,11 @@ export interface Lot {
   customerId: string | null;
   barcodePrintedAt: string | null;
   notes: string | null;
+  productTemperature: string | null;
+  visualInspection: VisualInspection | null;
+  receivedById: string | null;
+  freight: string | null;
+  photos: LotPhoto[];
   createdAt: string;
 }
 
@@ -149,6 +154,11 @@ export function useReceiveStock() {
       receivedDate?: string;
       expiryDate?: string;
       notes?: string;
+      productTemperature?: string;
+      visualInspection?: VisualInspection;
+      receivedById?: string;
+      freight?: string;
+      photos?: LotPhoto[];
     }) => fetchApi<{ lot: LotWithDetails; movement: Record<string, unknown> }>("/receive-stock", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lots"] });
