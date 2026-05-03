@@ -387,7 +387,18 @@ export default function CustomLabelBuilder() {
               min={10}
               max={300}
               value={labelW}
-              onChange={e => setLayout(p => ({ ...p, width: Math.max(10, parseInt(e.target.value) || 10) }))}
+              onChange={e => {
+                const raw = e.target.value;
+                if (raw === "") return;
+                const n = parseInt(raw, 10);
+                if (!Number.isFinite(n)) return;
+                setLayout(p => ({ ...p, width: n }));
+              }}
+              onBlur={e => {
+                const n = parseInt(e.target.value, 10);
+                const clamped = Math.max(10, Math.min(300, Number.isFinite(n) ? n : 10));
+                setLayout(p => ({ ...p, width: clamped }));
+              }}
               data-testid="input-label-width"
             />
           </div>
@@ -399,7 +410,18 @@ export default function CustomLabelBuilder() {
               min={10}
               max={300}
               value={labelH}
-              onChange={e => setLayout(p => ({ ...p, height: Math.max(10, parseInt(e.target.value) || 10) }))}
+              onChange={e => {
+                const raw = e.target.value;
+                if (raw === "") return;
+                const n = parseInt(raw, 10);
+                if (!Number.isFinite(n)) return;
+                setLayout(p => ({ ...p, height: n }));
+              }}
+              onBlur={e => {
+                const n = parseInt(e.target.value, 10);
+                const clamped = Math.max(10, Math.min(300, Number.isFinite(n) ? n : 10));
+                setLayout(p => ({ ...p, height: clamped }));
+              }}
               data-testid="input-label-height"
             />
           </div>
