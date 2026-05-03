@@ -72,7 +72,7 @@ Domain routing map:
 - `lots`: Lot tracking for raw materials, intermediates, and finished goods, including traceability data.
 - `recipes`: Versioned product formulations.
 - `recipeItems`: Bill of materials for recipes.
-- `batches`: Production batches with status workflows.
+- `batches`: Production batches with status workflows. Includes optional `cleaningTime` (decimal, mins) and `numberOfStaff` (int) labour fields captured during finalize.
 - `batchMaterials`: Material lots consumed in batches for traceability.
 - `batchOutputs`: Supports multiple product outputs per batch.
 - `orders`: Customer orders with priority and status.
@@ -83,7 +83,7 @@ Domain routing map:
 
 ### API Endpoints (Key)
 - CRUD operations for `products`, `materials`, `lots`, `recipes`, `batches`, `orders`.
-- Batch-specific: Record input (`POST /api/batches/:id/lot-input`), manage multiple outputs (`GET/POST /api/batches/:id/outputs`), finalize batches (`POST /api/batches/:id/finalize`).
+- Batch-specific: Record input (`POST /api/batches/:id/lot-input`), manage multiple outputs (`GET/POST /api/batches/:id/outputs`, `PATCH/DELETE /api/batch-outputs/:id`), finalize batches (`POST /api/batches/:id/finalize` accepts `cleaningTime`/`numberOfStaff`). Add/edit/remove on completed batches keeps the finished-good lot in sync and is blocked when the lot has already been consumed/shipped.
 - Order-specific: Get orders with allocation (`GET /api/orders/with-allocation`), complete orders (`POST /api/orders/:id/complete`).
 - Traceability: Forward (`GET /api/traceability/forward/:lotId`) and backward (`GET /api/traceability/backward/:batchId`).
 - Inventory: Receive stock (`POST /api/receive-stock`).

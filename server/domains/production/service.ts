@@ -358,6 +358,15 @@ export const productionService = {
       const remainingTotal = remainingOutputs.reduce((sum, o) => sum + parseFloat(o.quantity), 0);
 
       const existingLots = await repo.getLotsForBatchAndProduct(output.batchId, output.productId);
+      // Lot-safe reversal: block if removing this output would force lot quantity below already-consumed amount
+      for (const lot of existingLots) {
+        const lotQty = parseFloat(lot.quantity || "0");
+        const lotRemaining = parseFloat(lot.remainingQuantity || "0");
+        const consumed = lotQty - lotRemaining;
+        if (consumed > remainingTotal + 0.0001) {
+          throw new Error(`Cannot remove output: lot ${lot.lotNumber} has already been consumed/shipped (${consumed.toFixed(2)} KG). Reduce or remove dependent stock movements first.`);
+        }
+      }
       for (const lot of existingLots) {
         if (remainingTotal <= 0) {
           // No more output rows for this product — remove the lot entirely
@@ -407,6 +416,15 @@ export const productionService = {
       const existingLots = await repo.getLotsForBatchAndProduct(output.batchId, output.productId);
       if (existingLots.length > 0) {
         const lot = existingLots[0];
+        // Lot-safe reversal: block reductions that would push lot quantity below already-consumed amount
+        if (delta < 0) {
+          const lotQty = parseFloat(lot.quantity || "0");
+          const lotRemaining = parseFloat(lot.remainingQuantity || "0");
+          const consumed = lotQty - lotRemaining;
+          if (lotQty + delta < consumed - 0.0001) {
+            throw new Error(`Cannot reduce output: lot ${lot.lotNumber} has already been consumed/shipped (${consumed.toFixed(2)} KG). Reduce or remove dependent stock movements first.`);
+          }
+        }
         const newLotQty = (parseFloat(lot.quantity) + delta).toFixed(3);
         const newRemainingQty = Math.max(0, parseFloat(lot.remainingQuantity || "0") + delta).toFixed(3);
         await repo.updateLotFields(lot.id, { quantity: newLotQty, remainingQuantity: newRemainingQty });

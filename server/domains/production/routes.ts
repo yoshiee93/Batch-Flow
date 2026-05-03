@@ -144,7 +144,12 @@ productionRouter.post("/batches/:id/outputs", productionOrAdmin, asyncHandler(as
   if (isNaN(qty) || qty <= 0) {
     return res.status(400).json({ error: "quantity must be a positive number" });
   }
-  res.status(201).json(await svc.addBatchOutput(req.params.id, productId, quantity));
+  try {
+    res.status(201).json(await svc.addBatchOutput(req.params.id, productId, quantity));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to add batch output";
+    res.status(400).json({ error: message });
+  }
 }));
 
 productionRouter.patch("/batch-outputs/:id", productionOrAdmin, asyncHandler(async (req, res) => {
