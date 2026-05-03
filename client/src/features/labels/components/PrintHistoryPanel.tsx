@@ -95,6 +95,7 @@ export default function PrintHistoryPanel() {
                 <SelectItem value="all">All kinds</SelectItem>
                 <SelectItem value="raw_intake">Raw Intake</SelectItem>
                 <SelectItem value="finished_output">Finished Output</SelectItem>
+                <SelectItem value="output_lot">Output Lot</SelectItem>
                 <SelectItem value="batch">Batch</SelectItem>
                 <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
