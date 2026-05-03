@@ -5,7 +5,7 @@ import {
 } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../lib/authMiddleware";
-import { customersService as svc } from "./service";
+import { customersService as svc, TestingRequiredError } from "./service";
 
 const adminOnly = requireRole("admin");
 
@@ -100,7 +100,18 @@ customersRouter.post("/orders/:id/complete", adminOnly, asyncHandler(async (req,
   if (!items || items.length === 0) {
     return res.status(400).json({ error: "Order must have at least one line item before it can be completed" });
   }
-  res.json(await svc.completeOrder(orderId));
+  try {
+    res.json(await svc.completeOrder(orderId));
+  } catch (err) {
+    if (err instanceof TestingRequiredError) {
+      return res.status(409).json({ error: err.message, code: err.code, blockingLots: err.blockingLots });
+    }
+    throw err;
+  }
+}));
+
+customersRouter.get("/orders/:id/testing-blockers", asyncHandler(async (req, res) => {
+  res.json(await svc.getOrderTestingBlockers(req.params.id));
 }));
 
 customersRouter.post("/allocation/run", adminOnly, asyncHandler(async (_req, res) => {

@@ -7,6 +7,8 @@ import {
   Box,
   Menu,
   ShoppingCart,
+  TrendingUp,
+  BarChart3,
   Users,
   Calculator,
   ScanSearch,
@@ -20,11 +22,13 @@ import { useAuth } from '@/contexts/AuthContext';
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/', adminOnly: false },
   { label: 'Orders', icon: ShoppingCart, href: '/orders', adminOnly: true },
+  { label: 'Forecast', icon: TrendingUp, href: '/forecast', adminOnly: true },
   { label: 'Customers', icon: Users, href: '/customers', adminOnly: true },
   { label: 'Production', icon: Factory, href: '/production', adminOnly: false },
   { label: 'Inventory', icon: Box, href: '/inventory', adminOnly: false },
   { label: 'Tracking', icon: ScanSearch, href: '/traceability', adminOnly: false },
   { label: 'Calculator', icon: Calculator, href: '/calculator', adminOnly: false },
+  { label: 'Reports', icon: BarChart3, href: '/reports/production', adminOnly: false, productionOrAdmin: true },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -43,6 +47,7 @@ export function Sidebar({ className }: { className?: string }) {
     : '??';
 
   const isAdmin = user?.role === 'admin';
+  const isProductionOrAdmin = user?.role === 'admin' || user?.role === 'production';
 
   async function handleLogout() {
     await logout();
@@ -62,7 +67,11 @@ export function Sidebar({ className }: { className?: string }) {
       </div>
       
       <nav className="flex-1 p-4 space-y-1">
-        {navItems.filter(item => !item.adminOnly || isAdmin).map((item) => {
+        {navItems.filter(item => {
+          if (item.adminOnly && !isAdmin) return false;
+          if ((item as any).productionOrAdmin && !isProductionOrAdmin) return false;
+          return true;
+        }).map((item) => {
           const isActive = location === item.href;
           return (
             <Link key={item.href} href={item.href}>

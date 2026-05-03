@@ -9,6 +9,8 @@ import { AuthProvider, useAuth, useRole, type UserRole } from "@/contexts/AuthCo
 import { Layout } from "@/components/layout/Layout";
 import Dashboard from "@/features/dashboard/pages/Dashboard";
 import Orders from "@/features/customers/pages/Orders";
+import Forecast from "@/features/forecast/pages/Forecast";
+import ProductionYtd from "@/features/reports/pages/ProductionYtd";
 import Customers from "@/features/customers/pages/Customers";
 import Production from "@/features/production/pages/Production";
 import Inventory from "@/features/inventory/pages/Inventory";
@@ -99,6 +101,12 @@ function Router() {
               <Route path="/" component={Dashboard} />
               <Route path="/orders">
                 <RequireRole roles={["admin"]}><Orders /></RequireRole>
+              </Route>
+              <Route path="/forecast">
+                <RequireRole roles={["admin"]}><Forecast /></RequireRole>
+              </Route>
+              <Route path="/reports/production">
+                <RequireRole roles={["admin", "production"]}><ProductionYtd /></RequireRole>
               </Route>
               <Route path="/customers">
                 <RequireRole roles={["admin"]}><Customers /></RequireRole>

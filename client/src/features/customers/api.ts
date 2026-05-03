@@ -12,7 +12,16 @@ export interface Customer {
   notes: string | null;
   active: boolean;
   defaultLabelTemplateId: string | null;
+  requiresTesting: boolean;
   createdAt: string;
+}
+
+export interface OrderTestingBlocker {
+  lotId: string;
+  lotNumber: string;
+  productId: string;
+  productName: string;
+  testingStatus: string;
 }
 
 export interface Order {
@@ -24,6 +33,9 @@ export interface Order {
   priority: "low" | "normal" | "high" | "urgent";
   dueDate: string;
   notes: string | null;
+  poNumber: string | null;
+  customBatchNumber: string | null;
+  freight: string | null;
   createdAt: string;
 }
 
@@ -42,6 +54,16 @@ export interface OrderItemWithProduct extends OrderItem {
 export interface OrderWithAllocation extends Order {
   allocationStatus: 'ready_to_ship' | 'partially_allocated' | 'awaiting_stock';
   items: OrderItemWithProduct[];
+  customerRequiresTesting?: boolean;
+  testingBlockers?: OrderTestingBlocker[];
+}
+
+export function useOrderTestingBlockers(orderId: string | null) {
+  return useQuery<OrderTestingBlocker[]>({
+    queryKey: ["orderTestingBlockers", orderId],
+    queryFn: () => fetchApi(`/orders/${orderId}/testing-blockers`),
+    enabled: !!orderId,
+  });
 }
 
 export function useCustomers() {

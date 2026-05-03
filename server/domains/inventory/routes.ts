@@ -85,6 +85,19 @@ inventoryRouter.get("/lots/:id/lineage", asyncHandler(async (req, res) => {
   res.json(lineage);
 }));
 
+const recordTestingSchema = z.object({
+  testingStatus: z.enum(["not_required", "pending", "passed", "failed"]),
+  testingNotes: z.string().max(2000).optional().nullable(),
+  testingCertificate: z.string().max(500).optional().nullable(),
+});
+
+inventoryRouter.patch("/lots/:id/testing", requireRole("admin"), asyncHandler(async (req, res) => {
+  const data = recordTestingSchema.parse(req.body);
+  const lot = await svc.recordLotTesting(req.params.id, data);
+  if (!lot) return res.status(404).json({ error: "Lot not found" });
+  res.json(lot);
+}));
+
 inventoryRouter.patch("/lots/:id/barcode-printed", inventoryOrAdmin, asyncHandler(async (req, res) => {
   const lot = await svc.updateLotBarcodePrinted(req.params.id);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
@@ -107,7 +120,10 @@ inventoryRouter.post("/lots", inventoryOrAdmin, asyncHandler(async (req, res) =>
 }));
 
 inventoryRouter.patch("/lots/:id", inventoryOrAdmin, asyncHandler(async (req, res) => {
-  const data = insertLotSchema.partial().parse(req.body);
+  const data = insertLotSchema
+    .omit({ testingStatus: true, testingNotes: true, testingCertificate: true, testedAt: true, testedById: true })
+    .partial()
+    .parse(req.body);
   const lot = await svc.updateLot(req.params.id, data);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
   res.json(lot);

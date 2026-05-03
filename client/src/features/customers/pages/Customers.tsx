@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Building2, Mail, Phone } from 'lucide-react';
+import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Building2, Mail, Phone, FlaskConical } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, type Customer } from '@/features/customers/api';
 import { useLabelTemplates } from '@/features/labels/api';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +29,7 @@ export default function Customers() {
     address: '',
     notes: '',
     defaultLabelTemplateId: '' as string,
+    requiresTesting: false,
   });
 
   const { canManageCustomers } = useRole();
@@ -47,7 +49,7 @@ export default function Customers() {
   );
 
   const resetForm = () => {
-    setFormData({ code: '', name: '', contactName: '', email: '', phone: '', address: '', notes: '', defaultLabelTemplateId: '' });
+    setFormData({ code: '', name: '', contactName: '', email: '', phone: '', address: '', notes: '', defaultLabelTemplateId: '', requiresTesting: false });
   };
 
   const handleCreate = async () => {
@@ -66,6 +68,7 @@ export default function Customers() {
         notes: formData.notes || null,
         active: true,
         defaultLabelTemplateId: formData.defaultLabelTemplateId || null,
+        requiresTesting: formData.requiresTesting,
       });
       toast({ title: "Customer created", description: `Customer ${formData.name} created successfully` });
       setIsCreateDialogOpen(false);
@@ -86,6 +89,7 @@ export default function Customers() {
       address: customer.address || '',
       notes: customer.notes || '',
       defaultLabelTemplateId: customer.defaultLabelTemplateId || '',
+      requiresTesting: !!customer.requiresTesting,
     });
     setIsEditDialogOpen(true);
   };
@@ -105,6 +109,7 @@ export default function Customers() {
         address: formData.address || null,
         notes: formData.notes || null,
         defaultLabelTemplateId: formData.defaultLabelTemplateId || null,
+        requiresTesting: formData.requiresTesting,
       });
       toast({ title: "Customer updated", description: `Customer ${formData.name} updated successfully` });
       setIsEditDialogOpen(false);
@@ -238,6 +243,18 @@ export default function Customers() {
                   data-testid="input-customer-notes"
                 />
               </div>
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="create-requires-testing" className="flex items-center gap-2"><FlaskConical className="h-4 w-4" /> Requires Testing</Label>
+                  <p className="text-xs text-muted-foreground">Block order completion until customer-assigned lots pass testing.</p>
+                </div>
+                <Switch
+                  id="create-requires-testing"
+                  checked={formData.requiresTesting}
+                  onCheckedChange={(v) => setFormData({ ...formData, requiresTesting: v })}
+                  data-testid="switch-create-requires-testing"
+                />
+              </div>
               {labelTemplates.length > 0 && (
                 <div className="space-y-2">
                   <Label htmlFor="create-label-template">Default Label Template</Label>
@@ -338,9 +355,16 @@ export default function Customers() {
                       ) : '-'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={customer.active ? 'default' : 'secondary'} data-testid={`badge-customer-status-${customer.id}`}>
-                        {customer.active ? 'Active' : 'Inactive'}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Badge variant={customer.active ? 'default' : 'secondary'} data-testid={`badge-customer-status-${customer.id}`}>
+                          {customer.active ? 'Active' : 'Inactive'}
+                        </Badge>
+                        {customer.requiresTesting && (
+                          <Badge className="bg-purple-100 text-purple-700 border-purple-200" data-testid={`badge-customer-testing-${customer.id}`}>
+                            <FlaskConical className="h-3 w-3 mr-1" /> Testing
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {canManageCustomers && (
@@ -455,6 +479,18 @@ export default function Customers() {
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 data-testid="input-edit-customer-notes"
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="edit-requires-testing" className="flex items-center gap-2"><FlaskConical className="h-4 w-4" /> Requires Testing</Label>
+                <p className="text-xs text-muted-foreground">Block order completion until customer-assigned lots pass testing.</p>
+              </div>
+              <Switch
+                id="edit-requires-testing"
+                checked={formData.requiresTesting}
+                onCheckedChange={(v) => setFormData({ ...formData, requiresTesting: v })}
+                data-testid="switch-edit-requires-testing"
               />
             </div>
             {labelTemplates.length > 0 && (

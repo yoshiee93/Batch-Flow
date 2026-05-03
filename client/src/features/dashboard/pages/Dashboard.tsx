@@ -205,7 +205,7 @@ export default function Dashboard() {
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground truncate mt-0.5">
-                            {product?.name || 'Unknown product'} · {parseFloat(batch.plannedQuantity).toFixed(0)} {product?.unit || 'KG'} planned
+                            {product?.name || 'Unknown product'} · {parseFloat(batch.plannedQuantity).toFixed(0)}{product?.unit ? ` ${product.unit}` : ''} planned
                           </p>
                         </div>
                         <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />

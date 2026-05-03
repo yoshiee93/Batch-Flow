@@ -2,9 +2,18 @@ import { db } from "../../db";
 import { customersRepository as repo } from "./repository";
 import { createAuditLog } from "../../lib/auditLog";
 import { inventoryRepository } from "../inventory/repository";
-import { orderItems, orders, auditLogs, products } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { orderItems, orders, auditLogs, products, lots } from "@shared/schema";
+import { eq, sql, and, gt, or, isNull } from "drizzle-orm";
 import type { Customer, InsertCustomer, Order, InsertOrder, OrderItem, InsertOrderItem, StockMovement } from "@shared/schema";
+
+export class TestingRequiredError extends Error {
+  code = "TESTING_REQUIRED";
+  blockingLots: { lotId: string; lotNumber: string; productId: string; productName: string; testingStatus: string }[];
+  constructor(blockingLots: TestingRequiredError["blockingLots"]) {
+    super("Cannot complete order: customer requires testing and one or more lots have not passed testing");
+    this.blockingLots = blockingLots;
+  }
+}
 
 export const customersService = {
   getCustomers: repo.getCustomers.bind(repo),
@@ -66,9 +75,64 @@ export const customersService = {
     await customersService.runStockAllocation();
   },
 
+  async getOrderTestingBlockers(orderId: string) {
+    const order = await repo.getOrder(orderId);
+    if (!order || !order.customerId) return [];
+    const customer = await repo.getCustomer(order.customerId);
+    if (!customer || !customer.requiresTesting) return [];
+
+    const items = await repo.getOrderItems(orderId);
+    const productIds = Array.from(new Set(items.map(i => i.productId)));
+    if (productIds.length === 0) return [];
+
+    const blockers: { lotId: string; lotNumber: string; productId: string; productName: string; testingStatus: string }[] = [];
+
+    for (const item of items) {
+      const candidateLots = await db.select().from(lots).where(
+        and(
+          eq(lots.productId, item.productId),
+          eq(lots.lotType, "finished_good"),
+          eq(lots.status, "active"),
+          or(eq(lots.customerId, order.customerId), isNull(lots.customerId)),
+          gt(lots.remainingQuantity, "0"),
+        )
+      );
+      candidateLots.sort((a, b) => new Date(a.receivedDate).getTime() - new Date(b.receivedDate).getTime());
+      let needed = parseFloat(item.quantity);
+      const product = await repo.getProductById(item.productId);
+      const productName = product?.name ?? item.productId;
+      for (const lot of candidateLots) {
+        if (needed <= 0) break;
+        const remaining = parseFloat(lot.remainingQuantity);
+        if (remaining <= 0) continue;
+        if (lot.testingStatus !== "passed") {
+          blockers.push({
+            lotId: lot.id,
+            lotNumber: lot.lotNumber,
+            productId: item.productId,
+            productName,
+            testingStatus: lot.testingStatus,
+          });
+        }
+        needed -= remaining;
+      }
+    }
+    return blockers;
+  },
+
   async completeOrder(orderId: string): Promise<{ order: Order; movements: StockMovement[] }> {
     const order = await repo.getOrder(orderId);
     if (!order) throw new Error("Order not found");
+
+    if (order.customerId) {
+      const customer = await repo.getCustomer(order.customerId);
+      if (customer?.requiresTesting) {
+        const blockers = await customersService.getOrderTestingBlockers(orderId);
+        if (blockers.length > 0) {
+          throw new TestingRequiredError(blockers);
+        }
+      }
+    }
 
     const items = await repo.getOrderItems(orderId);
     const createdMovements: StockMovement[] = [];
@@ -145,7 +209,14 @@ export const customersService = {
   async getOrdersWithAllocation() {
     await customersService.runStockAllocation();
     const ordersWithItems = await repo.getOrdersWithItems();
-    return ordersWithItems.map(order => {
+    const allCustomers = await repo.getCustomers();
+    const customerById = new Map(allCustomers.map(c => [c.id, c]));
+    const result = [] as ((typeof ordersWithItems)[number] & {
+      allocationStatus: string;
+      customerRequiresTesting: boolean;
+      testingBlockers: { lotId: string; lotNumber: string; productId: string; productName: string; testingStatus: string }[];
+    })[];
+    for (const order of ordersWithItems) {
       let allocationStatus = "awaiting_stock";
       if (order.status === "shipped") {
         allocationStatus = "shipped";
@@ -157,7 +228,14 @@ export const customersService = {
         if (fullyAllocated) allocationStatus = "ready_to_ship";
         else if (partiallyAllocated) allocationStatus = "partially_allocated";
       }
-      return { ...order, allocationStatus };
-    });
+      const customer = order.customerId ? customerById.get(order.customerId) : undefined;
+      const customerRequiresTesting = !!customer?.requiresTesting;
+      let testingBlockers: { lotId: string; lotNumber: string; productId: string; productName: string; testingStatus: string }[] = [];
+      if (customerRequiresTesting && order.status !== "shipped" && order.status !== "cancelled") {
+        testingBlockers = await customersService.getOrderTestingBlockers(order.id);
+      }
+      result.push({ ...order, allocationStatus, customerRequiresTesting, testingBlockers });
+    }
+    return result;
   },
 };

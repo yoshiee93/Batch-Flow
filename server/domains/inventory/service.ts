@@ -74,6 +74,33 @@ export const inventoryService = {
     await createAuditLog({ entityType: "lot", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
   },
 
+  async recordLotTesting(
+    lotId: string,
+    data: { testingStatus: "pending" | "passed" | "failed" | "not_required"; testingNotes?: string | null; testingCertificate?: string | null }
+  ): Promise<Lot | undefined> {
+    const userId = getCurrentUserId();
+    const updated = await repo.updateLotRaw(lotId, {
+      testingStatus: data.testingStatus,
+      testingNotes: data.testingNotes ?? null,
+      testingCertificate: data.testingCertificate ?? null,
+      testedAt: new Date(),
+      testedById: userId || null,
+    });
+    if (updated) {
+      await createAuditLog({
+        entityType: "lot",
+        entityId: lotId,
+        action: "testing_recorded",
+        changes: JSON.stringify({
+          testingStatus: data.testingStatus,
+          testingNotes: data.testingNotes ?? null,
+          testingCertificate: data.testingCertificate ?? null,
+        }),
+      });
+    }
+    return updated;
+  },
+
   async updateLotBarcodePrinted(lotId: string): Promise<Lot | undefined> {
     const updated = await repo.updateLotRaw(lotId, { barcodePrintedAt: new Date() });
     if (updated) {
@@ -150,6 +177,7 @@ export const inventoryService = {
       receivedById: effectiveReceivedById,
       freight: freight || null,
       photos: photos ?? [],
+      testingStatus: "not_required",
     });
 
     const newStock = (parseFloat(currentStock || "0") + quantityNum).toFixed(3);

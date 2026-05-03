@@ -14,6 +14,8 @@ import { adminRouter } from "./domains/admin/routes";
 import { labelsRouter } from "./domains/labels/routes";
 import { templatesRouter } from "./domains/templates/routes";
 import { securityRouter } from "./domains/security/routes";
+import { forecastRouter } from "./domains/forecast/routes";
+import { reportsRouter } from "./domains/reports/routes";
 import { requireAuth } from "./lib/authMiddleware";
 
 export async function registerRoutes(
@@ -35,6 +37,8 @@ export async function registerRoutes(
   app.use("/api", labelsRouter);
   app.use("/api", templatesRouter);
   app.use("/api", securityRouter);
+  app.use("/api", forecastRouter);
+  app.use("/api", reportsRouter);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof z.ZodError) {

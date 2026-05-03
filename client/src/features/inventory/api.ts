@@ -30,8 +30,26 @@ export interface Lot {
   visualInspection: VisualInspection | null;
   receivedById: string | null;
   freight: string | null;
+  testingStatus: "not_required" | "pending" | "passed" | "failed";
+  testingNotes: string | null;
+  testingCertificate: string | null;
+  testedAt: string | null;
+  testedById: string | null;
   photos: LotPhoto[];
   createdAt: string;
+}
+
+export function useRecordLotTesting() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ lotId, ...data }: { lotId: string; testingStatus: Lot["testingStatus"]; testingNotes?: string | null; testingCertificate?: string | null }) =>
+      fetchApi<Lot>(`/lots/${lotId}/testing`, { method: "PATCH", body: JSON.stringify(data) }),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
+      queryClient.invalidateQueries({ queryKey: ["lot", vars.lotId] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithAllocation"] });
+    },
+  });
 }
 
 export interface LotWithDetails extends Lot {

@@ -8,12 +8,20 @@ import { Separator } from '@/components/ui/separator';
 import {
   ArrowLeft, ChevronRight, Loader2, AlertCircle, Package, Factory,
   Tag, Truck, ArrowRight, ArrowUpRight, ClipboardList, Calendar,
-  Hash, Barcode, ExternalLink, Printer, ThermometerSnowflake, Eye, User as UserIcon, Camera
+  Hash, Barcode, ExternalLink, Printer, ThermometerSnowflake, Eye, User as UserIcon, Camera, FlaskConical
 } from 'lucide-react';
+import { useState } from 'react';
 import {
   useLotById, useLotUsage, useLotLineage, useMaterials, useProducts, useBatch,
+  useRecordLotTesting,
   type LotUsageEntry, type OutputLot, type VisualInspection
 } from '@/lib/api';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label as UiLabel } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useRole } from '@/contexts/AuthContext';
 import { useUsers } from '@/features/quality/api';
 import { format } from 'date-fns';
 import { useRecordPrint } from '@/features/labels/api';
@@ -25,6 +33,13 @@ const lotStatusColors: Record<string, string> = {
   quarantine: 'bg-yellow-100 text-yellow-700',
   consumed: 'bg-gray-100 text-gray-600',
   expired: 'bg-red-100 text-red-700',
+};
+
+const testingStatusBadge: Record<string, string> = {
+  not_required: 'bg-gray-100 text-gray-600',
+  pending: 'bg-amber-100 text-amber-700 border-amber-200',
+  passed: 'bg-green-100 text-green-700 border-green-200',
+  failed: 'bg-red-100 text-red-700 border-red-200',
 };
 
 const lotTypeLabels: Record<string, string> = {
@@ -88,7 +103,11 @@ export default function LotDetail() {
   const { data: lineage, isLoading: lineageLoading } = useLotLineage(id!);
   const { data: sourceBatch } = useBatch(lot?.sourceBatchId || '');
   const recordPrint = useRecordPrint();
+  const recordTesting = useRecordLotTesting();
   const { toast } = useToast();
+  const { isAdmin } = useRole();
+  const [testingDialogOpen, setTestingDialogOpen] = useState(false);
+  const [testingForm, setTestingForm] = useState<{ status: 'not_required' | 'pending' | 'passed' | 'failed'; notes: string; certificate: string }>({ status: 'pending', notes: '', certificate: '' });
 
   if (lotLoading) {
     return (
@@ -147,6 +166,9 @@ export default function LotDetail() {
                 </Badge>
                 <Badge variant="outline" data-testid="badge-lot-type">
                   {lot.lotType ? (lotTypeLabels[lot.lotType] ?? lot.lotType) : '—'}
+                </Badge>
+                <Badge className={testingStatusBadge[lot.testingStatus] ?? 'bg-gray-100 text-gray-600'} data-testid="badge-lot-testing-status">
+                  <FlaskConical className="h-3 w-3 mr-1" /> {lot.testingStatus.replace('_', ' ')}
                 </Badge>
               </div>
             </div>
@@ -373,8 +395,137 @@ export default function LotDetail() {
               {lot.barcodePrintedAt ? 'Print Again' : 'Print Label'}
             </Button>
           )}
+          {isAdmin && lot.lotType === 'finished_good' && (
+            <Button
+              variant="outline"
+              className="w-full"
+              data-testid="button-record-testing"
+              onClick={() => {
+                setTestingForm({
+                  status: lot.testingStatus === 'not_required' ? 'pending' : lot.testingStatus,
+                  notes: lot.testingNotes || '',
+                  certificate: lot.testingCertificate || '',
+                });
+                setTestingDialogOpen(true);
+              }}
+            >
+              <FlaskConical className="mr-2 h-4 w-4" />
+              Record Testing
+            </Button>
+          )}
         </div>
       </div>
+
+      {(lot.testingStatus !== 'not_required' || lot.testingNotes || lot.testingCertificate) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FlaskConical className="h-4 w-4" /> Testing
+              <Badge className={testingStatusBadge[lot.testingStatus] ?? 'bg-gray-100 text-gray-600'} data-testid="badge-testing-status-detail">
+                {lot.testingStatus.replace('_', ' ')}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              {lot.testedAt && (
+                <div>
+                  <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Tested At</div>
+                  <div data-testid="text-tested-at">{fmtDate(lot.testedAt, 'dd MMM yyyy HH:mm')}</div>
+                </div>
+              )}
+              {lot.testedById && (() => {
+                const u = usersList.find(x => x.id === lot.testedById);
+                const name = u ? (u.fullName || u.username) : lot.testedById;
+                return (
+                  <div>
+                    <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Tested By</div>
+                    <div data-testid="text-tested-by">{name}</div>
+                  </div>
+                );
+              })()}
+              {lot.testingCertificate && (
+                <div className="sm:col-span-2">
+                  <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Certificate</div>
+                  <div data-testid="text-testing-certificate">{lot.testingCertificate}</div>
+                </div>
+              )}
+              {lot.testingNotes && (
+                <div className="sm:col-span-2">
+                  <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Notes</div>
+                  <p className="whitespace-pre-wrap" data-testid="text-testing-notes">{lot.testingNotes}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={testingDialogOpen} onOpenChange={setTestingDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Testing</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <UiLabel htmlFor="testing-status">Status</UiLabel>
+              <Select value={testingForm.status} onValueChange={(v) => setTestingForm({ ...testingForm, status: v as any })}>
+                <SelectTrigger id="testing-status" data-testid="select-testing-status"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="not_required">Not Required</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="passed">Passed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <UiLabel htmlFor="testing-certificate">Certificate Reference</UiLabel>
+              <Input
+                id="testing-certificate"
+                value={testingForm.certificate}
+                onChange={(e) => setTestingForm({ ...testingForm, certificate: e.target.value })}
+                placeholder="COA-2026-0123"
+                data-testid="input-testing-certificate"
+              />
+            </div>
+            <div className="space-y-2">
+              <UiLabel htmlFor="testing-notes">Notes</UiLabel>
+              <Textarea
+                id="testing-notes"
+                value={testingForm.notes}
+                onChange={(e) => setTestingForm({ ...testingForm, notes: e.target.value })}
+                rows={3}
+                data-testid="input-testing-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTestingDialogOpen(false)}>Cancel</Button>
+            <Button
+              data-testid="button-save-testing"
+              disabled={recordTesting.isPending}
+              onClick={async () => {
+                try {
+                  await recordTesting.mutateAsync({
+                    lotId: lot.id,
+                    testingStatus: testingForm.status,
+                    testingNotes: testingForm.notes || null,
+                    testingCertificate: testingForm.certificate || null,
+                  });
+                  toast({ title: 'Testing recorded', description: `Lot ${lot.lotNumber} status set to ${testingForm.status.replace('_', ' ')}` });
+                  setTestingDialogOpen(false);
+                } catch (err) {
+                  toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to record testing', variant: 'destructive' });
+                }
+              }}
+            >
+              {recordTesting.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {lot.sourceBatchId && (
         <Card>

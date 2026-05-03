@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown, Archive } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown, Archive, FlaskConical } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -57,11 +57,14 @@ export default function Orders() {
     customerId: z.string().optional().or(z.literal('')),
     priority: z.enum(['low', 'normal', 'high', 'urgent']),
     dueDate: z.string().min(1, 'Due date is required'),
+    poNumber: z.string().optional().or(z.literal('')),
+    customBatchNumber: z.string().optional().or(z.literal('')),
+    freight: z.string().optional().or(z.literal('')),
   });
   type CreateOrderValues = z.infer<typeof createOrderSchema>;
   const createOrderForm = useForm<CreateOrderValues>({
     resolver: zodResolver(createOrderSchema),
-    defaultValues: { orderNumber: '', customerName: '', customerId: '', priority: 'normal', dueDate: '' },
+    defaultValues: { orderNumber: '', customerName: '', customerId: '', priority: 'normal', dueDate: '', poNumber: '', customBatchNumber: '', freight: '' },
     mode: 'onChange',
   });
   const newOrder = createOrderForm.watch();
@@ -76,11 +79,14 @@ export default function Orders() {
     priority: z.enum(['low', 'normal', 'high', 'urgent']),
     dueDate: z.string().min(1, 'Due date is required'),
     notes: z.string().optional().or(z.literal('')),
+    poNumber: z.string().optional().or(z.literal('')),
+    customBatchNumber: z.string().optional().or(z.literal('')),
+    freight: z.string().optional().or(z.literal('')),
   });
   type EditOrderValues = z.infer<typeof editOrderSchema>;
   const editOrderForm = useForm<EditOrderValues>({
     resolver: zodResolver(editOrderSchema),
-    defaultValues: { customerName: '', customerId: '', priority: 'normal', dueDate: '', notes: '' },
+    defaultValues: { customerName: '', customerId: '', priority: 'normal', dueDate: '', notes: '', poNumber: '', customBatchNumber: '', freight: '' },
     mode: 'onChange',
   });
   const editOrder = editOrderForm.watch();
@@ -146,10 +152,13 @@ export default function Orders() {
         priority: values.priority,
         dueDate: new Date(values.dueDate).toISOString(),
         status: 'pending',
+        poNumber: values.poNumber || null,
+        customBatchNumber: values.customBatchNumber || null,
+        freight: values.freight || null,
       });
       toast({ title: "Order created", description: `Order ${values.orderNumber} created. Add products below.` });
       setIsCreateDialogOpen(false);
-      createOrderForm.reset({ orderNumber: '', customerName: '', customerId: '', priority: 'normal', dueDate: '' });
+      createOrderForm.reset({ orderNumber: '', customerName: '', customerId: '', priority: 'normal', dueDate: '', poNumber: '', customBatchNumber: '', freight: '' });
 
       if (createdOrder) {
         setSelectedOrder(createdOrder);
@@ -159,12 +168,16 @@ export default function Orders() {
           priority: createdOrder.priority,
           dueDate: createdOrder.dueDate.split('T')[0],
           notes: createdOrder.notes || '',
+          poNumber: createdOrder.poNumber || '',
+          customBatchNumber: createdOrder.customBatchNumber || '',
+          freight: createdOrder.freight || '',
         });
         setIsEditDialogOpen(true);
+        setTimeout(() => editOrderForm.trigger(), 0);
       }
     } catch (error) {
       if (error instanceof ApiValidationError) {
-        const unmatched = applyServerFieldErrors(error, createOrderForm.setError, ['orderNumber','customerName','customerId','priority','dueDate']);
+        const unmatched = applyServerFieldErrors(error, createOrderForm.setError, ['orderNumber','customerName','customerId','priority','dueDate','poNumber','customBatchNumber','freight']);
         if (!unmatched.handled) toast({ title: "Error", description: error.message || "Failed to create order", variant: "destructive" });
       } else {
         toast({ title: "Error", description: (error as Error)?.message || "Failed to create order", variant: "destructive" });
@@ -180,8 +193,12 @@ export default function Orders() {
       priority: order.priority,
       dueDate: order.dueDate.split('T')[0],
       notes: order.notes || '',
+      poNumber: order.poNumber || '',
+      customBatchNumber: order.customBatchNumber || '',
+      freight: order.freight || '',
     });
     setIsEditDialogOpen(true);
+    setTimeout(() => editOrderForm.trigger(), 0);
   };
 
   const handleViewClick = (order: OrderWithAllocation) => {
@@ -199,12 +216,15 @@ export default function Orders() {
         priority: values.priority,
         dueDate: new Date(values.dueDate).toISOString(),
         notes: values.notes || null,
+        poNumber: values.poNumber || null,
+        customBatchNumber: values.customBatchNumber || null,
+        freight: values.freight || null,
       });
       toast({ title: 'Order updated', description: `Order ${selectedOrder.orderNumber} updated successfully` });
       setIsEditDialogOpen(false);
     } catch (error) {
       if (error instanceof ApiValidationError) {
-        const unmatched = applyServerFieldErrors(error, editOrderForm.setError, ['customerName','customerId','priority','dueDate','notes']);
+        const unmatched = applyServerFieldErrors(error, editOrderForm.setError, ['customerName','customerId','priority','dueDate','notes','poNumber','customBatchNumber','freight']);
         if (!unmatched.handled) toast({ title: 'Error', description: error.message || 'Failed to update order', variant: 'destructive' });
       } else {
         toast({ title: 'Error', description: (error as Error)?.message || 'Failed to update order', variant: 'destructive' });
@@ -346,6 +366,36 @@ export default function Orders() {
                 {createOrderForm.formState.errors.dueDate && (
                   <p className="text-sm text-destructive" data-testid="error-due-date">{createOrderForm.formState.errors.dueDate.message}</p>
                 )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="poNumber">Customer PO Number</Label>
+                <Input
+                  id="poNumber"
+                  placeholder="e.g. PO-12345"
+                  value={newOrder.poNumber || ''}
+                  onChange={(e) => setNewOrder({ ...newOrder, poNumber: e.target.value })}
+                  data-testid="input-po-number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customBatchNumber">Custom Batch Number</Label>
+                <Input
+                  id="customBatchNumber"
+                  placeholder="Optional override of internal batch code"
+                  value={newOrder.customBatchNumber || ''}
+                  onChange={(e) => setNewOrder({ ...newOrder, customBatchNumber: e.target.value })}
+                  data-testid="input-custom-batch-number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="freight">Freight</Label>
+                <Input
+                  id="freight"
+                  placeholder="e.g. DHL — AWB 123 — $185"
+                  value={newOrder.freight || ''}
+                  onChange={(e) => setNewOrder({ ...newOrder, freight: e.target.value })}
+                  data-testid="input-freight"
+                />
               </div>
             </div>
             <DialogFooter>
@@ -518,6 +568,24 @@ export default function Orders() {
                   <p className="text-sm text-muted-foreground">Status</p>
                   <OrderStatusBadge status={viewingOrder.status} />
                 </div>
+                {viewingOrder.poNumber && (
+                  <div data-testid="view-po-number">
+                    <p className="text-sm text-muted-foreground">Customer PO #</p>
+                    <p className="font-medium font-mono">{viewingOrder.poNumber}</p>
+                  </div>
+                )}
+                {viewingOrder.customBatchNumber && (
+                  <div data-testid="view-custom-batch-number">
+                    <p className="text-sm text-muted-foreground">Custom Batch #</p>
+                    <p className="font-medium font-mono">{viewingOrder.customBatchNumber}</p>
+                  </div>
+                )}
+                {viewingOrder.freight && (
+                  <div className="col-span-2" data-testid="view-freight">
+                    <p className="text-sm text-muted-foreground">Freight</p>
+                    <p className="font-medium">{viewingOrder.freight}</p>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -531,7 +599,7 @@ export default function Orders() {
                       const currentStock = product ? parseFloat(product.currentStock) : 0;
                       const needed = parseFloat(item.quantity);
                       const reserved = parseFloat(item.reservedQuantity);
-                      const unit = product?.unit || 'KG';
+                      const unit = product?.unit || '';
                       const stockStatus = reserved >= needed ? 'ready' : reserved > 0 ? 'partial' : 'waiting';
                       
                       return (
@@ -642,7 +710,7 @@ function EditOrderContent({
   onClose,
 }: {
   order: Order;
-  editOrder: { customerName: string; customerId?: string; priority: string; dueDate: string; notes?: string };
+  editOrder: { customerName: string; customerId?: string; priority: string; dueDate: string; notes?: string; poNumber?: string; customBatchNumber?: string; freight?: string };
   setEditOrder: (value: any) => void;
   customers: Customer[];
   products: Product[];
@@ -774,6 +842,33 @@ function EditOrderContent({
             data-testid="input-edit-notes"
           />
         </div>
+        <div className="space-y-2">
+          <Label>Customer PO Number</Label>
+          <Input
+            value={editOrder.poNumber || ''}
+            onChange={(e) => setEditOrder({ ...editOrder, poNumber: e.target.value })}
+            placeholder="e.g. PO-12345"
+            data-testid="input-edit-po-number"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Custom Batch Number</Label>
+          <Input
+            value={editOrder.customBatchNumber || ''}
+            onChange={(e) => setEditOrder({ ...editOrder, customBatchNumber: e.target.value })}
+            placeholder="Optional override of internal batch code"
+            data-testid="input-edit-custom-batch-number"
+          />
+        </div>
+        <div className="space-y-2 col-span-2">
+          <Label>Freight</Label>
+          <Input
+            value={editOrder.freight || ''}
+            onChange={(e) => setEditOrder({ ...editOrder, freight: e.target.value })}
+            placeholder="e.g. DHL — AWB 123 — $185"
+            data-testid="input-edit-freight"
+          />
+        </div>
       </div>
 
       <div className="border-t pt-4">
@@ -793,7 +888,7 @@ function EditOrderContent({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
-                    <TableHead className="text-right">Quantity (KG)</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
                     <TableHead className="text-right">In Stock</TableHead>
                     <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
@@ -811,9 +906,9 @@ function EditOrderContent({
                       return (
                         <TableRow key={item.id} data-testid={`row-order-item-${item.id}`}>
                           <TableCell>{product?.name || 'Unknown Product'}</TableCell>
-                          <TableCell className="text-right font-mono">{parseFloat(item.quantity).toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono">{parseFloat(item.quantity).toFixed(2)}{product?.unit ? ` ${product.unit}` : ''}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {product ? parseFloat(product.currentStock).toFixed(2) : '-'}
+                            {product ? `${parseFloat(product.currentStock).toFixed(2)}${product.unit ? ` ${product.unit}` : ''}` : '-'}
                           </TableCell>
                           <TableCell>
                             {canManageOrders && (
@@ -887,7 +982,7 @@ function EditOrderContent({
                 </Popover>
               </div>
               <div className="w-32 space-y-2">
-                <Label>Quantity (KG)</Label>
+                <Label>Quantity{(() => { const p = products.find(pp => pp.id === newItem.productId); return p?.unit ? ` (${p.unit})` : ''; })()}</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -970,8 +1065,24 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
       className="cursor-pointer hover:bg-muted/50"
       onClick={() => onViewClick(order)}
     >
-      <TableCell className="font-mono font-bold">{order.orderNumber}</TableCell>
-      <TableCell>{order.customerName}</TableCell>
+      <TableCell className="font-mono font-bold">
+        <div className="flex flex-col">
+          <span>{order.orderNumber}</span>
+          {order.poNumber && (
+            <span className="text-xs text-muted-foreground font-normal" data-testid={`text-po-number-${order.id}`}>PO: {order.poNumber}</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-col gap-0.5">
+          <span>{order.customerName}</span>
+          {order.customerRequiresTesting && (
+            <Badge className="bg-purple-100 text-purple-700 border-purple-200 self-start" data-testid={`badge-order-testing-${order.id}`}>
+              <FlaskConical size={10} className="mr-1" /> Testing
+            </Badge>
+          )}
+        </div>
+      </TableCell>
       <TableCell>
         <div className="space-y-1">
           {order.items.map((item) => {
@@ -980,7 +1091,7 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
             const needed = parseFloat(item.quantity);
             return (
               <div key={item.id} className="text-sm">
-                {item.productName} <span className="text-muted-foreground font-mono">({allocated.toFixed(0)}/{needed.toFixed(0)} {product?.unit || 'KG'})</span>
+                {item.productName} <span className="text-muted-foreground font-mono">({allocated.toFixed(0)}/{needed.toFixed(0)}{product?.unit ? ` ${product.unit}` : ''})</span>
               </div>
             );
           })}
@@ -1020,17 +1131,28 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
                 <DropdownMenuItem onClick={() => onStatusChange(order.id, 'ready')}>
                   <CheckCircle2 size={14} className="mr-2" /> Mark Ready
                 </DropdownMenuItem>
-                {order.status !== 'shipped' && order.status !== 'cancelled' && (
-                  <DropdownMenuItem 
-                    onClick={() => setIsCompleteDialogOpen(true)}
-                    disabled={order.items.length === 0}
-                    className="text-green-600"
-                    data-testid={`button-complete-order-${order.id}`}
-                    title={order.items.length === 0 ? 'Order must have at least one line item before it can be completed' : undefined}
-                  >
-                    <Truck size={14} className="mr-2" /> Complete Order
-                  </DropdownMenuItem>
-                )}
+                {order.status !== 'shipped' && order.status !== 'cancelled' && (() => {
+                  const blockerCount = order.testingBlockers?.length ?? 0;
+                  const blocked = blockerCount > 0;
+                  const blockerLotNumbers = (order.testingBlockers ?? []).map(b => b.lotNumber).join(', ');
+                  const tooltip = order.items.length === 0
+                    ? 'Order must have at least one line item before it can be completed'
+                    : blocked
+                      ? `Testing required before shipping. Blocking lots: ${blockerLotNumbers}`
+                      : undefined;
+                  return (
+                    <DropdownMenuItem
+                      onClick={() => setIsCompleteDialogOpen(true)}
+                      disabled={order.items.length === 0 || blocked}
+                      className="text-green-600"
+                      data-testid={`button-complete-order-${order.id}`}
+                      title={tooltip}
+                    >
+                      <Truck size={14} className="mr-2" /> Complete Order
+                      {blocked && <FlaskConical size={12} className="ml-2" />}
+                    </DropdownMenuItem>
+                  );
+                })()}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive" onClick={() => onStatusChange(order.id, 'cancelled')}>
                   Cancel Order
@@ -1104,7 +1226,14 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDe
       className="cursor-pointer hover:bg-muted/50"
       onClick={() => onViewClick(order)}
     >
-      <TableCell className="font-mono font-bold">{order.orderNumber}</TableCell>
+      <TableCell className="font-mono font-bold">
+        <div className="flex flex-col">
+          <span>{order.orderNumber}</span>
+          {order.poNumber && (
+            <span className="text-xs text-muted-foreground font-normal">PO: {order.poNumber}</span>
+          )}
+        </div>
+      </TableCell>
       <TableCell>{order.customerName}</TableCell>
       <TableCell>
         <div className="space-y-1">
@@ -1113,7 +1242,7 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDe
             const quantity = parseFloat(item.quantity);
             return (
               <div key={item.id} className="text-sm">
-                {item.productName} <span className="text-muted-foreground font-mono">({quantity.toFixed(0)} {product?.unit || 'KG'})</span>
+                {item.productName} <span className="text-muted-foreground font-mono">({quantity.toFixed(0)}{product?.unit ? ` ${product.unit}` : ''})</span>
               </div>
             );
           })}

@@ -128,6 +128,7 @@ export const movementTypeEnum = pgEnum("movement_type", ["receipt", "production_
 export const qualityResultEnum = pgEnum("quality_result", ["pass", "fail", "pending"]);
 export const lotTypeEnum = pgEnum("lot_type", ["raw_material", "intermediate", "finished_good"]);
 export const lotStatusEnum = pgEnum("lot_status", ["active", "quarantined", "released", "consumed", "expired"]);
+export const lotTestingStatusEnum = pgEnum("lot_testing_status", ["not_required", "pending", "passed", "failed"]);
 export const sourceTypeEnum = pgEnum("source_type", ["supplier", "farmer", "internal_batch"]);
 
 export const users = pgTable("users", {
@@ -151,6 +152,7 @@ export const customers = pgTable("customers", {
   notes: text("notes"),
   active: boolean("active").notNull().default(true),
   defaultLabelTemplateId: varchar("default_label_template_id"),
+  requiresTesting: boolean("requires_testing").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -236,6 +238,11 @@ export const lots = pgTable("lots", {
   visualInspection: varchar("visual_inspection", { length: 20 }),
   receivedById: varchar("received_by_id").references(() => users.id),
   freight: text("freight"),
+  testingStatus: lotTestingStatusEnum("testing_status").notNull().default("not_required"),
+  testingNotes: text("testing_notes"),
+  testingCertificate: text("testing_certificate"),
+  testedAt: timestamp("tested_at"),
+  testedById: varchar("tested_by_id").references(() => users.id),
   photos: jsonb("photos").$type<LotPhoto[]>().notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -324,6 +331,9 @@ export const orders = pgTable("orders", {
   priority: orderPriorityEnum("priority").notNull().default("normal"),
   dueDate: timestamp("due_date").notNull(),
   notes: text("notes"),
+  poNumber: varchar("po_number", { length: 100 }),
+  customBatchNumber: varchar("custom_batch_number", { length: 50 }),
+  freight: text("freight"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -578,3 +588,32 @@ export const insertTemplateSchema = createInsertSchema(templates, {
 
 export type InsertTemplate = z.infer<typeof insertTemplateSchema>;
 export type Template = typeof templates.$inferSelect;
+
+export const forecastStatusEnum = pgEnum("forecast_status", ["open", "converted", "archived"]);
+
+export const forecastOrders = pgTable("forecast_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => customers.id),
+  productId: varchar("product_id").notNull().references(() => products.id),
+  quantity: decimal("quantity", { precision: 12, scale: 3 }).notNull(),
+  expectedDate: timestamp("expected_date").notNull(),
+  notes: text("notes"),
+  status: forecastStatusEnum("status").notNull().default("open"),
+  convertedOrderId: varchar("converted_order_id").references(() => orders.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const forecastOrdersRelations = relations(forecastOrders, ({ one }) => ({
+  customer: one(customers, { fields: [forecastOrders.customerId], references: [customers.id] }),
+  product: one(products, { fields: [forecastOrders.productId], references: [products.id] }),
+  convertedOrder: one(orders, { fields: [forecastOrders.convertedOrderId], references: [orders.id] }),
+}));
+
+export const insertForecastOrderSchema = createInsertSchema(forecastOrders).omit({ id: true, createdAt: true, updatedAt: true }).extend({
+  expectedDate: z.union([z.string(), z.date()]).transform((val) => typeof val === 'string' ? new Date(val) : val),
+});
+
+export type InsertForecastOrder = z.infer<typeof insertForecastOrderSchema>;
+export type ForecastOrder = typeof forecastOrders.$inferSelect;
+export type ForecastStatus = "open" | "converted" | "archived";

@@ -29,7 +29,7 @@ Preferred communication style: Simple, everyday language.
 - **API Pattern**: RESTful API
 - **Database ORM**: Drizzle ORM (PostgreSQL dialect)
 - **Schema Validation**: Zod with drizzle-zod
-- **Modular Monolith**: Organized by business domain (`catalog`, `inventory`, `production`, `traceability`, `quality`, `customers`, `dashboard`).
+- **Modular Monolith**: Organized by business domain (`catalog`, `inventory`, `production`, `traceability`, `quality`, `customers`, `dashboard`, `forecast`, `reports`).
 - **Central Data Access**: `server/storage.ts` for database interactions.
 - **Audit Logging**: System-wide immutable audit logging for key actions and entity types, captured via `AsyncLocalStorage` middleware.
 - **Reusable Templates Module**: Generic `templates` table with kind-specific Zod schema validation, managed by admin-only routes, supporting `batch.standard` and `product.spec` kinds.
@@ -39,7 +39,7 @@ Preferred communication style: Simple, everyday language.
 - **Schema**: `shared/schema.ts` (shared between frontend/backend).
 - **Database**: PostgreSQL.
 - **Migrations**: Drizzle Kit.
-- **Key Tables**: `categories` (dynamic product categorization with visibility controls), `products`, `materials`, `lots` (with receiving QA fields), `recipes`, `recipeItems`, `batches` (with optional `cleaningTime`, `numberOfStaff`, `finishTime`, `productAssessment` upon finalize), `batchMaterials`, `batchOutputs`, `orders`, `orderItems`, `qualityChecks`, `stockMovements`, `auditLogs`, `templates` (reusable generic templates).
+- **Key Tables**: `categories` (dynamic product categorization with visibility controls), `products`, `materials`, `lots` (with receiving QA fields and customer-specific testing status fields), `recipes`, `recipeItems`, `batches` (with optional `cleaningTime`, `numberOfStaff`, `finishTime`, `productAssessment` upon finalize), `batchMaterials`, `batchOutputs`, `orders` (with optional `poNumber`, `customBatchNumber`, `freight`), `orderItems`, `qualityChecks`, `stockMovements`, `auditLogs`, `templates` (reusable generic templates), `forecastOrders` (potential customer demand with conversion link).
 
 ### Technical Implementations
 - Full-stack TypeScript.
