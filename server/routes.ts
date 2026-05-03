@@ -12,6 +12,7 @@ import { customersRouter } from "./domains/customers/routes";
 import { dashboardRouter } from "./domains/dashboard/routes";
 import { adminRouter } from "./domains/admin/routes";
 import { labelsRouter } from "./domains/labels/routes";
+import { templatesRouter } from "./domains/templates/routes";
 import { securityRouter } from "./domains/security/routes";
 import { requireAuth } from "./lib/authMiddleware";
 
@@ -32,6 +33,7 @@ export async function registerRoutes(
   app.use("/api", dashboardRouter);
   app.use("/api", adminRouter);
   app.use("/api", labelsRouter);
+  app.use("/api", templatesRouter);
   app.use("/api", securityRouter);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

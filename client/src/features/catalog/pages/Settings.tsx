@@ -27,7 +27,9 @@ import CustomLabelBuilder from '@/features/labels/components/CustomLabelBuilder'
 import PrintCustomLabel from '@/features/labels/components/PrintCustomLabel';
 import PrintHistoryPanel from '@/features/labels/components/PrintHistoryPanel';
 import ActivityLogPanel from '@/features/security/components/ActivityLogPanel';
-import { Activity } from 'lucide-react';
+import { Activity, FileText } from 'lucide-react';
+import TemplatesPanel from '@/features/templates/TemplatesPanel';
+import { BatchStandardForm, ProductSpecForm } from '@/features/templates/kindForms';
 
 const TAB_VALUES = ['general', 'production', 'labels', 'data', 'security'] as const;
 type TabValue = typeof TAB_VALUES[number];
@@ -725,7 +727,32 @@ export default function Settings() {
     data: [
       { id: 'categories', label: 'Product Categories', icon: Tags, render: renderCategories },
       ...(isAdmin
-        ? [{ id: 'import-export', label: 'Export / Import', icon: Database, render: renderImportExport }]
+        ? [
+            {
+              id: 'reusable-templates',
+              label: 'Reusable Templates',
+              icon: FileText,
+              render: () => (
+                <div className="space-y-6" data-testid="section-reusable-templates">
+                  <TemplatesPanel
+                    kind="batch.standard"
+                    defaultPayload={{ description: '' }}
+                    renderForm={(payload, setPayload, errors) => (
+                      <BatchStandardForm payload={payload} setPayload={setPayload} fieldErrors={errors} />
+                    )}
+                  />
+                  <TemplatesPanel
+                    kind="product.spec"
+                    defaultPayload={{ description: '' }}
+                    renderForm={(payload, setPayload, errors) => (
+                      <ProductSpecForm payload={payload} setPayload={setPayload} fieldErrors={errors} />
+                    )}
+                  />
+                </div>
+              ),
+            },
+            { id: 'import-export', label: 'Export / Import', icon: Database, render: renderImportExport },
+          ]
         : []),
     ],
     security: [

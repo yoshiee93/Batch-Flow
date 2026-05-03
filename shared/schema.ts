@@ -508,3 +508,24 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertLabelTemplate = z.infer<typeof insertLabelTemplateSchema>;
 export type LabelTemplate = typeof labelTemplates.$inferSelect;
 export type LabelTemplateType = "raw_intake" | "finished_output" | "batch";
+
+export const templates = pgTable("templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  kind: varchar("kind", { length: 64 }).notNull(),
+  name: text("name").notNull(),
+  customerId: varchar("customer_id").references(() => customers.id),
+  isDefault: boolean("is_default").notNull().default(false),
+  payload: jsonb("payload").notNull().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  kindIdx: index("templates_kind_idx").on(t.kind),
+  kindCustomerIdx: index("templates_kind_customer_idx").on(t.kind, t.customerId),
+}));
+
+export const insertTemplateSchema = createInsertSchema(templates, {
+  payload: z.unknown().optional(),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type InsertTemplate = z.infer<typeof insertTemplateSchema>;
+export type Template = typeof templates.$inferSelect;
