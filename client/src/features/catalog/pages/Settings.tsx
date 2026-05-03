@@ -64,6 +64,37 @@ export default function Settings() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
+  const [processCodeEdits, setProcessCodeEdits] = useState<Record<string, string>>({});
+
+  const handleProcessCodeSave = async (category: Category) => {
+    const next = (processCodeEdits[category.id] ?? category.processCode ?? '').toUpperCase();
+    const current = category.processCode ?? '';
+    if (next === current) return;
+    try {
+      await updateCategory.mutateAsync({
+        id: category.id,
+        name: category.name,
+        excludeFromYield: category.excludeFromYield,
+        showInTabs: category.showInTabs,
+        showInInventory: category.showInInventory,
+        showInReceiveStock: category.showInReceiveStock,
+        showInProductionBatch: category.showInProductionBatch,
+        showInProductionInputs: category.showInProductionInputs,
+        showInProductionOutputs: category.showInProductionOutputs,
+        sortOrder: category.sortOrder,
+        processCode: next || null,
+      });
+      toast({ title: "Process code updated", description: `"${category.name}" set to ${next || 'none'}` });
+      setProcessCodeEdits(prev => {
+        const copy = { ...prev };
+        delete copy[category.id];
+        return copy;
+      });
+    } catch {
+      toast({ title: "Error", description: "Failed to update process code", variant: "destructive" });
+    }
+  };
+
   const handleTabChange = (value: string) => {
     if (!(TAB_VALUES as readonly string[]).includes(value)) return;
     const next = value as TabValue;
@@ -403,6 +434,78 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      <Card data-testid="card-process-codes">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wrench className="h-5 w-5" />
+            Process Codes
+          </CardTitle>
+          <CardDescription>
+            Assign a single-character process code to each category for SOP batch code generation. Known codes: 3 = Fresh/IQF, 4 = Freeze Dried, 6 = Frozen.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {categories.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Tags className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No categories defined yet</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[160px]">Category</TableHead>
+                    <TableHead className="text-center min-w-[120px]">Process Code</TableHead>
+                    <TableHead className="min-w-[160px]">Meaning</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Save</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {categories.map((category) => {
+                    const draft = processCodeEdits[category.id] ?? category.processCode ?? '';
+                    const dirty = draft.toUpperCase() !== (category.processCode ?? '');
+                    return (
+                      <TableRow key={category.id} data-testid={`row-process-code-${category.id}`}>
+                        <TableCell className="font-medium">{category.name}</TableCell>
+                        <TableCell className="text-center">
+                          <Input
+                            value={draft}
+                            onChange={(e) => setProcessCodeEdits(prev => ({ ...prev, [category.id]: e.target.value.toUpperCase() }))}
+                            placeholder="—"
+                            maxLength={1}
+                            className="w-16 mx-auto text-center font-mono"
+                            disabled={!canManageSettings}
+                            data-testid={`input-process-code-${category.id}`}
+                          />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {draft ? (PROCESS_CODE_MAP[draft.toUpperCase()] || <span className="italic">Custom</span>) : <span className="italic">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {canManageSettings && (
+                            <Button
+                              size="sm"
+                              variant={dirty ? 'default' : 'outline'}
+                              disabled={!dirty || updateCategory.isPending}
+                              onClick={() => handleProcessCodeSave(category)}
+                              data-testid={`button-save-process-code-${category.id}`}
+                            >
+                              {updateCategory.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                              Save
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
           </TabsContent>
 
           <TabsContent value="labels" className="space-y-6 mt-4">
@@ -421,8 +524,7 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            {isAdmin && (
-              <Card data-testid="card-custom-label-builder">
+            <Card data-testid="card-custom-label-builder">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Construction className="h-5 w-5" />
@@ -438,9 +540,7 @@ export default function Settings() {
                   </div>
                 </CardContent>
               </Card>
-            )}
 
-            {isAdmin && (
               <Card data-testid="card-print-custom-label">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -457,7 +557,6 @@ export default function Settings() {
                   </div>
                 </CardContent>
               </Card>
-            )}
           </TabsContent>
 
           <TabsContent value="data" className="space-y-6 mt-4">
@@ -493,7 +592,6 @@ export default function Settings() {
                   <TableRow>
                     <TableHead className="min-w-[120px]">Name</TableHead>
                     <TableHead className="text-center min-w-[80px]">Sort Order</TableHead>
-                    <TableHead className="text-center min-w-[100px]">Process Code</TableHead>
                     <TableHead className="text-center min-w-[100px]">Show in Tabs</TableHead>
                     <TableHead className="text-center min-w-[120px]">Exclude from Yield</TableHead>
                     <TableHead className="text-center min-w-[70px]">Default</TableHead>
@@ -507,18 +605,6 @@ export default function Settings() {
                       {category.name}
                     </TableCell>
                     <TableCell className="text-center">{category.sortOrder}</TableCell>
-                    <TableCell className="text-center">
-                      {category.processCode ? (
-                        <span className="font-mono font-medium text-primary">
-                          {category.processCode}
-                          <span className="text-muted-foreground font-normal text-xs ml-1">
-                            — {PROCESS_CODE_MAP[category.processCode] || ''}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">—</span>
-                      )}
-                    </TableCell>
                     <TableCell className="text-center">
                       {category.showInTabs ? (
                         <span className="text-green-600">Yes</span>
@@ -774,20 +860,6 @@ export default function Settings() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="create-processCode">Process Code</Label>
-              <Input
-                id="create-processCode"
-                value={formData.processCode}
-                onChange={(e) => setFormData({ ...formData, processCode: e.target.value.toUpperCase() })}
-                placeholder="e.g., 3, 4, 6"
-                maxLength={1}
-                data-testid="input-category-process-code"
-              />
-              <p className="text-xs text-muted-foreground">
-                Used in SOP batch codes. Known codes: 3 = Fresh/IQF, 4 = Freeze Dried, 6 = Frozen
-              </p>
-            </div>
-            <div className="grid gap-2">
               <Label htmlFor="create-sortOrder">Sort Order</Label>
               <Input
                 id="create-sortOrder"
@@ -868,20 +940,6 @@ export default function Settings() {
                 placeholder="e.g., Powders"
                 data-testid="input-edit-category-name"
               />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-processCode">Process Code</Label>
-              <Input
-                id="edit-processCode"
-                value={formData.processCode}
-                onChange={(e) => setFormData({ ...formData, processCode: e.target.value.toUpperCase() })}
-                placeholder="e.g., 3, 4, 6"
-                maxLength={1}
-                data-testid="input-edit-category-process-code"
-              />
-              <p className="text-xs text-muted-foreground">
-                Used in SOP batch codes. Known codes: 3 = Fresh/IQF, 4 = Freeze Dried, 6 = Frozen
-              </p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-sortOrder">Sort Order</Label>
