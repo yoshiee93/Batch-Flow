@@ -295,7 +295,7 @@ export function useBatchOutputLots(batchId: string, options?: { enabled?: boolea
 
 export interface TimelineEvent {
   at: string;
-  kind: "created" | "started" | "input" | "qc" | "output" | "output_lot" | "status" | "print" | "finalize" | "completed" | "audit";
+  kind: "created" | "started" | "input" | "qc" | "output" | "output_lot" | "status" | "print" | "finalize" | "completed" | "movement" | "allocation" | "audit";
   title: string;
   detail?: string;
   userId?: string | null;
