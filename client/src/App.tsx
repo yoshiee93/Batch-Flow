@@ -52,7 +52,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 function RequireRole({ roles, children }: { roles: UserRole[]; children: ReactNode }) {
   const { role } = useRole();
   const { toast } = useToast();
-  const allowed = roles.includes(role as UserRole);
+  const allowed = roles.includes(role);
 
   useEffect(() => {
     if (!allowed) {
@@ -71,7 +71,11 @@ function RequireRole({ roles, children }: { roles: UserRole[]; children: ReactNo
 function ForbiddenToastBridge() {
   const { toast } = useToast();
   useEffect(() => {
+    let lastShownAt = 0;
     function onForbidden() {
+      const now = Date.now();
+      if (now - lastShownAt < 1500) return;
+      lastShownAt = now;
       toast({
         title: "Permission denied",
         description: "You don't have permission to do this.",
