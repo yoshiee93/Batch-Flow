@@ -4,12 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Construction, Type, Tag as TagIcon, Barcode as BarcodeIcon, QrCode, Minus, Square, Trash2, Save, RotateCcw, Printer, Loader2, Plus } from "lucide-react";
+import { Construction, Type, Tag as TagIcon, Barcode as BarcodeIcon, QrCode, Minus, Square, Trash2, Save, RotateCcw, Printer, Loader2 } from "lucide-react";
 import {
   useLabelTemplates,
-  useCreateLabelTemplate,
   useUpdateLabelTemplate,
   parseLabelTemplateSettings,
   type LabelTemplate,
@@ -23,6 +21,7 @@ import {
   defaultLayout,
   fieldLabel,
   generateBarcodeSvg,
+  generateQrSvg,
   printLayoutLabel,
   resolveBarcodeSource,
   resolveField,
@@ -46,7 +45,6 @@ interface DragState {
 
 export default function CustomLabelBuilder() {
   const { data: templates = [] } = useLabelTemplates();
-  const createTemplate = useCreateLabelTemplate();
   const updateTemplate = useUpdateLabelTemplate();
   const { toast } = useToast();
 
@@ -55,9 +53,6 @@ export default function CustomLabelBuilder() {
   const [layout, setLayout] = useState<LabelLayout>(defaultLayout());
   const [originalLayoutJson, setOriginalLayoutJson] = useState<string>(JSON.stringify(defaultLayout()));
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
-  const [isNewOpen, setIsNewOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newType, setNewType] = useState<LabelTemplateType>("finished_output");
   const [qrSvgs, setQrSvgs] = useState<Record<string, string>>({});
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -105,20 +100,11 @@ export default function CustomLabelBuilder() {
       return;
     }
     (async () => {
-      const QRCode = (await import("qrcode")).default;
       const next: Record<string, string> = {};
       for (const el of qrEls) {
         if (el.type !== "qr") continue;
         const value = resolveBarcodeSource(el.source, SAMPLE_CONTEXT) || " ";
-        try {
-          next[el.id] = await QRCode.toString(value, {
-            type: "svg",
-            margin: 0,
-            errorCorrectionLevel: "M",
-          });
-        } catch {
-          next[el.id] = "";
-        }
+        next[el.id] = await generateQrSvg(value);
       }
       if (!cancelled) setQrSvgs(next);
     })();
@@ -246,31 +232,6 @@ export default function CustomLabelBuilder() {
     await printLayoutLabel(layout, SAMPLE_CONTEXT, selectedTemplate?.name ?? "Label preview");
   }
 
-  async function handleCreateNew() {
-    const name = newName.trim();
-    if (!name) {
-      toast({ title: "Missing name", description: "Enter a template name.", variant: "destructive" });
-      return;
-    }
-    try {
-      const created = await createTemplate.mutateAsync({
-        name,
-        labelType: newType,
-        customerId: null,
-        isDefault: false,
-        settings: { layout: defaultLayout() },
-      });
-      setIsNewOpen(false);
-      setNewName("");
-      setFilterType(newType);
-      // The query invalidates and refetches; selectedId effect will pick it up by id.
-      setSelectedId((created as LabelTemplate).id);
-      toast({ title: "Template created", description: `"${name}" ready for layout editing.` });
-    } catch {
-      toast({ title: "Create failed", description: "Could not create template.", variant: "destructive" });
-    }
-  }
-
   const labelW = layout.width ?? 60;
   const labelH = layout.height ?? 40;
   const activeElement = (layout.elements ?? []).find(e => e.id === activeElementId) ?? null;
@@ -283,11 +244,11 @@ export default function CustomLabelBuilder() {
           Custom Label Builder
         </CardTitle>
         <CardDescription>
-          Pick a template, set its size in millimeters, and drag elements onto the canvas. Save to persist the layout into the template.
+          Pick a template, set its size in millimeters, and drag elements onto the canvas. Save to persist the layout into the template. Use the Label Templates section above to create new templates.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label>Label Type</Label>
             <Select value={filterType} onValueChange={v => setFilterType(v as LabelTemplateType)}>
@@ -309,12 +270,6 @@ export default function CustomLabelBuilder() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>&nbsp;</Label>
-            <Button variant="outline" className="w-full" onClick={() => { setNewType(filterType); setIsNewOpen(true); }} data-testid="button-builder-new-template">
-              <Plus className="h-4 w-4 mr-2" /> New Template
-            </Button>
           </div>
         </div>
 
@@ -446,37 +401,6 @@ export default function CustomLabelBuilder() {
           </div>
         </div>
       </CardContent>
-
-      <Dialog open={isNewOpen} onOpenChange={setIsNewOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New Label Template</DialogTitle>
-            <DialogDescription>Creates a new template with an empty layout, ready to design.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <Label htmlFor="new-tpl-name">Template Name</Label>
-              <Input id="new-tpl-name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Custom 100x60" data-testid="input-new-template-name" />
-            </div>
-            <div className="space-y-1">
-              <Label>Label Type</Label>
-              <Select value={newType} onValueChange={v => setNewType(v as LabelTemplateType)}>
-                <SelectTrigger data-testid="select-new-template-type"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {LABEL_TYPE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsNewOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateNew} disabled={createTemplate.isPending} data-testid="button-confirm-new-template">
-              {createTemplate.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              Create
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 }
