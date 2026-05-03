@@ -62,7 +62,7 @@ export default function Orders() {
   const createOrderForm = useForm<CreateOrderValues>({
     resolver: zodResolver(createOrderSchema),
     defaultValues: { orderNumber: '', customerName: '', customerId: '', priority: 'normal', dueDate: '' },
-    mode: 'onSubmit',
+    mode: 'onChange',
   });
   const newOrder = createOrderForm.watch();
   const setNewOrder = (next: Partial<CreateOrderValues> | ((prev: CreateOrderValues) => CreateOrderValues)) => {
@@ -70,13 +70,25 @@ export default function Orders() {
     const partial = typeof next === 'function' ? next(current) : next;
     createOrderForm.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
   };
-  const [editOrder, setEditOrder] = useState({
-    customerName: '',
-    customerId: '',
-    priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent',
-    dueDate: '',
-    notes: '',
+  const editOrderSchema = z.object({
+    customerName: z.string().min(1, 'Customer is required'),
+    customerId: z.string().optional().or(z.literal('')),
+    priority: z.enum(['low', 'normal', 'high', 'urgent']),
+    dueDate: z.string().min(1, 'Due date is required'),
+    notes: z.string().optional().or(z.literal('')),
   });
+  type EditOrderValues = z.infer<typeof editOrderSchema>;
+  const editOrderForm = useForm<EditOrderValues>({
+    resolver: zodResolver(editOrderSchema),
+    defaultValues: { customerName: '', customerId: '', priority: 'normal', dueDate: '', notes: '' },
+    mode: 'onChange',
+  });
+  const editOrder = editOrderForm.watch();
+  const setEditOrder = (next: Partial<EditOrderValues> | ((prev: EditOrderValues) => EditOrderValues)) => {
+    const current = editOrderForm.getValues();
+    const partial = typeof next === 'function' ? next(current) : next;
+    editOrderForm.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
+  };
   
   const { canManageOrders } = useRole();
 
@@ -97,12 +109,9 @@ export default function Orders() {
         title: "Order completed", 
         description: `Order shipped successfully. ${result.movements.length} stock movement(s) logged.` 
       });
-    } catch (error: any) {
-      toast({ 
-        title: "Error", 
-        description: error.message || "Failed to complete order", 
-        variant: "destructive" 
-      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to complete order";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
 
@@ -180,28 +189,28 @@ export default function Orders() {
     setIsViewDialogOpen(true);
   };
 
-  const handleUpdateOrder = async () => {
-    if (!selectedOrder || !editOrder.customerName) {
-      toast({ title: "Missing fields", description: "Please fill in the customer name", variant: "destructive" });
-      return;
-    }
+  const handleUpdateOrder = editOrderForm.handleSubmit(async (values) => {
+    if (!selectedOrder) return;
     try {
       await updateOrder.mutateAsync({
         id: selectedOrder.id,
-        customerName: editOrder.customerName,
-        customerId: editOrder.customerId || null,
-        priority: editOrder.priority,
-        dueDate: new Date(editOrder.dueDate).toISOString(),
-        notes: editOrder.notes || null,
+        customerName: values.customerName,
+        customerId: values.customerId || null,
+        priority: values.priority,
+        dueDate: new Date(values.dueDate).toISOString(),
+        notes: values.notes || null,
       });
-      toast({ title: "Order updated", description: `Order ${selectedOrder.orderNumber} updated successfully` });
+      toast({ title: 'Order updated', description: `Order ${selectedOrder.orderNumber} updated successfully` });
       setIsEditDialogOpen(false);
-      setSelectedOrder(null);
     } catch (error) {
-      toast({ title: "Error", description: "Failed to update order", variant: "destructive" });
+      if (error instanceof ApiValidationError) {
+        const unmatched = applyServerFieldErrors(error, editOrderForm.setError, ['customerName','customerId','priority','dueDate','notes']);
+        if (!unmatched.handled) toast({ title: 'Error', description: error.message || 'Failed to update order', variant: 'destructive' });
+      } else {
+        toast({ title: 'Error', description: (error as Error)?.message || 'Failed to update order', variant: 'destructive' });
+      }
     }
-  };
-
+  });
   const handleCustomerSelect = (customerId: string, isCreate: boolean) => {
     const customer = customers.find(c => c.id === customerId);
     if (customer) {
@@ -341,7 +350,7 @@ export default function Orders() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateOrder} disabled={createOrder.isPending} data-testid="button-submit-order">
+              <Button onClick={handleCreateOrder} disabled={!createOrderForm.formState.isValid || createOrder.isPending} data-testid="button-submit-order">
                 {createOrder.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create Order
               </Button>
@@ -471,6 +480,7 @@ export default function Orders() {
               onCustomerSelect={(id) => handleCustomerSelect(id, false)}
               onSave={handleUpdateOrder}
               isPending={updateOrder.isPending}
+              isValid={editOrderForm.formState.isValid}
               onClose={() => setIsEditDialogOpen(false)}
             />
           )}
@@ -620,16 +630,18 @@ function EditOrderContent({
   onCustomerSelect,
   onSave,
   isPending,
+  isValid,
   onClose,
 }: {
   order: Order;
-  editOrder: { customerName: string; customerId: string; priority: string; dueDate: string; notes: string };
+  editOrder: { customerName: string; customerId?: string; priority: string; dueDate: string; notes?: string };
   setEditOrder: (value: any) => void;
   customers: Customer[];
   products: Product[];
   onCustomerSelect: (id: string) => void;
   onSave: () => void;
   isPending: boolean;
+  isValid: boolean;
   onClose: () => void;
 }) {
   const { canManageOrders } = useRole();
@@ -648,7 +660,7 @@ function EditOrderContent({
   const addItemForm = useForm<AddItemValues>({
     resolver: zodResolver(addItemSchema),
     defaultValues: { productId: '', quantity: '' },
-    mode: 'onSubmit',
+    mode: 'onChange',
   });
   const newItem = addItemForm.watch();
   const setNewItem = (next: Partial<AddItemValues> | ((prev: AddItemValues) => AddItemValues)) => {
@@ -667,12 +679,13 @@ function EditOrderContent({
       });
       toast({ title: "Item added", description: "Order item added successfully" });
       addItemForm.reset({ productId: '', quantity: '' });
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof ApiValidationError) {
         const unmatched = applyServerFieldErrors(error, addItemForm.setError, ['productId', 'quantity']);
         if (!unmatched.handled) toast({ title: 'Error', description: error.message || 'Failed to add order item', variant: 'destructive' });
       } else {
-        toast({ title: "Error", description: error?.message || "Failed to add order item", variant: "destructive" });
+        const msg = error instanceof Error ? error.message : "Failed to add order item";
+        toast({ title: "Error", description: msg, variant: "destructive" });
       }
     }
   });
@@ -881,7 +894,7 @@ function EditOrderContent({
               </div>
               <Button
                 onClick={handleAddItem}
-                disabled={createOrderItem.isPending}
+                disabled={!addItemForm.formState.isValid || createOrderItem.isPending}
                 data-testid="button-add-item"
               >
                 {createOrderItem.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -893,7 +906,7 @@ function EditOrderContent({
 
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Cancel</Button>
-        {canManageOrders && <Button onClick={onSave} disabled={isPending} data-testid="button-save-order">
+        {canManageOrders && <Button onClick={onSave} disabled={!isValid || isPending} data-testid="button-save-order">
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Save Changes
         </Button>}

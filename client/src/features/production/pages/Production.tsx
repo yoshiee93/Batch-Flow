@@ -70,7 +70,7 @@ export default function Production() {
   const createBatchForm = useForm<CreateBatchValues>({
     resolver: zodResolver(createBatchSchema),
     defaultValues: { batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') },
-    mode: 'onSubmit',
+    mode: 'onChange',
   });
   const newBatch = createBatchForm.watch();
   const setNewBatch = (next: Partial<CreateBatchValues> | ((prev: CreateBatchValues) => CreateBatchValues)) => {
@@ -213,13 +213,14 @@ export default function Production() {
       toast({ title: "Batch updated", description: `Batch ${selectedBatch.batchNumber} updated successfully` });
       setIsEditDialogOpen(false);
       setSelectedBatch(null);
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof ApiValidationError) {
         const firstField = Object.keys(error.fields)[0];
         const firstMsg = firstField ? error.fields[firstField] : undefined;
         toast({ title: 'Validation', description: firstMsg || error.message, variant: 'destructive' });
       } else {
-        toast({ title: "Error", description: error?.message || "Failed to update batch", variant: "destructive" });
+        const msg = error instanceof Error ? error.message : "Failed to update batch";
+        toast({ title: "Error", description: msg, variant: "destructive" });
       }
     }
   };
@@ -636,7 +637,7 @@ export default function Production() {
                 createBatchForm.reset({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
                 setBatchNumberEdited(false);
               }}>Cancel</Button>
-              <Button onClick={handleCreateBatch} disabled={createBatch.isPending} data-testid="button-submit-batch">
+              <Button onClick={handleCreateBatch} disabled={!createBatchForm.formState.isValid || createBatch.isPending} data-testid="button-submit-batch">
                 {createBatch.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create Batch
               </Button>
@@ -1071,8 +1072,9 @@ function BatchMaterialsEditor({
       toast({ title: "Material updated", description: "Quantity has been updated and inventory adjusted" });
       setEditingMaterial(null);
       setEditQuantity('');
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to update material", variant: "destructive" });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to update material";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
 
@@ -1523,7 +1525,7 @@ function BatchOutputsEditor({
       cleaningTime: initialCleaningTime || '',
       numberOfStaff: initialNumberOfStaff != null ? String(initialNumberOfStaff) : '',
     },
-    mode: 'onSubmit',
+    mode: 'onChange',
   });
   const wasteQuantity = finalizeForm.watch('wasteQuantity');
   const millingQuantity = finalizeForm.watch('millingQuantity');
@@ -1585,8 +1587,9 @@ function BatchOutputsEditor({
       await addBatchOutput.mutateAsync({ batchId, productId: newOutputForm.productId, quantity: newOutputForm.quantity });
       toast({ title: "Output added", description: isCompleted ? "Product output added and finished-good lot created" : "Product output has been added to batch and inventory" });
       setNewOutputForm({ productId: '', quantity: '' });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to add output", variant: "destructive" });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to add output";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
   
@@ -1594,8 +1597,9 @@ function BatchOutputsEditor({
     try {
       await removeBatchOutput.mutateAsync(outputId);
       toast({ title: "Output removed", description: "Product output removed and inventory adjusted" });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to remove output", variant: "destructive" });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to remove output";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
 
@@ -1606,8 +1610,9 @@ function BatchOutputsEditor({
       toast({ title: "Output updated", description: "Quantity updated and inventory adjusted" });
       setEditingOutputId(null);
       setEditOutputQty('');
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to update output", variant: "destructive" });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to update output";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
   
@@ -2110,7 +2115,7 @@ function BatchOutputsEditor({
           
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleFinalize} disabled={finalizeBatch.isPending} data-testid="button-finalize-batch">
+            <Button onClick={handleFinalize} disabled={!finalizeForm.formState.isValid || finalizeBatch.isPending} data-testid="button-finalize-batch">
               {finalizeBatch.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {markCompleted ? 'Finalize & Complete' : 'Save Changes'}
             </Button>

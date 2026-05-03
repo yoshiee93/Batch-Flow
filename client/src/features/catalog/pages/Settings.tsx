@@ -289,8 +289,8 @@ export default function Settings() {
     try {
       await deleteCategory.mutateAsync(category.id);
       toast({ title: "Category deleted", description: `Category "${category.name}" has been removed` });
-    } catch (error: any) {
-      const message = error?.message || "Failed to delete category. It may still have products assigned.";
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete category. It may still have products assigned.";
       toast({ title: "Cannot delete category", description: message, variant: "destructive" });
     }
   };

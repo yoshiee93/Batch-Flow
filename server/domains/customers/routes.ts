@@ -85,14 +85,6 @@ customersRouter.post("/orders/:id/items", adminOnly, asyncHandler(async (req, re
   res.status(201).json(await svc.createOrderItem(data));
 }));
 
-customersRouter.post("/orders/:id/complete-validate", adminOnly, asyncHandler(async (req, res) => {
-  const items = await svc.getOrderItems(req.params.id);
-  if (!items || items.length === 0) {
-    return res.status(400).json({ error: "Order must have at least one line item before it can be completed" });
-  }
-  res.json({ ok: true });
-}));
-
 customersRouter.delete("/order-items/:id", adminOnly, asyncHandler(async (req, res) => {
   await svc.deleteOrderItem(req.params.id);
   res.status(204).send();
@@ -104,6 +96,10 @@ customersRouter.post("/orders/:id/complete", adminOnly, asyncHandler(async (req,
   if (!order) return res.status(404).json({ error: "Order not found" });
   if (order.status === "shipped") return res.status(400).json({ error: "Order already completed" });
   if (order.status === "cancelled") return res.status(400).json({ error: "Cannot complete cancelled order" });
+  const items = await svc.getOrderItems(orderId);
+  if (!items || items.length === 0) {
+    return res.status(400).json({ error: "Order must have at least one line item before it can be completed" });
+  }
   res.json(await svc.completeOrder(orderId));
 }));
 

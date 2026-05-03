@@ -94,7 +94,7 @@ export default function Inventory() {
   });
   type ProductFormValues = z.infer<typeof productSchema>;
   const productFormDefaults: ProductFormValues = { sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null, fruitCode: '', isReceivable: false };
-  const productRhf = useForm<ProductFormValues>({ resolver: zodResolver(productSchema), defaultValues: productFormDefaults, mode: 'onSubmit' });
+  const productRhf = useForm<ProductFormValues>({ resolver: zodResolver(productSchema), defaultValues: productFormDefaults, mode: 'onChange' });
   const productForm = productRhf.watch();
   const setProductForm = (next: Partial<ProductFormValues> | ((prev: ProductFormValues) => ProductFormValues)) => {
     const current = productRhf.getValues();
@@ -132,7 +132,7 @@ export default function Inventory() {
   const receiveRhf = useForm<ReceiveFormValues>({
     resolver: zodResolver(receiveSchema),
     defaultValues: EMPTY_RECEIVE_FORM as unknown as ReceiveFormValues,
-    mode: 'onSubmit',
+    mode: 'onChange',
   });
   const receiveForm = receiveRhf.watch();
   const setReceiveForm = (next: Partial<ReceiveFormValues> | ((prev: ReceiveFormValues) => ReceiveFormValues)) => {
@@ -1143,7 +1143,7 @@ export default function Inventory() {
           {!receivedLot && (
             <DialogFooter>
               <Button variant="outline" onClick={handleCloseReceive}>Cancel</Button>
-              <Button onClick={handleReceiveStock} disabled={receiveStock.isPending} data-testid="button-submit-receive">
+              <Button onClick={handleReceiveStock} disabled={!receiveRhf.formState.isValid || receiveStock.isPending} data-testid="button-submit-receive">
                 {receiveStock.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Receive Stock
               </Button>
@@ -1232,7 +1232,7 @@ export default function Inventory() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateProductOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateProduct} disabled={createProduct.isPending} data-testid="button-submit-product">
+            <Button onClick={handleCreateProduct} disabled={!productRhf.formState.isValid || createProduct.isPending} data-testid="button-submit-product">
               {createProduct.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add Product
             </Button>
@@ -1392,7 +1392,7 @@ export default function Inventory() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditProductOpen(false)}>Cancel</Button>
-            <Button onClick={handleUpdateProduct} disabled={updateProduct.isPending} data-testid="button-update-product">
+            <Button onClick={handleUpdateProduct} disabled={!productRhf.formState.isValid || updateProduct.isPending} data-testid="button-update-product">
               {updateProduct.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Update Good
             </Button>
