@@ -28,8 +28,7 @@ export function ConfirmDialog({
   variant = "destructive", pending = false,
   onConfirm, testId,
 }: ConfirmDialogProps) {
-  const handleConfirm = async (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleConfirm = async () => {
     await onConfirm();
   };
   const actionClasses = variant === "destructive"
