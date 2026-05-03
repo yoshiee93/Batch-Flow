@@ -35,8 +35,18 @@ export const inventoryService = {
   getBatchInputLots: repo.getBatchInputLots.bind(repo),
   getBatchOutputLots: repo.getBatchOutputLots.bind(repo),
   getStockMovements: repo.getStockMovements.bind(repo),
-  createStockMovement: repo.createStockMovement.bind(repo),
   getAuditLogs: repo.getAuditLogs.bind(repo),
+
+  async createStockMovement(data: InsertStockMovement): Promise<StockMovement> {
+    const created = await repo.createStockMovement(data);
+    await createAuditLog({
+      entityType: "stock_movement",
+      entityId: created.id,
+      action: data.movementType ?? "adjustment",
+      changes: JSON.stringify(data),
+    });
+    return created;
+  },
   getReceivableItems: repo.getReceivableItems.bind(repo),
 
   async createLot(data: InsertLot): Promise<Lot> {

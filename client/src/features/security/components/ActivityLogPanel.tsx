@@ -12,8 +12,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Activity, ChevronLeft, ChevronRight, Loader2, AlertCircle, X } from "lucide-react";
+import { Activity, ChevronLeft, ChevronRight, Loader2, AlertCircle, X, ExternalLink } from "lucide-react";
+import { Link } from "wouter";
 import { useAuditLogList, useAuditLogFacets, type AuditLogRow, type AuditLogFilters } from "@/features/security/api";
+import { entityLinkFor, summarizeChanges } from "@/features/security/lib/auditFormat";
 
 const PAGE_SIZE = 20;
 const ALL = "__all__";
@@ -243,10 +245,10 @@ export default function ActivityLogPanel() {
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[160px]">When</TableHead>
-                <TableHead className="min-w-[140px]">User</TableHead>
-                <TableHead className="min-w-[120px]">Entity</TableHead>
+                <TableHead className="min-w-[140px]">Who</TableHead>
+                <TableHead className="min-w-[160px]">Entity</TableHead>
                 <TableHead className="min-w-[120px]">Action</TableHead>
-                <TableHead className="min-w-[200px]">Entity ID</TableHead>
+                <TableHead className="min-w-[260px]">Summary</TableHead>
                 <TableHead className="min-w-[100px] text-right">Detail</TableHead>
               </TableRow>
             </TableHeader>
@@ -271,45 +273,65 @@ export default function ActivityLogPanel() {
                   </TableCell>
                 </TableRow>
               ) : (
-                items.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className="cursor-pointer hover:bg-accent/40"
-                    onClick={() => setSelected(row)}
-                    data-testid={`row-audit-${row.id}`}
-                  >
-                    <TableCell className="font-mono text-xs whitespace-nowrap">{formatDateTime(row.createdAt)}</TableCell>
-                    <TableCell className="text-sm">
-                      {row.userName ? (
-                        <div className="flex flex-col">
-                          <span>{row.userName}</span>
-                          {row.userRole && <span className="text-xs text-muted-foreground">{row.userRole}</span>}
+                items.map((row) => {
+                  const link = entityLinkFor(row);
+                  const summary = summarizeChanges(row);
+                  return (
+                    <TableRow
+                      key={row.id}
+                      className="cursor-pointer hover:bg-accent/40"
+                      onClick={() => setSelected(row)}
+                      data-testid={`row-audit-${row.id}`}
+                    >
+                      <TableCell className="font-mono text-xs whitespace-nowrap">{formatDateTime(row.createdAt)}</TableCell>
+                      <TableCell className="text-sm">
+                        {row.userName ? (
+                          <div className="flex flex-col">
+                            <span>{row.userName}</span>
+                            {row.userRole && <span className="text-xs text-muted-foreground">{row.userRole}</span>}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic">system</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{row.entityType}</Badge>
+                          {link && (
+                            <Link
+                              href={link}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-primary hover:underline inline-flex items-center text-xs"
+                              data-testid={`link-audit-entity-${row.id}`}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground italic">system</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{row.entityType}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{row.action}</Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs truncate max-w-[200px]" title={row.entityId}>
-                      {row.entityId}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => { e.stopPropagation(); setSelected(row); }}
-                        data-testid={`button-audit-detail-${row.id}`}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{row.action}</Badge>
+                      </TableCell>
+                      <TableCell
+                        className="text-sm text-muted-foreground truncate max-w-[360px]"
+                        title={summary}
+                        data-testid={`text-audit-summary-${row.id}`}
                       >
-                        View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                        {summary}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); setSelected(row); }}
+                          data-testid={`button-audit-detail-${row.id}`}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -379,6 +401,19 @@ export default function ActivityLogPanel() {
                   <div className="col-span-2">
                     <div className="text-xs text-muted-foreground">Entity ID</div>
                     <div className="font-mono text-xs break-all" data-testid="text-detail-entity-id">{selected.entityId}</div>
+                    {entityLinkFor(selected) && (
+                      <Link
+                        href={entityLinkFor(selected)!}
+                        className="text-primary hover:underline inline-flex items-center gap-1 text-xs mt-1"
+                        data-testid="link-detail-entity"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Open {selected.entityType}
+                      </Link>
+                    )}
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-muted-foreground">Summary</div>
+                    <div className="text-sm" data-testid="text-detail-summary">{summarizeChanges(selected)}</div>
                   </div>
                 </div>
 

@@ -118,8 +118,3 @@ inventoryRouter.post("/stock-movements", inventoryOrAdmin, asyncHandler(async (r
   const data = insertStockMovementSchema.parse(req.body);
   res.status(201).json(await svc.createStockMovement(data));
 }));
-
-inventoryRouter.get("/audit-logs", asyncHandler(async (req, res) => {
-  const { entityType, entityId } = req.query;
-  res.json(await svc.getAuditLogs(entityType as string, entityId as string));
-}));

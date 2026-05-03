@@ -49,15 +49,16 @@ function buildQs(filters: AuditLogFilters): string {
 }
 
 export function useAuditLogList(filters: AuditLogFilters) {
+  const qs = buildQs({ ...filters, _format: "page" } as AuditLogFilters & { _format: string });
   return useQuery<AuditLogListResult>({
     queryKey: ["auditLogList", filters],
-    queryFn: () => fetchApi<AuditLogListResult>(`/admin/audit-logs${buildQs(filters)}`),
+    queryFn: () => fetchApi<AuditLogListResult>(`/audit-logs${qs}`),
   });
 }
 
 export function useAuditLogFacets() {
   return useQuery<AuditLogFacets>({
     queryKey: ["auditLogFacets"],
-    queryFn: () => fetchApi<AuditLogFacets>("/admin/audit-logs/facets"),
+    queryFn: () => fetchApi<AuditLogFacets>("/audit-logs/facets"),
   });
 }
