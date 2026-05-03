@@ -39,6 +39,9 @@ export async function fetchApi<T>(endpoint: string, options?: RequestInit): Prom
     const message = (body as { error?: string; message?: string }).error
       || (body as { message?: string }).message
       || (res.status === 403 ? "You don't have permission to do this." : "Request failed");
+    if (res.status === 403 && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("api:forbidden", { detail: { message } }));
+    }
     throw new ApiError(message, res.status);
   }
   if (res.status === 204) {

@@ -19,8 +19,8 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/', adminOnly: false },
-  { label: 'Orders', icon: ShoppingCart, href: '/orders', adminOnly: false },
-  { label: 'Customers', icon: Users, href: '/customers', adminOnly: false },
+  { label: 'Orders', icon: ShoppingCart, href: '/orders', adminOnly: true },
+  { label: 'Customers', icon: Users, href: '/customers', adminOnly: true },
   { label: 'Production', icon: Factory, href: '/production', adminOnly: false },
   { label: 'Inventory', icon: Box, href: '/inventory', adminOnly: false },
   { label: 'Tracking', icon: ScanSearch, href: '/traceability', adminOnly: false },
@@ -92,11 +92,13 @@ export function Sidebar({ className }: { className?: string }) {
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <Link href="/settings">
-              <Button variant="ghost" size="icon" className="text-sidebar-foreground/60 hover:text-sidebar-foreground" data-testid="button-settings">
-                <Settings size={16} />
-              </Button>
-            </Link>
+            {isAdmin && (
+              <Link href="/settings">
+                <Button variant="ghost" size="icon" className="text-sidebar-foreground/60 hover:text-sidebar-foreground" data-testid="button-settings">
+                  <Settings size={16} />
+                </Button>
+              </Link>
+            )}
             <Button
               variant="ghost"
               size="icon"

@@ -26,6 +26,7 @@ import { format } from 'date-fns';
 import { useRecordPrint } from '@/features/labels/api';
 import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
+import { useRole } from '@/contexts/AuthContext';
 
 const batchStatusColors: Record<string, string> = {
   planned: 'bg-gray-100 text-gray-700',
@@ -89,6 +90,7 @@ export default function BatchDetail() {
   const updateBatch = useUpdateBatch();
   const batchCustomerId = outputLots[0]?.customerId ?? null;
   const createQualityCheck = useCreateQualityCheck();
+  const { canManageBatches } = useRole();
 
   const [showQcForm, setShowQcForm] = useState(false);
   const [qcForm, setQcForm] = useState({
@@ -343,7 +345,7 @@ export default function BatchDetail() {
                 View Full Trace
               </Button>
             </Link>
-            {batch.status === 'completed' && (
+            {canManageBatches && batch.status === 'completed' && (
               <Button
                 className="w-full"
                 variant="outline"
@@ -355,7 +357,7 @@ export default function BatchDetail() {
                 Send to QC
               </Button>
             )}
-            {batch.status === 'quality_check' && (
+            {canManageBatches && batch.status === 'quality_check' && (
               <>
                 <Button
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -576,7 +578,7 @@ export default function BatchDetail() {
               </CardTitle>
               <CardDescription className="mt-1">QC records for this production batch.</CardDescription>
             </div>
-            {!showQcForm && (
+            {canManageBatches && !showQcForm && (
               <Button
                 size="sm"
                 variant="outline"
