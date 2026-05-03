@@ -1,0 +1,238 @@
+Review this ClearTrace application and execute the following work as a structured multi-task plan.
+
+IMPORTANT INSTRUCTIONS:
+
+* Create a NEW TASK for EACH section below (one task per heading).
+* Do NOT combine tasks.
+* Complete tasks in the order listed.
+* After each task: run typecheck/build and fix errors before moving on.
+* Do not refactor unrelated parts of the codebase.
+* Preserve existing functionality unless explicitly stated.
+* Keep changes modular, safe, and minimal.
+
+---
+
+## TASK 1: SETTINGS RESTRUCTURE + MOVE LABEL TEMPLATES
+
+Goal:
+Clean up Settings and prevent future bloat.
+
+Requirements:
+
+* Move Label Templates UI from main navigation into Settings.
+* Remove the main “Labels” sidebar item.
+* Create structured Settings sections:
+
+  * General
+  * Production
+  * Labels
+  * Data
+  * Security (placeholder)
+* Move existing configuration pages into appropriate sections.
+* In "Labels" section:
+
+  * Keep existing label template CRUD UI
+  * Add placeholder cards:
+
+    * “Custom Label Builder”
+    * “Print Custom Label”
+* Keep all backend APIs unchanged.
+* Preserve permissions/admin logic.
+
+---
+
+## TASK 2: PRINT AGAIN FUNCTIONALITY
+
+Goal:
+Allow fast re-printing of labels.
+
+Requirements:
+
+* Add “Print Again” button to:
+
+  * Batch detail pages
+  * Inventory item views
+  * Production outputs (where applicable)
+* Reuse existing label print API (DO NOT duplicate logic)
+* Prefill data from the selected record
+* Trigger print flow directly
+* Handle missing template gracefully
+
+---
+
+## TASK 3: VALIDATION + ERROR PROOFING
+
+Goal:
+Prevent bad data and user mistakes.
+
+Requirements:
+
+* Add validation to:
+
+  * Batch forms
+  * Product forms
+  * Inventory forms
+  * Production forms
+* Enforce required fields
+* Show inline error messages
+* Prevent invalid submission
+* Add confirmation dialogs for:
+
+  * Delete actions
+  * Overwrites
+* Ensure backend validation aligns with frontend
+
+---
+
+## TASK 4: GLOBAL SEARCH
+
+Goal:
+Enable fast lookup across the system.
+
+Backend:
+
+* Create GET /api/search?q=
+* Search:
+
+  * batches (batchCode)
+  * products (name)
+  * customers (name)
+  * inventory
+* Return grouped results
+
+Frontend:
+
+* Add command palette (Ctrl+K / Cmd+K)
+* Group results:
+
+  * Batches
+  * Products
+  * Customers
+  * Inventory
+* Clicking result navigates to correct page
+* Include loading/empty states
+
+---
+
+## TASK 5: SIMPLE DASHBOARD
+
+Goal:
+Provide quick operational overview.
+
+Requirements:
+
+* Create /dashboard page (or make it homepage)
+* Display:
+
+  * Batches created today
+  * Labels printed today
+  * Low stock items
+* Keep UI minimal (no complex charts)
+* Use existing UI components
+
+---
+
+## TASK 6: BATCH TIMELINE / TRACEABILITY VIEW
+
+Goal:
+Visualise full batch lifecycle.
+
+Backend:
+
+* Create GET /api/batches/:id/timeline
+* Aggregate:
+
+  * batch creation
+  * inputs
+  * production steps
+  * outputs
+  * inventory movement
+  * labels printed
+  * customer/output data (if available)
+
+Frontend:
+
+* Create /batches/:id/timeline page
+* Add link from batch detail
+* Show chronological timeline of events
+* Each event includes:
+
+  * type
+  * timestamp
+  * summary
+  * link to related record
+* Keep UI simple and audit-friendly
+
+---
+
+## TASK 7: ACTIVITY LOG
+
+Goal:
+Track system activity for auditing.
+
+Database:
+
+* Create activity_logs table:
+
+  * id
+  * userId
+  * action
+  * entityType
+  * entityId
+  * metadata (JSON)
+  * createdAt
+
+Backend:
+
+* Log:
+
+  * batch create/update
+  * product create/update
+  * inventory changes
+  * label printing
+  * template changes
+
+Frontend:
+
+* Show activity on batch detail
+* Add global activity list in Settings
+
+---
+
+## TASK 8: BASIC ROLE-BASED UI
+
+Goal:
+Restrict access without full RBAC.
+
+Requirements:
+
+* Use existing user role (admin vs user)
+* Hide Settings for non-admin users
+* Hide/disable destructive actions for non-admins
+* Ensure backend also protects key admin routes
+
+---
+
+## TASK 9: TEMPLATE SYSTEM FOUNDATION
+
+Goal:
+Prepare for future reusable templates.
+
+Requirements:
+
+* Do NOT break existing label templates
+* Extend label template structure to allow optional layout JSON
+* Maintain backward compatibility
+* Add structure to support future:
+
+  * batch templates
+  * product templates
+* Add clear comments for future expansion
+
+---
+
+END OF PLAN
+
+Execute each task sequentially.
+Do not skip tasks.
+Do not merge tasks.
