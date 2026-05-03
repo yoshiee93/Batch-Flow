@@ -47,10 +47,14 @@ export default function Production() {
     const params = new URLSearchParams(window.location.search);
     return params.get('action') === 'create';
   });
+  const [todayFilterActive, setTodayFilterActive] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('filter') === 'today';
+  });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('action') === 'create') {
+    if (params.get('action') === 'create' || params.get('filter') === 'today') {
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, []);
@@ -646,25 +650,57 @@ export default function Production() {
         </Dialog>
       </div>
 
+      {todayFilterActive && (
+        <div
+          className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-blue-200 bg-blue-50 text-sm text-blue-800"
+          data-testid="banner-today-filter"
+        >
+          <span>Showing batches created today.</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setTodayFilterActive(false)}
+            data-testid="button-clear-today-filter"
+          >
+            Clear filter
+          </Button>
+        </div>
+      )}
+
       <div className="grid gap-6">
-        {batches.map((batch) => (
-          <BatchCard 
-            key={batch.id} 
-            batch={batch} 
-            products={products}
-            materials={materials}
-            lots={lots}
-            onEditClick={handleEditClick}
-            onRecordInputClick={handleRecordInputClick}
-            onRecordOutputClick={handleRecordOutputClick}
-            onDeleteClick={handleDeleteClick}
-          />
-        ))}
-        {batches.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            <p>No batches found. Create a new batch to get started.</p>
-          </div>
-        )}
+        {(() => {
+          const startOfToday = new Date();
+          startOfToday.setHours(0, 0, 0, 0);
+          const visibleBatches = todayFilterActive
+            ? batches.filter(b => b.createdAt && new Date(b.createdAt) >= startOfToday)
+            : batches;
+          return (
+            <>
+              {visibleBatches.map((batch) => (
+                <BatchCard
+                  key={batch.id}
+                  batch={batch}
+                  products={products}
+                  materials={materials}
+                  lots={lots}
+                  onEditClick={handleEditClick}
+                  onRecordInputClick={handleRecordInputClick}
+                  onRecordOutputClick={handleRecordOutputClick}
+                  onDeleteClick={handleDeleteClick}
+                />
+              ))}
+              {visibleBatches.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <p>
+                    {todayFilterActive
+                      ? 'No batches were created today.'
+                      : 'No batches found. Create a new batch to get started.'}
+                  </p>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

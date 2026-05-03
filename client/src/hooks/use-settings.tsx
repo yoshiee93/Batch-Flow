@@ -2,10 +2,12 @@ import { useState, useEffect, createContext, useContext, type ReactNode } from '
 
 interface AppSettings {
   cardsExpandedByDefault: boolean;
+  quickActionsEnabled: boolean;
 }
 
 const defaultSettings: AppSettings = {
   cardsExpandedByDefault: false,
+  quickActionsEnabled: true,
 };
 
 interface SettingsContextType {

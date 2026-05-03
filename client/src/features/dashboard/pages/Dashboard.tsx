@@ -26,6 +26,7 @@ import {
   useDashboardStats,
   useBatches,
 } from '@/lib/api';
+import { useSettings } from '@/hooks/use-settings';
 
 const QUICK_ACTIONS = [
   { label: 'New Order', icon: ShoppingCart, href: '/orders?action=create', description: 'Create a customer order' },
@@ -37,6 +38,7 @@ const QUICK_ACTIONS = [
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
+  const { settings } = useSettings();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: batches = [], isLoading: batchesLoading, isError: batchesError } = useBatches();
@@ -97,6 +99,7 @@ export default function Dashboard() {
         </p>
       </div>
 
+      {settings.quickActionsEnabled && (
       <Card data-testid="card-quick-actions">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -126,6 +129,7 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <KpiTile
@@ -133,7 +137,7 @@ export default function Dashboard() {
           icon={<FlaskConical className="h-4 w-4 text-blue-600" />}
           value={stats?.batchesCreatedToday}
           loading={statsLoading}
-          onClick={() => navigate('/production')}
+          onClick={() => navigate('/production?filter=today')}
           testId="kpi-batches-today"
           description="Tap to view production"
         />
@@ -151,7 +155,7 @@ export default function Dashboard() {
           value={stats?.lowStockAlerts}
           valueClassName="text-destructive"
           loading={statsLoading}
-          onClick={() => navigate('/inventory')}
+          onClick={() => navigate('/inventory?filter=lowstock')}
           testId="kpi-low-stock"
           description="Tap to view inventory"
         />
@@ -234,7 +238,7 @@ export default function Dashboard() {
                 {lowStockItems.map(item => (
                   <div
                     key={`${item.kind}-${item.id}`}
-                    onClick={() => navigate('/inventory')}
+                    onClick={() => navigate('/inventory?filter=lowstock')}
                     className="flex items-center justify-between gap-3 p-3 rounded-lg border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors cursor-pointer"
                     data-testid={`low-stock-item-${item.kind}-${item.id}`}
                   >

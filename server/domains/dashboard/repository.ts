@@ -1,6 +1,6 @@
 import { eq, gte, count } from "drizzle-orm";
 import { db } from "../../db";
-import { products, materials, batches, orders, printHistory } from "@shared/schema";
+import { products, materials, batches, orders, printHistory, lots } from "@shared/schema";
 
 function startOfToday(): Date {
   const d = new Date();
@@ -48,7 +48,23 @@ export const dashboardRepository = {
       .select({ count: count() })
       .from(printHistory)
       .where(gte(printHistory.printedAt, today));
-    const labelsPrintedToday = Number(printRow?.count ?? 0);
+    const printHistoryToday = Number(printRow?.count ?? 0);
+
+    let labelsPrintedToday = printHistoryToday;
+    if (printHistoryToday === 0) {
+      // Fallback for environments where print_history isn't populated yet:
+      // count batch + lot barcode prints stamped today via barcodePrintedAt.
+      const [lotRow] = await db
+        .select({ count: count() })
+        .from(lots)
+        .where(gte(lots.barcodePrintedAt, today));
+      const [batchRow] = await db
+        .select({ count: count() })
+        .from(batches)
+        .where(gte(batches.barcodePrintedAt, today));
+      labelsPrintedToday =
+        Number(lotRow?.count ?? 0) + Number(batchRow?.count ?? 0);
+    }
 
     return {
       activeBatches,

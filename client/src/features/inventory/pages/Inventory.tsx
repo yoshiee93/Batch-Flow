@@ -181,23 +181,36 @@ export default function Inventory() {
     }
   }, [visibleCategories, activeTab]);
 
+  const [lowStockOnly, setLowStockOnly] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('filter') === 'lowstock';
+  });
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('action') === 'receive') {
-      setIsReceiveStockOpen(true);
+    if (params.get('action') === 'receive' || params.get('filter') === 'lowstock') {
+      if (params.get('action') === 'receive') setIsReceiveStockOpen(true);
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, []);
 
-  const filteredMaterials = materials.filter(m =>
-    m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (m.sku && m.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredMaterials = materials.filter(m => {
+    const matchesSearch =
+      m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (m.sku && m.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (!matchesSearch) return false;
+    if (lowStockOnly && parseFloat(m.currentStock) > parseFloat(m.minStock)) return false;
+    return true;
+  });
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredProducts = products.filter(p => {
+    const matchesSearch =
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (!matchesSearch) return false;
+    if (lowStockOnly && parseFloat(p.currentStock) > parseFloat(p.minStock)) return false;
+    return true;
+  });
 
   const filteredLots = (lots as Lot[]).filter(lot => {
     if (!lotSearchTerm) return true;
@@ -663,6 +676,23 @@ export default function Inventory() {
           </Button>
         )}
       </div>
+
+      {lowStockOnly && (
+        <div
+          className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-destructive/30 bg-destructive/5 text-sm text-destructive"
+          data-testid="banner-lowstock-filter"
+        >
+          <span>Showing only items at or below minimum stock.</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLowStockOnly(false)}
+            data-testid="button-clear-lowstock-filter"
+          >
+            Clear filter
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="p-4">

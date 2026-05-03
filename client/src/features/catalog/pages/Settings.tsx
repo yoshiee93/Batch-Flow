@@ -325,6 +325,20 @@ export default function Settings() {
             data-testid="switch-cards-expanded"
           />
         </div>
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="quick-actions-enabled">Show Quick Actions on dashboard</Label>
+            <p className="text-sm text-muted-foreground">
+              When enabled, the Quick Actions block appears above the KPI tiles on the home dashboard.
+            </p>
+          </div>
+          <Switch
+            id="quick-actions-enabled"
+            checked={settings.quickActionsEnabled}
+            onCheckedChange={(checked) => updateSetting('quickActionsEnabled', checked)}
+            data-testid="switch-quick-actions-enabled"
+          />
+        </div>
       </CardContent>
     </Card>
   );
