@@ -465,7 +465,7 @@ export const insertPrintHistorySchema = createInsertSchema(printHistory, {
 }).omit({ id: true, printedAt: true });
 export type InsertPrintHistory = z.infer<typeof insertPrintHistorySchema>;
 export type PrintHistory = typeof printHistory.$inferSelect;
-export type PrintLabelKind = "raw_intake" | "finished_output" | "batch" | "custom";
+export type PrintLabelKind = "raw_intake" | "finished_output" | "output_lot" | "batch" | "custom";
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;

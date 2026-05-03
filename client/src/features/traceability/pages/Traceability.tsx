@@ -359,7 +359,7 @@ function ForwardTraceView({ trace, materials, products }: {
                   }}
                 >
                   <Printer className="h-4 w-4 mr-2" />
-                  {lot.barcodePrintedAt ? 'Reprint Label' : 'Print Label'}
+                  {lot.barcodePrintedAt ? 'Print Again' : 'Print Label'}
                 </Button>
               )}
               <Link href={`/lots/${lot.id}`}>
@@ -564,7 +564,7 @@ function ForwardTraceView({ trace, materials, products }: {
                         }}
                       >
                         <Printer className="h-3 w-3 mr-1" />
-                        {outputLot.barcodePrintedAt ? 'Reprint' : 'Print'}
+                        {outputLot.barcodePrintedAt ? 'Print Again' : 'Print Label'}
                       </Button>
                     )}
                   </div>
@@ -638,7 +638,7 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                   }}
                 >
                   <Printer className="h-4 w-4 mr-2" />
-                  {batch.barcodePrintedAt ? 'Reprint Label' : 'Print Label'}
+                  {batch.barcodePrintedAt ? 'Print Again' : 'Print Label'}
                 </Button>
               )}
               <Link href={`/batches/${batch.id}`}>
@@ -793,7 +793,7 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                         }}
                       >
                         <Printer className="h-3 w-3 mr-1" />
-                        {ol.barcodePrintedAt ? 'Reprint' : 'Print'}
+                        {ol.barcodePrintedAt ? 'Print Again' : 'Print Label'}
                       </Button>
                     )}
                   </div>

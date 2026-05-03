@@ -84,7 +84,7 @@ export function useUpdateLabelTemplate() {
   });
 }
 
-export type PrintLabelKind = "raw_intake" | "finished_output" | "batch" | "custom";
+export type PrintLabelKind = "raw_intake" | "finished_output" | "output_lot" | "batch" | "custom";
 
 export interface PrintHistoryRow {
   id: string;

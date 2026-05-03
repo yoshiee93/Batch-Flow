@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { reprintFromHistory } from "@/lib/printAndRecord";
 
 const KIND_LABELS: Record<PrintLabelKind, string> = {
+  output_lot: "Output Lot",
   raw_intake: "Raw Intake",
   finished_output: "Finished Output",
   batch: "Batch",
@@ -23,6 +24,7 @@ const KIND_LABELS: Record<PrintLabelKind, string> = {
 };
 
 const KIND_BADGE: Record<PrintLabelKind, string> = {
+  output_lot: "bg-emerald-100 text-emerald-700",
   raw_intake: "bg-blue-100 text-blue-700",
   finished_output: "bg-green-100 text-green-700",
   batch: "bg-amber-100 text-amber-700",

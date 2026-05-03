@@ -85,6 +85,12 @@ export default function Inventory() {
   const [itemSearchOpen, setItemSearchOpen] = useState(false);
   const [receiveCategoryFilter, setReceiveCategoryFilter] = useState<string>('all');
   const [receivedTemplateName, setReceivedTemplateName] = useState<string | null>(null);
+  type RecentReceivePrint = {
+    key: string;
+    lot: LotWithDetails;
+    printedAt: Date;
+  };
+  const [recentReceivePrints, setRecentReceivePrints] = useState<RecentReceivePrint[]>([]);
 
   const { canReceiveStock, canManageSettings } = useRole();
 
@@ -361,7 +367,13 @@ export default function Inventory() {
       entityType: 'lot', entityId: lot.id,
       displayName: itemName, secondaryName: lot.lotNumber,
       toast, recordPrint: (d) => recordPrint.mutate(d),
-      onAfterPrint: () => { if (!lot.barcodePrintedAt) markBarcodePrinted.mutate(lot.id); },
+      onAfterPrint: () => {
+        if (!lot.barcodePrintedAt) markBarcodePrinted.mutate(lot.id);
+        setRecentReceivePrints((prev) => {
+          const next = [{ key: `${lot.id}-${Date.now()}`, lot, printedAt: new Date() }, ...prev.filter(r => r.lot.id !== lot.id)];
+          return next.slice(0, 5);
+        });
+      },
     });
   }
 
@@ -370,6 +382,7 @@ export default function Inventory() {
     setReceivedLot(null);
     setReceivedTemplateName(null);
     setReceiveCategoryFilter('all');
+    setRecentReceivePrints([]);
     setIsReceiveStockOpen(true);
   };
 
@@ -377,6 +390,7 @@ export default function Inventory() {
     setIsReceiveStockOpen(false);
     setReceivedLot(null);
     setReceivedTemplateName(null);
+    setRecentReceivePrints([]);
     setReceiveForm(EMPTY_RECEIVE_FORM);
     setReceiveCategoryFilter('all');
   };
@@ -556,7 +570,7 @@ export default function Inventory() {
             data-testid={`button-print-label-${lot.id}`}
           >
             <Printer className="h-3.5 w-3.5" />
-            {lot.barcodePrintedAt ? 'Reprint' : 'Print'}
+            {lot.barcodePrintedAt ? 'Print Again' : 'Print Label'}
           </Button>
         </TableCell>
       </TableRow>
@@ -814,8 +828,33 @@ export default function Inventory() {
                 onClick={() => handlePrintReceivedLot(receivedLot)}
                 data-testid="button-print-label-received"
               >
-                <Printer className="h-4 w-4" /> Print Label
+                <Printer className="h-4 w-4" />
+                {recentReceivePrints.some(r => r.lot.id === receivedLot.id) ? 'Print Again' : 'Print Label'}
               </Button>
+              {recentReceivePrints.length > 0 && (
+                <div className="border rounded-lg p-3 space-y-2" data-testid="section-recent-prints">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recent Prints</div>
+                  <div className="space-y-1.5">
+                    {recentReceivePrints.map((r) => (
+                      <div key={r.key} className="flex items-center justify-between gap-2 text-sm" data-testid={`row-recent-print-${r.lot.id}`}>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium truncate">{r.lot.materialName || r.lot.productName || getLotItemName(r.lot as Lot)}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{r.lot.lotNumber} · {format(r.printedAt, 'HH:mm')}</div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 h-8"
+                          onClick={() => handlePrintReceivedLot(r.lot)}
+                          data-testid={`button-recent-print-again-${r.lot.id}`}
+                        >
+                          <Printer className="h-3.5 w-3.5" /> Print Again
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <Button
                 variant="outline"
                 className="w-full"

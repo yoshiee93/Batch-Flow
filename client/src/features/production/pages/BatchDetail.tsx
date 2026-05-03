@@ -288,7 +288,7 @@ export default function BatchDetail() {
                         }}
                       >
                         <Printer className="h-3 w-3 mr-1" />
-                        {batch.barcodePrintedAt ? 'Reprint Label' : 'Print Label'}
+                        {batch.barcodePrintedAt ? 'Print Again' : 'Print Label'}
                       </Button>
                     </div>
                   </div>
@@ -502,7 +502,7 @@ export default function BatchDetail() {
                         }}
                       >
                         <Printer className="h-3 w-3 mr-1" />
-                        {ol.barcodePrintedAt ? 'Reprint' : 'Print Label'}
+                        {ol.barcodePrintedAt ? 'Print Again' : 'Print Label'}
                       </Button>
                     )}
                   </div>

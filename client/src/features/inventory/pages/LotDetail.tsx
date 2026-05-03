@@ -301,7 +301,7 @@ export default function LotDetail() {
               }}
             >
               <Printer className="mr-2 h-4 w-4" />
-              {lot.barcodePrintedAt ? 'Reprint Label' : 'Print Label'}
+              {lot.barcodePrintedAt ? 'Print Again' : 'Print Label'}
             </Button>
           )}
         </div>

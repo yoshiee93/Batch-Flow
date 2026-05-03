@@ -1625,7 +1625,7 @@ function BatchOutputsEditor({
               }}
             >
               <Printer className="h-3 w-3 mr-1" />
-              {summaryBatchPrintedAt || finalizeResult.batch.barcodePrintedAt ? 'Reprint Batch Label' : 'Print Batch Label'}
+              {summaryBatchPrintedAt || finalizeResult.batch.barcodePrintedAt ? 'Print Again' : 'Print Batch Label'}
             </Button>
           </div>
         )}
@@ -1679,7 +1679,7 @@ function BatchOutputsEditor({
                     }}
                   >
                     <Printer className="h-3 w-3 mr-1" />
-                    {ol.barcodePrintedAt ? 'Reprint' : 'Print Label'}
+                    {ol.barcodePrintedAt ? 'Print Again' : 'Print Label'}
                   </Button>
                 )}
               </div>
@@ -1946,7 +1946,7 @@ function BatchOutputsEditor({
                         }}
                       >
                         <Printer className="h-3 w-3 mr-1" />
-                        {ol.barcodePrintedAt ? 'Reprint' : 'Print Label'}
+                        {ol.barcodePrintedAt ? 'Print Again' : 'Print Label'}
                       </Button>
                     )}
                   </div>

@@ -1,4 +1,4 @@
-import { eq, and, isNull, desc, gte, lte, or, ilike, sql } from "drizzle-orm";
+import { eq, and, isNull, desc, gte, lte, or, ilike, sql, type SQL } from "drizzle-orm";
 import { db } from "../../db";
 import {
   labelTemplates, customers, printHistory, users,
@@ -134,7 +134,7 @@ export const printHistoryRepository = {
 
   async list(filters: PrintHistoryFilters = {}): Promise<PrintHistoryRow[]> {
     const limit = Math.max(1, Math.min(filters.limit ?? 50, 500));
-    const conds: ReturnType<typeof eq>[] = [];
+    const conds: SQL[] = [];
     if (filters.from) conds.push(gte(printHistory.printedAt, filters.from));
     if (filters.to) conds.push(lte(printHistory.printedAt, filters.to));
     if (filters.labelKind) conds.push(eq(printHistory.labelKind, filters.labelKind));
@@ -145,7 +145,7 @@ export const printHistoryRepository = {
         ilike(printHistory.secondaryName, like),
         ilike(printHistory.templateName, like),
       );
-      if (qCond) conds.push(qCond as any);
+      if (qCond) conds.push(qCond);
     }
     const where = conds.length > 0 ? and(...conds) : undefined;
     const rows = await db

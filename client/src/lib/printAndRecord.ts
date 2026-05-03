@@ -65,7 +65,8 @@ export async function printAndRecord(params: PrintAndRecordParams): Promise<void
   } = params;
   const ctx = params.ctx ?? ctxFromLegacy(legacyData);
 
-  const resolveType = templateTypeForResolve ?? (kind === "custom" ? "finished_output" : kind);
+  const resolveType = templateTypeForResolve
+    ?? (kind === "custom" || kind === "output_lot" ? "finished_output" : kind);
   const template = await fetchLabelTemplate(resolveType, customerId ?? null);
 
   if (!template && kind !== "custom") {
@@ -123,7 +124,7 @@ export async function reprintFromHistory(params: ReprintFromHistoryParams): Prom
   const ctx = (snapshot.ctx as LabelDataContext) ?? {};
   const legacyData = snapshot.legacyData as LabelData | undefined;
   const resolveType = (snapshot.templateTypeForResolve as "raw_intake" | "finished_output" | "batch" | undefined)
-    ?? (labelKind === "custom" ? "finished_output" : labelKind);
+    ?? (labelKind === "custom" || labelKind === "output_lot" ? "finished_output" : labelKind);
   const customerId = (snapshot.customerId as string | null | undefined) ?? null;
 
   if (!legacyData) {
