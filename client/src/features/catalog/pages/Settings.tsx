@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList, Leaf, Database, Download, Upload, ShieldAlert, Tag, Wrench, ShieldCheck, Construction, Printer } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList, Leaf, Database, Download, Upload, ShieldAlert, Tag, Wrench, ShieldCheck } from 'lucide-react';
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useProducts, useUpdateProduct, type Category, type Product } from '@/features/catalog/api';
 import { PROCESS_CODE_MAP, FRUIT_CODE_MAP } from '@shared/batchCodeConfig';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,8 @@ import { useSettings } from '@/hooks/use-settings';
 import { useRole } from '@/contexts/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 import LabelTemplatesPanel from '@/features/labels/pages/Labels';
+import CustomLabelBuilder from '@/features/labels/components/CustomLabelBuilder';
+import PrintCustomLabel from '@/features/labels/components/PrintCustomLabel';
 
 const TAB_VALUES = ['general', 'production', 'labels', 'data', 'security'] as const;
 type TabValue = typeof TAB_VALUES[number];
@@ -524,39 +526,8 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            <Card data-testid="card-custom-label-builder">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Construction className="h-5 w-5" />
-                    Custom Label Builder
-                  </CardTitle>
-                  <CardDescription>
-                    Drag-and-drop layout designer for fully custom label artwork. Coming soon.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border border-dashed bg-muted/40 p-6 text-center text-sm text-muted-foreground">
-                    Visual label builder is in development. The current Label Templates above already control which fields are printed.
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card data-testid="card-print-custom-label">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Printer className="h-5 w-5" />
-                    Print Custom Label
-                  </CardTitle>
-                  <CardDescription>
-                    Print a one-off label using a custom layout. Coming soon.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border border-dashed bg-muted/40 p-6 text-center text-sm text-muted-foreground">
-                    This will let you print a single ad-hoc label without creating a full template.
-                  </div>
-                </CardContent>
-              </Card>
+            {isAdmin && <CustomLabelBuilder />}
+            {isAdmin && <PrintCustomLabel />}
           </TabsContent>
 
           <TabsContent value="data" className="space-y-6 mt-4">

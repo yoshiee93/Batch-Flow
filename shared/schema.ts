@@ -6,12 +6,85 @@ import { z } from "zod";
 export const userRoleEnum = pgEnum("user_role", ["admin", "production", "inventory", "readonly"]);
 export const labelTypeEnum = pgEnum("label_type_enum", ["raw_intake", "finished_output", "batch"]);
 
+export type LabelFieldKey =
+  | "productName"
+  | "lotNumber"
+  | "batchCode"
+  | "quantity"
+  | "unit"
+  | "quantityWithUnit"
+  | "productionDate"
+  | "expiryDate"
+  | "receivedDate"
+  | "supplierLot"
+  | "source"
+  | "barcodeValue"
+  | "customerName";
+
+export type LabelTextAlign = "left" | "center" | "right";
+export type LabelRotation = 0 | 90 | 180 | 270;
+
+interface LabelElementBase {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation?: LabelRotation;
+}
+
+export interface LabelTextElement extends LabelElementBase {
+  type: "text";
+  text: string;
+  fontSize?: number;
+  bold?: boolean;
+  align?: LabelTextAlign;
+}
+
+export interface LabelFieldElement extends LabelElementBase {
+  type: "field";
+  fieldKey: LabelFieldKey;
+  prefix?: string;
+  fontSize?: number;
+  bold?: boolean;
+  align?: LabelTextAlign;
+}
+
+export interface LabelBarcodeElement extends LabelElementBase {
+  type: "barcode";
+  source: "barcodeValue" | "lotNumber" | "batchCode";
+  showText?: boolean;
+}
+
+export interface LabelQrElement extends LabelElementBase {
+  type: "qr";
+  source: "barcodeValue" | "lotNumber" | "batchCode";
+}
+
+export interface LabelLineElement extends LabelElementBase {
+  type: "line";
+  stroke?: number;
+}
+
+export interface LabelBoxElement extends LabelElementBase {
+  type: "box";
+  stroke?: number;
+}
+
+export type LabelElement =
+  | LabelTextElement
+  | LabelFieldElement
+  | LabelBarcodeElement
+  | LabelQrElement
+  | LabelLineElement
+  | LabelBoxElement;
+
 export interface LabelLayout {
   version: number;
   width?: number;
   height?: number;
   unit?: "mm" | "in" | "px";
-  elements?: unknown[];
+  elements?: LabelElement[];
 }
 
 export interface LabelTemplateSettings {
