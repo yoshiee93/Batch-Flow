@@ -33,11 +33,22 @@ export async function registerRoutes(
   app.use("/api", labelsRouter);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    console.error("API Error:", err);
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation error", details: err.errors });
+      const fields: Record<string, string> = {};
+      for (const issue of err.errors) {
+        const key = issue.path.length > 0 ? issue.path.join(".") : "_form";
+        if (!(key in fields)) fields[key] = issue.message;
+      }
+      return res.status(400).json({ error: "Validation failed", fields });
     }
-    res.status(500).json({ error: err.message || "Internal server error" });
+    if (err && typeof err.message === "string") {
+      const msg = err.message;
+      if (msg === "Forbidden") return res.status(403).json({ error: "You don't have permission to do this." });
+      if (msg === "Unauthorized") return res.status(401).json({ error: "Sign in to continue." });
+    }
+    console.error("API Error:", err);
+    const status = (err && (err.status || err.statusCode)) || 500;
+    res.status(status).json({ error: err?.message || "Internal server error" });
   });
 
   return httpServer;

@@ -1,4 +1,4 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
@@ -83,13 +83,6 @@ app.use((req, res, next) => {
   await labelsRepository.ensureDefaultTemplates();
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route

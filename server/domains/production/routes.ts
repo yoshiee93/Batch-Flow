@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import {
   insertBatchSchema, insertBatchMaterialSchema,
 } from "@shared/schema";
@@ -9,6 +10,44 @@ import { productionService as svc } from "./service";
 const productionOrAdmin = requireRole("production", "admin");
 
 export const productionRouter = Router();
+
+const decimalString = (label: string) =>
+  z.string().min(1, `${label} is required`).refine(v => {
+    const n = parseFloat(v);
+    return !isNaN(n) && n > 0;
+  }, `${label} must be a positive number`);
+
+const optionalNonNegativeNumeric = z.union([z.string(), z.number(), z.null(), z.undefined()])
+  .transform(v => v == null || v === "" ? null : String(v))
+  .refine(v => v == null || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0),
+    "must be a non-negative number");
+
+const finalizeBatchSchema = z.object({
+  wasteQuantity: optionalNonNegativeNumeric.optional(),
+  millingQuantity: optionalNonNegativeNumeric.optional(),
+  wetQuantity: optionalNonNegativeNumeric.optional(),
+  cleaningTime: optionalNonNegativeNumeric.optional(),
+  numberOfStaff: z.union([z.string(), z.number(), z.null(), z.undefined()])
+    .transform(v => v == null || v === "" ? null : Number(v))
+    .refine(v => v == null || (Number.isInteger(v) && v >= 0),
+      "numberOfStaff must be a non-negative integer")
+    .optional(),
+  markCompleted: z.boolean().optional(),
+});
+
+const batchMaterialQuantitySchema = z.object({
+  quantity: decimalString("quantity"),
+});
+
+const batchOutputCreateSchema = z.object({
+  productId: z.string().min(1, "productId is required"),
+  quantity: decimalString("quantity"),
+});
+
+const lotInputSchema = z.object({
+  lotId: z.string().min(1, "lotId is required"),
+  quantity: decimalString("quantity"),
+});
 
 productionRouter.get("/batches", asyncHandler(async (_req, res) => {
   res.json(await svc.getBatches());
@@ -76,12 +115,7 @@ productionRouter.delete("/batch-materials/:id", productionOrAdmin, asyncHandler(
 }));
 
 productionRouter.patch("/batch-materials/:id", productionOrAdmin, asyncHandler(async (req, res) => {
-  const { quantity } = req.body;
-  if (!quantity) return res.status(400).json({ error: "quantity is required" });
-  const qty = parseFloat(quantity);
-  if (isNaN(qty) || qty <= 0) {
-    return res.status(400).json({ error: "quantity must be a positive number" });
-  }
+  const { quantity } = batchMaterialQuantitySchema.parse(req.body);
   res.json(await svc.updateBatchMaterial(req.params.id, quantity));
 }));
 
@@ -136,14 +170,7 @@ productionRouter.post("/batches/:id/output", productionOrAdmin, asyncHandler(asy
 }));
 
 productionRouter.post("/batches/:id/outputs", productionOrAdmin, asyncHandler(async (req, res) => {
-  const { productId, quantity } = req.body;
-  if (!productId || !quantity) {
-    return res.status(400).json({ error: "productId and quantity are required" });
-  }
-  const qty = parseFloat(quantity);
-  if (isNaN(qty) || qty <= 0) {
-    return res.status(400).json({ error: "quantity must be a positive number" });
-  }
+  const { productId, quantity } = batchOutputCreateSchema.parse(req.body);
   try {
     res.status(201).json(await svc.addBatchOutput(req.params.id, productId, quantity));
   } catch (err) {
@@ -153,10 +180,7 @@ productionRouter.post("/batches/:id/outputs", productionOrAdmin, asyncHandler(as
 }));
 
 productionRouter.patch("/batch-outputs/:id", productionOrAdmin, asyncHandler(async (req, res) => {
-  const { quantity } = req.body;
-  if (!quantity) return res.status(400).json({ error: "quantity is required" });
-  const qty = parseFloat(quantity);
-  if (isNaN(qty) || qty <= 0) return res.status(400).json({ error: "quantity must be a positive number" });
+  const { quantity } = batchMaterialQuantitySchema.parse(req.body);
   try {
     res.json(await svc.updateBatchOutput(req.params.id, quantity));
   } catch (err) {
@@ -176,26 +200,15 @@ productionRouter.delete("/batch-outputs/:id", productionOrAdmin, asyncHandler(as
 }));
 
 productionRouter.post("/batches/:id/finalize", productionOrAdmin, asyncHandler(async (req, res) => {
-  const { wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, markCompleted } = req.body;
-
-  // Validate optional numeric fields
-  if (cleaningTime != null && cleaningTime !== '') {
-    const ct = parseFloat(cleaningTime);
-    if (isNaN(ct) || ct < 0) return res.status(400).json({ error: "cleaningTime must be a non-negative number" });
-  }
-  if (numberOfStaff != null && numberOfStaff !== '') {
-    const ns = Number(numberOfStaff);
-    if (!Number.isInteger(ns) || ns < 0) return res.status(400).json({ error: "numberOfStaff must be a non-negative integer" });
-  }
-
+  const parsed = finalizeBatchSchema.parse(req.body);
   res.json(await svc.finalizeBatch(
     req.params.id,
-    wasteQuantity || "0",
-    millingQuantity || "0",
-    wetQuantity || "0",
-    cleaningTime || null,
-    numberOfStaff != null && numberOfStaff !== '' ? Number(numberOfStaff) : null,
-    markCompleted || false
+    parsed.wasteQuantity ?? "0",
+    parsed.millingQuantity ?? "0",
+    parsed.wetQuantity ?? "0",
+    parsed.cleaningTime ?? null,
+    parsed.numberOfStaff ?? null,
+    parsed.markCompleted ?? false
   ));
 }));
 
@@ -204,14 +217,7 @@ productionRouter.post("/batches/:id/regenerate-lots", productionOrAdmin, asyncHa
 }));
 
 productionRouter.post("/batches/:id/lot-input", productionOrAdmin, asyncHandler(async (req, res) => {
-  const { lotId, quantity } = req.body;
-  if (!lotId || !quantity) {
-    return res.status(400).json({ error: "lotId and quantity are required" });
-  }
-  const qty = parseFloat(quantity);
-  if (isNaN(qty) || qty <= 0) {
-    return res.status(400).json({ error: "quantity must be a positive number" });
-  }
+  const { lotId, quantity } = lotInputSchema.parse(req.body);
   try {
     res.status(201).json(await svc.recordBatchLotInput(req.params.id, lotId, quantity));
   } catch (err) {
