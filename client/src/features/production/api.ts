@@ -16,6 +16,8 @@ export interface Batch {
   wetQuantity: string | null;
   cleaningTime: string | null;
   numberOfStaff: number | null;
+  finishTime: string | null;
+  productAssessment: { result: "pass" | "conditional" | "fail"; notes?: string } | null;
   startDate: string | null;
   endDate: string | null;
   assignedTo: string | null;
@@ -172,29 +174,6 @@ export function useUpdateBatchMaterial() {
   });
 }
 
-export function useRecordBatchOutput() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ batchId, actualQuantity, wasteQuantity, millingQuantity, markCompleted }: {
-      batchId: string;
-      actualQuantity: string;
-      wasteQuantity: string;
-      millingQuantity: string;
-      markCompleted: boolean;
-    }) =>
-      fetchApi<Batch>(`/batches/${batchId}/output`, {
-        method: "POST",
-        body: JSON.stringify({ actualQuantity, wasteQuantity, millingQuantity, markCompleted })
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["batches"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["lots"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
-    },
-  });
-}
-
 export function useBatchOutputs(batchId: string) {
   return useQuery<BatchOutput[]>({
     queryKey: ["batchOutputs", batchId],
@@ -238,18 +217,20 @@ export function useRemoveBatchOutput() {
 export function useFinalizeBatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ batchId, wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, markCompleted }: {
+    mutationFn: ({ batchId, wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, finishTime, productAssessment, markCompleted }: {
       batchId: string;
       wasteQuantity: string;
       millingQuantity: string;
       wetQuantity: string;
       cleaningTime?: string;
       numberOfStaff?: number;
+      finishTime?: string | null;
+      productAssessment?: { result: "pass" | "conditional" | "fail"; notes?: string } | null;
       markCompleted: boolean;
     }) =>
       fetchApi<FinalizeResult>(`/batches/${batchId}/finalize`, {
         method: "POST",
-        body: JSON.stringify({ wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, markCompleted })
+        body: JSON.stringify({ wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, finishTime, productAssessment, markCompleted })
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["batches"] });

@@ -426,18 +426,26 @@ export const productionRepository = {
       let kind: TimelineEventKind = "audit";
 
       const looksLikeFinalize = !!parsed &&
-        ("cleaningTime" in parsed || "numberOfStaff" in parsed || "markCompleted" in parsed);
+        ("cleaningTime" in parsed || "numberOfStaff" in parsed || "markCompleted" in parsed ||
+         "finishTime" in parsed || "productAssessment" in parsed);
 
-      if (action === "completed" && looksLikeFinalize) {
-        // Skip — endDate already emits a `completed` event
-        continue;
-      } else if (looksLikeFinalize && parsed) {
+      if (looksLikeFinalize && parsed) {
         kind = "finalize";
         title = "Batch finalized";
         const parts: string[] = [];
         if (parsed.cleaningTime != null && parsed.cleaningTime !== "") parts.push(`Cleaning: ${parsed.cleaningTime} min`);
         if (parsed.numberOfStaff != null) parts.push(`Staff: ${parsed.numberOfStaff}`);
         if (parsed.totalOutput) parts.push(`Output: ${parsed.totalOutput} KG`);
+        if (parsed.finishTime) {
+          try {
+            const dt = new Date(String(parsed.finishTime));
+            if (!isNaN(dt.getTime())) parts.push(`Finished: ${dt.toLocaleString()}`);
+          } catch {}
+        }
+        if (parsed.productAssessment && typeof parsed.productAssessment === "object") {
+          const pa = parsed.productAssessment as { result?: string; notes?: string };
+          if (pa.result) parts.push(`Assessment: ${pa.result}${pa.notes ? ` (${pa.notes})` : ""}`);
+        }
         if (parts.length) detail = parts.join(" · ");
       } else if (action === "update" && parsed) {
         if (typeof parsed.status === "string") {
@@ -490,7 +498,8 @@ export const productionRepository = {
       });
     }
 
-    if (batchRow.endDate) {
+    const hasFinalizeEvent = events.some((e) => e.kind === "finalize");
+    if (batchRow.endDate && !hasFinalizeEvent) {
       events.push({
         at: batchRow.endDate.toISOString(),
         kind: "completed",

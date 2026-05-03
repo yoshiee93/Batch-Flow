@@ -195,6 +195,10 @@ export default function BatchDetail() {
                 <div data-testid="text-end-date">{fmtDate(batch.endDate)}</div>
               </div>
               <div>
+                <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Finish Time</div>
+                <div data-testid="text-finish-time">{batch.finishTime ? fmtDate(batch.finishTime) : '—'}</div>
+              </div>
+              <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Assigned To</div>
                 <div>{batch.assignedTo || '—'}</div>
               </div>
@@ -229,6 +233,39 @@ export default function BatchDetail() {
                 <div>
                   <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Milling Qty</div>
                   <div className="font-mono">{fmtQty(batch.millingQuantity)}</div>
+                </div>
+              )}
+              {batch.cleaningTime && parseFloat(batch.cleaningTime) > 0 && (
+                <div>
+                  <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Cleaning Time</div>
+                  <div className="font-mono" data-testid="text-cleaning-time">{batch.cleaningTime} mins</div>
+                </div>
+              )}
+              {batch.numberOfStaff != null && batch.numberOfStaff > 0 && (
+                <div>
+                  <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Number of Staff</div>
+                  <div className="font-mono" data-testid="text-number-of-staff">{batch.numberOfStaff}</div>
+                </div>
+              )}
+              {batch.productAssessment && (
+                <div className="col-span-2 sm:col-span-3">
+                  <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Product Assessment</div>
+                  <div className="flex items-center gap-2 flex-wrap" data-testid="text-product-assessment">
+                    <Badge
+                      className={
+                        batch.productAssessment.result === 'pass'
+                          ? 'bg-green-100 text-green-800 border-green-200'
+                          : batch.productAssessment.result === 'conditional'
+                          ? 'bg-amber-100 text-amber-800 border-amber-200'
+                          : 'bg-red-100 text-red-800 border-red-200'
+                      }
+                    >
+                      {batch.productAssessment.result.charAt(0).toUpperCase() + batch.productAssessment.result.slice(1)}
+                    </Badge>
+                    {batch.productAssessment.notes && (
+                      <span className="text-muted-foreground text-sm">{batch.productAssessment.notes}</span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

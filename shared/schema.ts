@@ -289,6 +289,8 @@ export const batches = pgTable("batches", {
   batchCode: varchar("batch_code", { length: 20 }).unique(),
   cleaningTime: decimal("cleaning_time", { precision: 10, scale: 2 }),
   numberOfStaff: integer("number_of_staff"),
+  finishTime: timestamp("finish_time"),
+  productAssessment: jsonb("product_assessment").$type<{ result: "pass" | "conditional" | "fail"; notes?: string }>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -477,6 +479,11 @@ export const insertRecipeItemSchema = createInsertSchema(recipeItems).omit({ id:
 export const insertBatchSchema = createInsertSchema(batches).omit({ id: true, createdAt: true }).extend({
   startDate: z.union([z.string(), z.date(), z.null()]).transform((val) => val === null ? null : typeof val === 'string' ? new Date(val) : val).optional(),
   endDate: z.union([z.string(), z.date(), z.null()]).transform((val) => val === null ? null : typeof val === 'string' ? new Date(val) : val).optional(),
+  finishTime: z.union([z.string(), z.date(), z.null()]).transform((val) => val === null ? null : typeof val === 'string' ? new Date(val) : val).optional(),
+  productAssessment: z.object({
+    result: z.enum(["pass", "conditional", "fail"]),
+    notes: z.string().optional(),
+  }).nullable().optional(),
 });
 export const insertBatchMaterialSchema = createInsertSchema(batchMaterials).omit({ id: true, addedAt: true });
 export const insertBatchOutputSchema = createInsertSchema(batchOutputs).omit({ id: true, addedAt: true });

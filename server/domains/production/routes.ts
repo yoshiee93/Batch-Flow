@@ -32,6 +32,14 @@ const finalizeBatchSchema = z.object({
     .refine(v => v == null || (Number.isInteger(v) && v >= 0),
       "numberOfStaff must be a non-negative integer")
     .optional(),
+  finishTime: z.union([z.string(), z.date(), z.null()])
+    .transform(v => v == null || v === "" ? null : (typeof v === "string" ? new Date(v) : v))
+    .refine(v => v == null || !isNaN(v.getTime()), "finishTime must be a valid date")
+    .optional(),
+  productAssessment: z.object({
+    result: z.enum(["pass", "conditional", "fail"]),
+    notes: z.string().optional(),
+  }).nullable().optional(),
   markCompleted: z.boolean().optional(),
 });
 
@@ -98,6 +106,9 @@ productionRouter.post("/batches", productionOrAdmin, asyncHandler(async (req, re
 
 productionRouter.patch("/batches/:id", productionOrAdmin, asyncHandler(async (req, res) => {
   const data = insertBatchSchema.partial().parse(req.body);
+  if (data.status === "completed" || "endDate" in data || "finishTime" in data || "productAssessment" in data) {
+    return res.status(400).json({ error: "Use POST /api/batches/:id/finalize to complete a batch or set finish/assessment fields." });
+  }
   const batch = await svc.updateBatch(req.params.id, data);
   if (!batch) return res.status(404).json({ error: "Batch not found" });
   res.json(batch);
@@ -162,17 +173,6 @@ productionRouter.post("/batches/:id/input", productionOrAdmin, asyncHandler(asyn
   res.status(201).json(batchMaterial);
 }));
 
-productionRouter.post("/batches/:id/output", productionOrAdmin, asyncHandler(async (req, res) => {
-  const { actualQuantity, wasteQuantity, millingQuantity, markCompleted } = req.body;
-  res.json(await svc.recordBatchOutput(
-    req.params.id,
-    actualQuantity || "0",
-    wasteQuantity || "0",
-    millingQuantity || "0",
-    markCompleted || false
-  ));
-}));
-
 productionRouter.post("/batches/:id/outputs", productionOrAdmin, asyncHandler(async (req, res) => {
   const { productId, quantity } = batchOutputCreateSchema.parse(req.body);
   try {
@@ -205,15 +205,16 @@ productionRouter.delete("/batch-outputs/:id", productionOrAdmin, asyncHandler(as
 
 productionRouter.post("/batches/:id/finalize", productionOrAdmin, asyncHandler(async (req, res) => {
   const parsed = finalizeBatchSchema.parse(req.body);
-  res.json(await svc.finalizeBatch(
-    req.params.id,
-    parsed.wasteQuantity ?? "0",
-    parsed.millingQuantity ?? "0",
-    parsed.wetQuantity ?? "0",
-    parsed.cleaningTime ?? null,
-    parsed.numberOfStaff ?? null,
-    parsed.markCompleted ?? false
-  ));
+  res.json(await svc.finalizeBatch(req.params.id, {
+    wasteQuantity: parsed.wasteQuantity ?? "0",
+    millingQuantity: parsed.millingQuantity ?? "0",
+    wetQuantity: parsed.wetQuantity ?? "0",
+    cleaningTime: parsed.cleaningTime ?? null,
+    numberOfStaff: parsed.numberOfStaff ?? null,
+    finishTime: parsed.finishTime ?? null,
+    productAssessment: parsed.productAssessment ?? null,
+    markCompleted: parsed.markCompleted ?? false,
+  }));
 }));
 
 productionRouter.post("/batches/:id/regenerate-lots", productionOrAdmin, asyncHandler(async (req, res) => {

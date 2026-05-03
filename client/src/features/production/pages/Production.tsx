@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -1047,6 +1048,8 @@ export default function Production() {
               wetQuantity={selectedBatch.wetQuantity || '0'}
               cleaningTime={selectedBatch.cleaningTime || ''}
               numberOfStaff={selectedBatch.numberOfStaff ?? undefined}
+              finishTime={selectedBatch.finishTime ?? null}
+              productAssessment={selectedBatch.productAssessment ?? null}
               onClose={() => setIsRecordOutputOpen(false)}
             />
           )}
@@ -1532,6 +1535,8 @@ function BatchOutputsEditor({
   wetQuantity: initialWet,
   cleaningTime: initialCleaningTime,
   numberOfStaff: initialNumberOfStaff,
+  finishTime: initialFinishTime,
+  productAssessment: initialProductAssessment,
   onClose,
 }: { 
   batchId: string;
@@ -1541,6 +1546,8 @@ function BatchOutputsEditor({
   wetQuantity: string;
   cleaningTime?: string;
   numberOfStaff?: number;
+  finishTime?: string | Date | null;
+  productAssessment?: { result: "pass" | "conditional" | "fail"; notes?: string } | null;
   onClose: () => void;
 }) {
   const [newOutputForm, setNewOutputForm] = useState({ productId: '', quantity: '' });
@@ -1551,8 +1558,18 @@ function BatchOutputsEditor({
     wetQuantity: z.string().refine((v) => v === '' || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0), { message: 'Wet must be a non-negative number' }),
     cleaningTime: z.string().refine((v) => v === '' || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0), { message: 'Cleaning time must be a non-negative number' }),
     numberOfStaff: z.string().refine((v) => v === '' || (Number.isInteger(parseFloat(v)) && parseInt(v) >= 0), { message: 'Number of staff must be a non-negative integer' }),
+    finishTime: z.string().refine((v) => v === '' || !isNaN(new Date(v).getTime()), { message: 'Finish time must be a valid date' }),
+    assessmentResult: z.enum(['', 'pass', 'conditional', 'fail']),
+    assessmentNotes: z.string(),
   });
   type FinalizeValues = z.infer<typeof finalizeSchema>;
+  const toLocalInput = (d: string | Date | null | undefined) => {
+    if (!d) return '';
+    const dt = typeof d === 'string' ? new Date(d) : d;
+    if (isNaN(dt.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  };
   const finalizeForm = useForm<FinalizeValues>({
     resolver: zodResolver(finalizeSchema),
     defaultValues: {
@@ -1561,6 +1578,9 @@ function BatchOutputsEditor({
       wetQuantity: initialWet,
       cleaningTime: initialCleaningTime || '',
       numberOfStaff: initialNumberOfStaff != null ? String(initialNumberOfStaff) : '',
+      finishTime: toLocalInput(initialFinishTime),
+      assessmentResult: (initialProductAssessment?.result ?? '') as '' | 'pass' | 'conditional' | 'fail',
+      assessmentNotes: initialProductAssessment?.notes ?? '',
     },
     mode: 'onChange',
   });
@@ -1569,11 +1589,17 @@ function BatchOutputsEditor({
   const wetQuantity = finalizeForm.watch('wetQuantity');
   const cleaningTime = finalizeForm.watch('cleaningTime');
   const numberOfStaff = finalizeForm.watch('numberOfStaff');
+  const finishTimeValue = finalizeForm.watch('finishTime');
+  const assessmentResult = finalizeForm.watch('assessmentResult');
+  const assessmentNotes = finalizeForm.watch('assessmentNotes');
   const setWasteQuantity = (v: string) => finalizeForm.setValue('wasteQuantity', v, { shouldDirty: true });
   const setMillingQuantity = (v: string) => finalizeForm.setValue('millingQuantity', v, { shouldDirty: true });
   const setWetQuantity = (v: string) => finalizeForm.setValue('wetQuantity', v, { shouldDirty: true });
   const setCleaningTime = (v: string) => finalizeForm.setValue('cleaningTime', v, { shouldDirty: true });
   const setNumberOfStaff = (v: string) => finalizeForm.setValue('numberOfStaff', v, { shouldDirty: true });
+  const setFinishTime = (v: string) => finalizeForm.setValue('finishTime', v, { shouldDirty: true });
+  const setAssessmentResult = (v: '' | 'pass' | 'conditional' | 'fail') => finalizeForm.setValue('assessmentResult', v, { shouldDirty: true });
+  const setAssessmentNotes = (v: string) => finalizeForm.setValue('assessmentNotes', v, { shouldDirty: true });
   const [markCompleted, setMarkCompleted] = useState(false);
   const [finalizeResult, setFinalizeResult] = useState<FinalizeResult | null>(null);
   const [summaryBatchPrintedAt, setSummaryBatchPrintedAt] = useState<string | null>(null);
@@ -1583,6 +1609,8 @@ function BatchOutputsEditor({
   const markBatchPrinted = useMarkBatchBarcodePrinted();
   const recordPrint = useRecordPrint();
   const { data: batchData } = useBatch(batchId);
+  const { isAdmin } = useRole();
+  const [showAdvancedAddOutput, setShowAdvancedAddOutput] = useState(false);
   
   useEffect(() => {
     finalizeForm.reset({
@@ -1591,10 +1619,13 @@ function BatchOutputsEditor({
       wetQuantity: initialWet,
       cleaningTime: initialCleaningTime || '',
       numberOfStaff: initialNumberOfStaff != null ? String(initialNumberOfStaff) : '',
+      finishTime: toLocalInput(initialFinishTime),
+      assessmentResult: (initialProductAssessment?.result ?? '') as '' | 'pass' | 'conditional' | 'fail',
+      assessmentNotes: initialProductAssessment?.notes ?? '',
     });
     setMarkCompleted(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [batchId, initialWaste, initialMilling, initialWet, initialCleaningTime, initialNumberOfStaff]);
+  }, [batchId, initialWaste, initialMilling, initialWet, initialCleaningTime, initialNumberOfStaff, initialFinishTime, initialProductAssessment]);
   
   const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
   const { data: outputLots = [], isLoading: outputLotsLoading } = useBatchOutputLots(batchId, { enabled: isCompleted });
@@ -1662,6 +1693,10 @@ function BatchOutputsEditor({
         wetQuantity: values.wetQuantity || "0",
         cleaningTime: values.cleaningTime || undefined,
         numberOfStaff: values.numberOfStaff ? parseInt(values.numberOfStaff) : undefined,
+        finishTime: values.finishTime ? new Date(values.finishTime).toISOString() : null,
+        productAssessment: values.assessmentResult
+          ? { result: values.assessmentResult, notes: values.assessmentNotes || undefined }
+          : null,
         markCompleted,
       });
       if (markCompleted) {
@@ -1810,9 +1845,25 @@ function BatchOutputsEditor({
   
   return (
     <div className="space-y-4 py-2">
-      {/* Add Product Output — always shown */}
-      <div className="space-y-3 pb-4 border-b">
-        <h4 className="font-medium text-sm">Add Product Output</h4>
+      {/* Add Product Output — admin-only advanced affordance (collapsed by default) */}
+      {isAdmin && (
+      <div className="space-y-3 pb-4 border-b" data-testid="section-add-output">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="font-medium text-sm">Add Product Output</h4>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="text-xs h-7"
+            onClick={() => setShowAdvancedAddOutput(v => !v)}
+            data-testid="button-toggle-advanced-add-output"
+          >
+            {showAdvancedAddOutput ? 'Hide advanced' : 'Show advanced'}
+          </Button>
+        </div>
+        {showAdvancedAddOutput && (
+        <>
+        <p className="text-xs text-muted-foreground">Advanced — adding outputs outside the normal Finalize flow.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="output-product">Product</Label>
@@ -1888,7 +1939,10 @@ function BatchOutputsEditor({
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
+      )}
 
       {/* Product Outputs list — always shown */}
       <div>
@@ -2098,7 +2152,7 @@ function BatchOutputsEditor({
 
           <div className="space-y-4">
             <h4 className="font-medium text-sm">Labour</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="cleaningTime">Cleaning Time (mins)</Label>
                 <Input id="cleaningTime" type="number" step="1" min="0" value={cleaningTime} onChange={(e) => setCleaningTime(e.target.value)} placeholder="0" data-testid="input-finalize-cleaning-time" />
@@ -2108,6 +2162,45 @@ function BatchOutputsEditor({
                 <Label htmlFor="numberOfStaff">Number of Staff</Label>
                 <Input id="numberOfStaff" type="number" step="1" min="0" value={numberOfStaff} onChange={(e) => setNumberOfStaff(e.target.value)} placeholder="0" data-testid="input-finalize-number-of-staff" />
                 {finalizeForm.formState.errors.numberOfStaff && <p className="text-sm text-destructive" data-testid="error-finalize-number-of-staff">{finalizeForm.formState.errors.numberOfStaff.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="finishTime">Finish Time</Label>
+                <Input id="finishTime" type="datetime-local" value={finishTimeValue} onChange={(e) => setFinishTime(e.target.value)} data-testid="input-finalize-finish-time" />
+                {finalizeForm.formState.errors.finishTime && <p className="text-sm text-destructive" data-testid="error-finalize-finish-time">{finalizeForm.formState.errors.finishTime.message}</p>}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="font-medium text-sm">Product Assessment</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="assessmentResult">Result</Label>
+                <Select
+                  value={assessmentResult || 'none'}
+                  onValueChange={(v) => setAssessmentResult(v === 'none' ? '' : (v as 'pass' | 'conditional' | 'fail'))}
+                >
+                  <SelectTrigger id="assessmentResult" data-testid="select-finalize-assessment-result">
+                    <SelectValue placeholder="Select result" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Not assessed —</SelectItem>
+                    <SelectItem value="pass">Pass</SelectItem>
+                    <SelectItem value="conditional">Conditional</SelectItem>
+                    <SelectItem value="fail">Fail</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assessmentNotes">Notes</Label>
+                <Textarea
+                  id="assessmentNotes"
+                  rows={2}
+                  value={assessmentNotes}
+                  onChange={(e) => setAssessmentNotes(e.target.value)}
+                  placeholder="Optional notes about product assessment"
+                  data-testid="input-finalize-assessment-notes"
+                />
               </div>
             </div>
           </div>

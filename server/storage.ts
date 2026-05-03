@@ -127,7 +127,6 @@ export interface IStorage {
   addBatchOutput(batchId: string, productId: string, quantity: string): Promise<BatchOutput>;
   removeBatchOutput(id: string): Promise<void>;
   finalizeBatch(batchId: string, wasteQuantity: string, millingQuantity: string, wetQuantity: string, markCompleted: boolean): Promise<Batch>;
-  recordBatchOutput(batchId: string, actualQuantity: string, wasteQuantity: string, millingQuantity: string, markCompleted: boolean): Promise<Batch>;
 
   getOrders(): Promise<Order[]>;
   getOrder(id: string): Promise<Order | undefined>;
