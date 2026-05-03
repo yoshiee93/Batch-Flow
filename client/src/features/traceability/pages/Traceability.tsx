@@ -17,8 +17,9 @@ import {
 } from '@/lib/api';
 import type { ForwardTraceResponse, BackwardTraceResponse } from '@/features/traceability/api';
 import type { OutputLot } from '@/features/inventory/api';
-import { printBarcodeLabel } from '@/lib/barcodePrint';
-import { useLabelTemplate, parseLabelTemplateSettings } from '@/features/labels/api';
+import { useRecordPrint } from '@/features/labels/api';
+import { printAndRecord } from '@/lib/printAndRecord';
+import { useToast } from '@/hooks/use-toast';
 
 type Candidate =
   | { type: 'lot'; id: string; label: string; sublabel?: string }
@@ -292,8 +293,8 @@ function ForwardTraceView({ trace, materials, products }: {
   const markLotPrinted = useMarkBarcodePrinted();
   const isProducedLot = lotType === 'finished_good' || lotType === 'intermediate';
   const { data: sourceBatchData } = useBatch(isProducedLot && lot.sourceBatchId ? lot.sourceBatchId : '');
-  const { data: rawIntakeTemplate } = useLabelTemplate('raw_intake', lot.customerId);
-  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output', lot.customerId);
+  const recordPrint = useRecordPrint();
+  const { toast } = useToast();
 
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
@@ -319,36 +320,42 @@ function ForwardTraceView({ trace, materials, products }: {
                   variant="outline"
                   size="sm"
                   data-testid="button-print-label-trace"
-                  onClick={() => {
+                  onClick={async () => {
                     if (lotType === 'finished_good' || lotType === 'intermediate') {
-                      printBarcodeLabel({
-                        template: "finished_output",
-                        lotNumber: lot.lotNumber,
-                        barcodeValue: lot.barcodeValue,
-                        productName: itemName,
-                        quantity: lot.quantity,
-                        unit: 'KG',
-                        producedDate: lot.producedDate || lot.receivedDate,
-                        expiryDate: lot.expiryDate,
-                        sourceBatch: sourceBatchData ? (sourceBatchData.batchCode || sourceBatchData.batchNumber) : undefined,
-                        templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
+                      await printAndRecord({
+                        kind: 'finished_output',
+                        customerId: lot.customerId ?? null,
+                        legacyData: {
+                          template: 'finished_output',
+                          lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue,
+                          productName: itemName, quantity: lot.quantity, unit: 'KG',
+                          producedDate: lot.producedDate || lot.receivedDate,
+                          expiryDate: lot.expiryDate,
+                          sourceBatch: sourceBatchData ? (sourceBatchData.batchCode || sourceBatchData.batchNumber) : undefined,
+                        },
+                        entityType: 'lot', entityId: lot.id,
+                        displayName: itemName, secondaryName: lot.lotNumber,
+                        toast, recordPrint: (d) => recordPrint.mutate(d),
+                        onAfterPrint: () => markLotPrinted.mutate(lot.id),
                       });
                     } else {
-                      printBarcodeLabel({
-                        template: "raw_intake",
-                        lotNumber: lot.lotNumber,
-                        barcodeValue: lot.barcodeValue,
-                        itemName,
-                        quantity: lot.quantity,
-                        unit: 'KG',
-                        sourceLabel: lot.supplierName || lot.sourceName || undefined,
-                        receivedDate: lot.receivedDate,
-                        expiryDate: lot.expiryDate,
-                        supplierLot: lot.supplierLot,
-                        templateSettings: rawIntakeTemplate ? parseLabelTemplateSettings(rawIntakeTemplate.settings) : undefined,
+                      await printAndRecord({
+                        kind: 'raw_intake',
+                        customerId: lot.customerId ?? null,
+                        legacyData: {
+                          template: 'raw_intake',
+                          lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue,
+                          itemName, quantity: lot.quantity, unit: 'KG',
+                          sourceLabel: lot.supplierName || lot.sourceName || undefined,
+                          receivedDate: lot.receivedDate, expiryDate: lot.expiryDate,
+                          supplierLot: lot.supplierLot,
+                        },
+                        entityType: 'lot', entityId: lot.id,
+                        displayName: itemName, secondaryName: lot.lotNumber,
+                        toast, recordPrint: (d) => recordPrint.mutate(d),
+                        onAfterPrint: () => markLotPrinted.mutate(lot.id),
                       });
                     }
-                    markLotPrinted.mutate(lot.id);
                   }}
                 >
                   <Printer className="h-4 w-4 mr-2" />
@@ -532,23 +539,28 @@ function ForwardTraceView({ trace, materials, products }: {
                         variant="outline"
                         className="text-xs h-7 px-2"
                         data-testid={`button-print-outlot-${outputLot.id}`}
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.preventDefault();
                           const outProduct = outputLot.productId ? products.find(p => p.id === outputLot.productId) : null;
                           const srcBatchUsage = outputLot.sourceBatchId ? usedInBatches.find(u => u.batch.id === outputLot.sourceBatchId) : null;
-                          printBarcodeLabel({
-                            template: "finished_output",
-                            lotNumber: outputLot.lotNumber,
-                            barcodeValue: outputLot.barcodeValue,
-                            productName: outProduct?.name || outputLot.lotNumber,
-                            quantity: outputLot.quantity,
-                            unit: 'KG',
-                            producedDate: outputLot.producedDate,
-                            sourceBatch: srcBatchUsage ? (srcBatchUsage.batch.batchCode || srcBatchUsage.batch.batchNumber) : undefined,
-                            expiryDate: outputLot.expiryDate,
-                            templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
+                          const displayName = outProduct?.name || outputLot.lotNumber;
+                          await printAndRecord({
+                            kind: 'finished_output',
+                            customerId: outputLot.customerId ?? null,
+                            legacyData: {
+                              template: 'finished_output',
+                              lotNumber: outputLot.lotNumber, barcodeValue: outputLot.barcodeValue,
+                              productName: displayName,
+                              quantity: outputLot.quantity, unit: 'KG',
+                              producedDate: outputLot.producedDate,
+                              sourceBatch: srcBatchUsage ? (srcBatchUsage.batch.batchCode || srcBatchUsage.batch.batchNumber) : undefined,
+                              expiryDate: outputLot.expiryDate,
+                            },
+                            entityType: 'lot', entityId: outputLot.id,
+                            displayName, secondaryName: outputLot.lotNumber,
+                            toast, recordPrint: (d) => recordPrint.mutate(d),
+                            onAfterPrint: () => markLotPrinted.mutate(outputLot.id),
                           });
-                          markLotPrinted.mutate(outputLot.id);
                         }}
                       >
                         <Printer className="h-3 w-3 mr-1" />
@@ -572,8 +584,8 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
   const markBatchPrinted = useMarkBatchBarcodePrinted();
   const markLotPrinted = useMarkBarcodePrinted();
   const batchCustomerId = outputLots[0]?.customerId ?? null;
-  const { data: batchTemplate } = useLabelTemplate('batch', batchCustomerId);
-  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output', batchCustomerId);
+  const recordPrint = useRecordPrint();
+  const { toast } = useToast();
 
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
@@ -603,19 +615,26 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                   variant="outline"
                   size="sm"
                   data-testid="button-print-batch-trace"
-                  onClick={() => {
-                    printBarcodeLabel({
-                      template: "batch",
-                      batchCode: batch.batchCode || batch.batchNumber,
-                      barcodeValue: batch.barcodeValue,
-                      productName: product?.name || 'Batch',
-                      quantity: batch.plannedQuantity,
-                      unit: 'KG',
-                      productionDate: batch.startDate,
-                      status: batch.status,
-                      templateSettings: batchTemplate ? parseLabelTemplateSettings(batchTemplate.settings) : undefined,
+                  onClick={async () => {
+                    const productName = product?.name || 'Batch';
+                    await printAndRecord({
+                      kind: 'batch',
+                      customerId: batchCustomerId,
+                      legacyData: {
+                        template: 'batch',
+                        batchCode: batch.batchCode || batch.batchNumber,
+                        barcodeValue: batch.barcodeValue,
+                        productName,
+                        quantity: batch.plannedQuantity, unit: 'KG',
+                        productionDate: batch.startDate,
+                        status: batch.status,
+                      },
+                      entityType: 'batch', entityId: batch.id,
+                      displayName: productName,
+                      secondaryName: batch.batchCode || batch.batchNumber,
+                      toast, recordPrint: (d) => recordPrint.mutate(d),
+                      onAfterPrint: () => markBatchPrinted.mutate(batch.id),
                     });
-                    markBatchPrinted.mutate(batch.id);
                   }}
                 >
                   <Printer className="h-4 w-4 mr-2" />
@@ -753,20 +772,24 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                         variant="outline"
                         className="text-xs h-7 px-2"
                         data-testid={`button-reprint-output-${ol.lotId}`}
-                        onClick={() => {
-                          printBarcodeLabel({
-                            template: "finished_output",
-                            lotNumber: ol.lotNumber,
-                            barcodeValue: ol.barcodeValue,
-                            productName: ol.productName || 'Output',
-                            quantity: ol.quantity,
-                            unit: 'KG',
-                            producedDate: batch.endDate,
-                            sourceBatch: batch.batchCode || batch.batchNumber,
-                            expiryDate: ol.expiryDate,
-                            templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
+                        onClick={async () => {
+                          await printAndRecord({
+                            kind: 'finished_output',
+                            customerId: ol.customerId ?? batchCustomerId,
+                            legacyData: {
+                              template: 'finished_output',
+                              lotNumber: ol.lotNumber, barcodeValue: ol.barcodeValue,
+                              productName: ol.productName || 'Output',
+                              quantity: ol.quantity, unit: 'KG',
+                              producedDate: batch.endDate,
+                              sourceBatch: batch.batchCode || batch.batchNumber,
+                              expiryDate: ol.expiryDate,
+                            },
+                            entityType: 'lot', entityId: ol.lotId,
+                            displayName: ol.productName || 'Output', secondaryName: ol.lotNumber,
+                            toast, recordPrint: (d) => recordPrint.mutate(d),
+                            onAfterPrint: () => markLotPrinted.mutate(ol.lotId),
                           });
-                          markLotPrinted.mutate(ol.lotId);
                         }}
                       >
                         <Printer className="h-3 w-3 mr-1" />

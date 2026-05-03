@@ -1,9 +1,9 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, desc, gte, lte, or, ilike, sql } from "drizzle-orm";
 import { db } from "../../db";
 import {
-  labelTemplates, customers,
+  labelTemplates, customers, printHistory, users,
   type LabelTemplate, type InsertLabelTemplate,
-  type LabelTemplateType,
+  type LabelTemplateType, type InsertPrintHistory, type PrintHistory,
 } from "@shared/schema";
 
 export const labelsRepository = {
@@ -111,5 +111,63 @@ export const labelsRepository = {
     if (toCreate.length > 0) {
       await db.insert(labelTemplates).values(toCreate);
     }
+  },
+};
+
+export interface PrintHistoryRow extends PrintHistory {
+  printedByUsername: string | null;
+}
+
+export interface PrintHistoryFilters {
+  from?: Date;
+  to?: Date;
+  labelKind?: string;
+  q?: string;
+  limit?: number;
+}
+
+export const printHistoryRepository = {
+  async record(data: InsertPrintHistory): Promise<PrintHistory> {
+    const [row] = await db.insert(printHistory).values(data).returning();
+    return row;
+  },
+
+  async list(filters: PrintHistoryFilters = {}): Promise<PrintHistoryRow[]> {
+    const limit = Math.max(1, Math.min(filters.limit ?? 50, 500));
+    const conds: ReturnType<typeof eq>[] = [];
+    if (filters.from) conds.push(gte(printHistory.printedAt, filters.from));
+    if (filters.to) conds.push(lte(printHistory.printedAt, filters.to));
+    if (filters.labelKind) conds.push(eq(printHistory.labelKind, filters.labelKind));
+    if (filters.q && filters.q.trim()) {
+      const like = `%${filters.q.trim()}%`;
+      const qCond = or(
+        ilike(printHistory.displayName, like),
+        ilike(printHistory.secondaryName, like),
+        ilike(printHistory.templateName, like),
+      );
+      if (qCond) conds.push(qCond as any);
+    }
+    const where = conds.length > 0 ? and(...conds) : undefined;
+    const rows = await db
+      .select({
+        id: printHistory.id,
+        printedAt: printHistory.printedAt,
+        printedByUserId: printHistory.printedByUserId,
+        labelKind: printHistory.labelKind,
+        templateId: printHistory.templateId,
+        templateName: printHistory.templateName,
+        entityType: printHistory.entityType,
+        entityId: printHistory.entityId,
+        displayName: printHistory.displayName,
+        secondaryName: printHistory.secondaryName,
+        snapshot: printHistory.snapshot,
+        printedByUsername: users.username,
+      })
+      .from(printHistory)
+      .leftJoin(users, eq(printHistory.printedByUserId, users.id))
+      .where(where ?? sql`true`)
+      .orderBy(desc(printHistory.printedAt))
+      .limit(limit);
+    return rows as PrintHistoryRow[];
   },
 };

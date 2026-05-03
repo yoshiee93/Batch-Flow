@@ -1,8 +1,9 @@
 import { Router } from "express";
+import { z } from "zod";
 import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../lib/authMiddleware";
-import { labelsRepository } from "./repository";
-import { insertLabelTemplateSchema } from "@shared/schema";
+import { labelsRepository, printHistoryRepository } from "./repository";
+import { insertLabelTemplateSchema, insertPrintHistorySchema } from "@shared/schema";
 
 const adminOnly = requireRole("admin");
 
@@ -50,4 +51,33 @@ labelsRouter.delete("/label-templates/:id", adminOnly, asyncHandler(async (req, 
   }
   await labelsRepository.deleteTemplate(req.params.id);
   res.status(204).send();
+}));
+
+const recordPrintBody = insertPrintHistorySchema.omit({ printedByUserId: true });
+
+labelsRouter.post("/print-history", asyncHandler(async (req, res) => {
+  const body = recordPrintBody.parse(req.body);
+  const userId = req.session?.userId ?? null;
+  const row = await printHistoryRepository.record({ ...body, printedByUserId: userId });
+  res.status(201).json(row);
+}));
+
+const listFiltersSchema = z.object({
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  labelKind: z.string().optional(),
+  q: z.string().optional(),
+  limit: z.coerce.number().int().positive().max(500).optional(),
+});
+
+labelsRouter.get("/print-history", adminOnly, asyncHandler(async (req, res) => {
+  const filters = listFiltersSchema.parse(req.query);
+  const rows = await printHistoryRepository.list({
+    from: filters.from ? new Date(filters.from) : undefined,
+    to: filters.to ? new Date(filters.to) : undefined,
+    labelKind: filters.labelKind,
+    q: filters.q,
+    limit: filters.limit,
+  });
+  res.json(rows);
 }));

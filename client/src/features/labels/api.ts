@@ -84,6 +84,70 @@ export function useUpdateLabelTemplate() {
   });
 }
 
+export type PrintLabelKind = "raw_intake" | "finished_output" | "batch" | "custom";
+
+export interface PrintHistoryRow {
+  id: string;
+  printedAt: string;
+  printedByUserId: string | null;
+  printedByUsername: string | null;
+  labelKind: PrintLabelKind;
+  templateId: string | null;
+  templateName: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  displayName: string;
+  secondaryName: string | null;
+  snapshot: Record<string, unknown>;
+}
+
+export interface RecordPrintInput {
+  labelKind: PrintLabelKind;
+  templateId?: string | null;
+  templateName?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  displayName: string;
+  secondaryName?: string | null;
+  snapshot: Record<string, unknown>;
+}
+
+export function useRecordPrint() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: RecordPrintInput) =>
+      fetchApi("/print-history", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["print-history"] });
+    },
+  });
+}
+
+export interface PrintHistoryFilters {
+  from?: string;
+  to?: string;
+  labelKind?: PrintLabelKind | "";
+  q?: string;
+  limit?: number;
+}
+
+export function usePrintHistory(filters: PrintHistoryFilters = {}, options?: { enabled?: boolean }) {
+  return useQuery<PrintHistoryRow[]>({
+    queryKey: ["print-history", filters],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (filters.from) params.set("from", filters.from);
+      if (filters.to) params.set("to", filters.to);
+      if (filters.labelKind) params.set("labelKind", filters.labelKind);
+      if (filters.q) params.set("q", filters.q);
+      if (filters.limit) params.set("limit", String(filters.limit));
+      const qs = params.toString();
+      return fetchApi(`/print-history${qs ? `?${qs}` : ""}`);
+    },
+    enabled: options?.enabled !== false,
+  });
+}
+
 export function useDeleteLabelTemplate() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -9,6 +9,7 @@ import { Construction, Type, Tag as TagIcon, Barcode as BarcodeIcon, QrCode, Min
 import {
   useLabelTemplates,
   useUpdateLabelTemplate,
+  useRecordPrint,
   parseLabelTemplateSettings,
   type LabelTemplate,
   type LabelTemplateType,
@@ -46,6 +47,7 @@ interface DragState {
 export default function CustomLabelBuilder() {
   const { data: templates = [] } = useLabelTemplates();
   const updateTemplate = useUpdateLabelTemplate();
+  const recordPrint = useRecordPrint();
   const { toast } = useToast();
 
   const [selectedId, setSelectedId] = useState<string>("");
@@ -229,7 +231,59 @@ export default function CustomLabelBuilder() {
   }
 
   async function handlePrintTest() {
-    await printLayoutLabel(layout, SAMPLE_CONTEXT, selectedTemplate?.name ?? "Label preview");
+    const displayName = selectedTemplate?.name ?? "Label preview";
+    await printLayoutLabel(layout, SAMPLE_CONTEXT, displayName);
+    const labelType: LabelTemplateType = selectedTemplate?.labelType ?? filterType;
+    const sample = SAMPLE_CONTEXT;
+    const lotNum = sample.lotNumber ?? "SAMPLE";
+    const batchCode = sample.batchCode ?? "SAMPLE";
+    const bc = sample.barcodeValue ?? lotNum;
+    let legacyData: import("@/lib/barcodePrint").LabelData;
+    if (labelType === "raw_intake") {
+      legacyData = {
+        template: "raw_intake",
+        lotNumber: lotNum, barcodeValue: bc,
+        itemName: sample.productName ?? displayName,
+        quantity: sample.quantity ?? "0", unit: sample.unit ?? "KG",
+        receivedDate: sample.productionDate ?? null,
+        expiryDate: sample.expiryDate ?? null,
+        supplierLot: sample.supplierLot ?? null,
+        sourceLabel: null,
+      };
+    } else if (labelType === "batch") {
+      legacyData = {
+        template: "batch",
+        batchCode, barcodeValue: bc,
+        productName: sample.productName ?? displayName,
+        quantity: sample.quantity ?? null, unit: sample.unit ?? null,
+        productionDate: sample.productionDate ?? null,
+        status: null,
+      };
+    } else {
+      legacyData = {
+        template: "finished_output",
+        lotNumber: lotNum, barcodeValue: bc,
+        productName: sample.productName ?? displayName,
+        quantity: sample.quantity ?? "0", unit: sample.unit ?? "KG",
+        producedDate: sample.productionDate ?? null,
+        sourceBatch: batchCode,
+        expiryDate: sample.expiryDate ?? null,
+      };
+    }
+    recordPrint.mutate({
+      labelKind: "custom",
+      templateId: selectedTemplate?.id ?? null,
+      templateName: selectedTemplate?.name ?? null,
+      entityType: null, entityId: null,
+      displayName,
+      secondaryName: "Test print",
+      snapshot: {
+        ctx: sample,
+        legacyData,
+        templateTypeForResolve: labelType,
+        customerId: null,
+      },
+    });
   }
 
   const labelW = layout.width ?? 60;

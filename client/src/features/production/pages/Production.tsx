@@ -31,8 +31,8 @@ import {
   fetchLotByBarcode,
   type Batch, type Product, type Material, type Lot, type BatchMaterial, type BatchOutput, type Category, type LotWithDetails, type FinalizeResult, type OutputLot
 } from '@/lib/api';
-import { printBarcodeLabel } from '@/lib/barcodePrint';
-import { useLabelTemplate, parseLabelTemplateSettings } from '@/features/labels/api';
+import { useRecordPrint } from '@/features/labels/api';
+import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
 import { buildBatchCode } from '@shared/batchCodeConfig';
 import { useRole } from '@/contexts/AuthContext';
@@ -1477,6 +1477,7 @@ function BatchOutputsEditor({
   const [editOutputQty, setEditOutputQty] = useState('');
   const markLotPrinted = useMarkBarcodePrinted();
   const markBatchPrinted = useMarkBatchBarcodePrinted();
+  const recordPrint = useRecordPrint();
   const { data: batchData } = useBatch(batchId);
   
   useEffect(() => {
@@ -1491,8 +1492,6 @@ function BatchOutputsEditor({
   const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
   const { data: outputLots = [], isLoading: outputLotsLoading } = useBatchOutputLots(batchId, { enabled: isCompleted });
   const batchCustomerId = outputLots[0]?.customerId ?? null;
-  const { data: batchTemplate } = useLabelTemplate('batch', batchCustomerId);
-  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output', batchCustomerId);
   const { data: allProducts = [] } = useProducts();
   const { data: allCategories = [] } = useCategories();
   const addBatchOutput = useAddBatchOutput();
@@ -1600,20 +1599,29 @@ function BatchOutputsEditor({
               variant="outline"
               className="text-xs h-7 px-2 shrink-0"
               data-testid="button-print-batch-label-summary"
-              onClick={() => {
-                printBarcodeLabel({
-                  template: "batch",
-                  batchCode: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
-                  barcodeValue: finalizeResult.batch.barcodeValue,
-                  productName: allProducts.find(p => p.id === finalizeResult.batch.productId)?.name || 'Batch',
-                  quantity: finalizeResult.batch.plannedQuantity,
-                  unit: 'KG',
-                  productionDate: finalizeResult.batch.startDate,
-                  status: finalizeResult.batch.status,
-                  templateSettings: batchTemplate ? parseLabelTemplateSettings(batchTemplate.settings) : undefined,
+              onClick={async () => {
+                const productName = allProducts.find(p => p.id === finalizeResult.batch.productId)?.name || 'Batch';
+                await printAndRecord({
+                  kind: 'batch',
+                  customerId: batchCustomerId,
+                  legacyData: {
+                    template: 'batch',
+                    batchCode: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
+                    barcodeValue: finalizeResult.batch.barcodeValue,
+                    productName,
+                    quantity: finalizeResult.batch.plannedQuantity, unit: 'KG',
+                    productionDate: finalizeResult.batch.startDate,
+                    status: finalizeResult.batch.status,
+                  },
+                  entityType: 'batch', entityId: finalizeResult.batch.id,
+                  displayName: productName,
+                  secondaryName: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
+                  toast, recordPrint: (d) => recordPrint.mutate(d),
+                  onAfterPrint: () => {
+                    markBatchPrinted.mutate(finalizeResult.batch.id);
+                    setSummaryBatchPrintedAt(new Date().toISOString());
+                  },
                 });
-                markBatchPrinted.mutate(finalizeResult.batch.id);
-                setSummaryBatchPrintedAt(new Date().toISOString());
               }}
             >
               <Printer className="h-3 w-3 mr-1" />
@@ -1642,26 +1650,32 @@ function BatchOutputsEditor({
                     variant="outline"
                     className="text-xs h-7 px-2"
                     data-testid={`button-print-final-lot-${ol.lotId}`}
-                    onClick={() => {
-                      printBarcodeLabel({
-                        template: "finished_output",
-                        lotNumber: ol.lotNumber,
-                        barcodeValue: ol.barcodeValue,
-                        productName: ol.productName || 'Output',
-                        quantity: ol.quantity,
-                        unit: 'KG',
-                        producedDate: finalizeResult.batch.endDate,
-                        sourceBatch: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
-                        expiryDate: ol.expiryDate,
-                        templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
+                    onClick={async () => {
+                      await printAndRecord({
+                        kind: 'finished_output',
+                        customerId: ol.customerId ?? batchCustomerId,
+                        legacyData: {
+                          template: 'finished_output',
+                          lotNumber: ol.lotNumber, barcodeValue: ol.barcodeValue,
+                          productName: ol.productName || 'Output',
+                          quantity: ol.quantity, unit: 'KG',
+                          producedDate: finalizeResult.batch.endDate,
+                          sourceBatch: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
+                          expiryDate: ol.expiryDate,
+                        },
+                        entityType: 'lot', entityId: ol.lotId,
+                        displayName: ol.productName || 'Output', secondaryName: ol.lotNumber,
+                        toast, recordPrint: (d) => recordPrint.mutate(d),
+                        onAfterPrint: () => {
+                          markLotPrinted.mutate(ol.lotId);
+                          setFinalizeResult(prev => prev ? {
+                            ...prev,
+                            outputLots: prev.outputLots.map(l =>
+                              l.lotId === ol.lotId ? { ...l, barcodePrintedAt: new Date().toISOString() } : l
+                            )
+                          } : null);
+                        },
                       });
-                      markLotPrinted.mutate(ol.lotId);
-                      setFinalizeResult(prev => prev ? {
-                        ...prev,
-                        outputLots: prev.outputLots.map(l =>
-                          l.lotId === ol.lotId ? { ...l, barcodePrintedAt: new Date().toISOString() } : l
-                        )
-                      } : null);
                     }}
                   >
                     <Printer className="h-3 w-3 mr-1" />
@@ -1911,20 +1925,24 @@ function BatchOutputsEditor({
                         variant="outline"
                         className="text-xs h-7 px-2"
                         data-testid={`button-reprint-lot-${ol.lotId}`}
-                        onClick={() => {
-                          printBarcodeLabel({
-                            template: "finished_output",
-                            lotNumber: ol.lotNumber,
-                            barcodeValue: ol.barcodeValue,
-                            productName: ol.productName || 'Output',
-                            quantity: ol.quantity,
-                            unit: 'KG',
-                            producedDate: batchData?.endDate,
-                            sourceBatch: batchData?.batchCode || batchData?.batchNumber,
-                            expiryDate: ol.expiryDate,
-                            templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
+                        onClick={async () => {
+                          await printAndRecord({
+                            kind: 'finished_output',
+                            customerId: ol.customerId ?? batchCustomerId,
+                            legacyData: {
+                              template: 'finished_output',
+                              lotNumber: ol.lotNumber, barcodeValue: ol.barcodeValue,
+                              productName: ol.productName || 'Output',
+                              quantity: ol.quantity, unit: 'KG',
+                              producedDate: batchData?.endDate,
+                              sourceBatch: batchData?.batchCode || batchData?.batchNumber,
+                              expiryDate: ol.expiryDate,
+                            },
+                            entityType: 'lot', entityId: ol.lotId,
+                            displayName: ol.productName || 'Output', secondaryName: ol.lotNumber,
+                            toast, recordPrint: (d) => recordPrint.mutate(d),
+                            onAfterPrint: () => markLotPrinted.mutate(ol.lotId),
                           });
-                          markLotPrinted.mutate(ol.lotId);
                         }}
                       >
                         <Printer className="h-3 w-3 mr-1" />

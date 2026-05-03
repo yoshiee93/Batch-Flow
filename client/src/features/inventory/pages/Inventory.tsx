@@ -23,8 +23,8 @@ import {
   useReceiveStock, useReceivableItems, useMarkBarcodePrinted,
   type Material, type Product, type Category, type Lot, type LotWithDetails, type ReceivableItem,
 } from '@/lib/api';
-import { printBarcodeLabel } from '@/lib/barcodePrint';
-import { fetchLabelTemplate, parseLabelTemplateSettings } from '@/features/labels/api';
+import { fetchLabelTemplate, useRecordPrint } from '@/features/labels/api';
+import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
 import { useRole } from '@/contexts/AuthContext';
 
@@ -102,6 +102,7 @@ export default function Inventory() {
   const deleteProduct = useDeleteProduct();
   const receiveStock = useReceiveStock();
   const markBarcodePrinted = useMarkBarcodePrinted();
+  const recordPrint = useRecordPrint();
   const { toast } = useToast();
 
   const isLoading = materialsLoading || productsLoading || lotsLoading;
@@ -171,39 +172,39 @@ export default function Inventory() {
   async function handlePrintLabel(lot: Lot) {
     const itemName = getLotItemName(lot);
     const unit = getLotUnit(lot);
+    const onAfter = () => { if (!lot.barcodePrintedAt) markBarcodePrinted.mutate(lot.id); };
     if (lot.lotType === 'finished_good' || lot.lotType === 'intermediate') {
       const srcBatch = lot.sourceBatchId ? batches.find(b => b.id === lot.sourceBatchId) : undefined;
-      const tmpl = await fetchLabelTemplate('finished_output', lot.customerId);
-      printBarcodeLabel({
-        template: "finished_output",
-        lotNumber: lot.lotNumber,
-        barcodeValue: lot.barcodeValue,
-        productName: itemName,
-        quantity: lot.originalQuantity || lot.quantity,
-        unit,
-        producedDate: lot.producedDate || lot.receivedDate,
-        sourceBatch: srcBatch?.batchCode || srcBatch?.batchNumber || 'N/A',
-        expiryDate: lot.expiryDate,
-        templateSettings: tmpl ? parseLabelTemplateSettings(tmpl.settings) : undefined,
+      await printAndRecord({
+        kind: 'finished_output',
+        customerId: lot.customerId ?? null,
+        legacyData: {
+          template: 'finished_output',
+          lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue, productName: itemName,
+          quantity: lot.originalQuantity || lot.quantity, unit,
+          producedDate: lot.producedDate || lot.receivedDate,
+          sourceBatch: srcBatch?.batchCode || srcBatch?.batchNumber || 'N/A',
+          expiryDate: lot.expiryDate,
+        },
+        entityType: 'lot', entityId: lot.id,
+        displayName: itemName, secondaryName: lot.lotNumber,
+        toast, recordPrint: (d) => recordPrint.mutate(d), onAfterPrint: onAfter,
       });
     } else {
-      const tmpl = await fetchLabelTemplate('raw_intake', lot.customerId);
-      printBarcodeLabel({
-        template: "raw_intake",
-        lotNumber: lot.lotNumber,
-        barcodeValue: lot.barcodeValue,
-        itemName,
-        quantity: lot.originalQuantity || lot.quantity,
-        unit,
-        sourceLabel: lot.supplierName || lot.sourceName || undefined,
-        receivedDate: lot.receivedDate,
-        expiryDate: lot.expiryDate,
-        supplierLot: lot.supplierLot,
-        templateSettings: tmpl ? parseLabelTemplateSettings(tmpl.settings) : undefined,
+      await printAndRecord({
+        kind: 'raw_intake',
+        customerId: lot.customerId ?? null,
+        legacyData: {
+          template: 'raw_intake',
+          lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue, itemName,
+          quantity: lot.originalQuantity || lot.quantity, unit,
+          sourceLabel: lot.supplierName || lot.sourceName || undefined,
+          receivedDate: lot.receivedDate, expiryDate: lot.expiryDate, supplierLot: lot.supplierLot,
+        },
+        entityType: 'lot', entityId: lot.id,
+        displayName: itemName, secondaryName: lot.lotNumber,
+        toast, recordPrint: (d) => recordPrint.mutate(d), onAfterPrint: onAfter,
       });
-    }
-    if (!lot.barcodePrintedAt) {
-      markBarcodePrinted.mutate(lot.id);
     }
   }
 
@@ -347,23 +348,21 @@ export default function Inventory() {
   async function handlePrintReceivedLot(lot: LotWithDetails) {
     const itemName = lot.materialName || lot.productName || getLotItemName(lot as Lot);
     const unit = getLotUnit(lot as Lot);
-    const tmpl = await fetchLabelTemplate('raw_intake', lot.customerId);
-    printBarcodeLabel({
-      template: 'raw_intake',
-      lotNumber: lot.lotNumber,
-      barcodeValue: lot.barcodeValue,
-      itemName,
-      quantity: lot.originalQuantity || lot.quantity,
-      unit,
-      sourceLabel: lot.supplierName || lot.sourceName || undefined,
-      receivedDate: lot.receivedDate,
-      expiryDate: lot.expiryDate,
-      supplierLot: lot.supplierLot,
-      templateSettings: tmpl ? parseLabelTemplateSettings(tmpl.settings) : undefined,
+    await printAndRecord({
+      kind: 'raw_intake',
+      customerId: lot.customerId ?? null,
+      legacyData: {
+        template: 'raw_intake',
+        lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue, itemName,
+        quantity: lot.originalQuantity || lot.quantity, unit,
+        sourceLabel: lot.supplierName || lot.sourceName || undefined,
+        receivedDate: lot.receivedDate, expiryDate: lot.expiryDate, supplierLot: lot.supplierLot,
+      },
+      entityType: 'lot', entityId: lot.id,
+      displayName: itemName, secondaryName: lot.lotNumber,
+      toast, recordPrint: (d) => recordPrint.mutate(d),
+      onAfterPrint: () => { if (!lot.barcodePrintedAt) markBarcodePrinted.mutate(lot.id); },
     });
-    if (!lot.barcodePrintedAt) {
-      markBarcodePrinted.mutate(lot.id);
-    }
   }
 
   const handleOpenReceive = () => {

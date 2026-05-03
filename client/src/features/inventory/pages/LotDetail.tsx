@@ -15,8 +15,9 @@ import {
   type LotUsageEntry, type OutputLot
 } from '@/lib/api';
 import { format } from 'date-fns';
-import { printBarcodeLabel } from '@/lib/barcodePrint';
-import { useLabelTemplate, parseLabelTemplateSettings } from '@/features/labels/api';
+import { useRecordPrint } from '@/features/labels/api';
+import { printAndRecord } from '@/lib/printAndRecord';
+import { useToast } from '@/hooks/use-toast';
 
 const lotStatusColors: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
@@ -84,8 +85,8 @@ export default function LotDetail() {
   const { data: usage = [], isLoading: usageLoading } = useLotUsage(id!);
   const { data: lineage, isLoading: lineageLoading } = useLotLineage(id!);
   const { data: sourceBatch } = useBatch(lot?.sourceBatchId || '');
-  const { data: rawIntakeTemplate } = useLabelTemplate('raw_intake', lot?.customerId);
-  const { data: finishedOutputTemplate } = useLabelTemplate('finished_output', lot?.customerId);
+  const recordPrint = useRecordPrint();
+  const { toast } = useToast();
 
   if (lotLoading) {
     return (
@@ -262,33 +263,39 @@ export default function LotDetail() {
               variant="outline"
               className="w-full"
               data-testid="button-print-label"
-              onClick={() => {
-                if (lot.lotType === 'finished_good' || lot.lotType === 'intermediate') {
-                  printBarcodeLabel({
-                    template: "finished_output",
-                    lotNumber: lot.lotNumber,
-                    barcodeValue: lot.barcodeValue,
-                    productName: itemName,
-                    quantity: lot.quantity,
-                    unit,
-                    producedDate: lot.producedDate || lot.receivedDate,
-                    sourceBatch: sourceBatch?.batchCode || sourceBatch?.batchNumber || undefined,
-                    expiryDate: lot.expiryDate,
-                    templateSettings: finishedOutputTemplate ? parseLabelTemplateSettings(finishedOutputTemplate.settings) : undefined,
+              onClick={async () => {
+                const isFinished = lot.lotType === 'finished_good' || lot.lotType === 'intermediate';
+                if (isFinished) {
+                  await printAndRecord({
+                    kind: 'finished_output',
+                    customerId: lot.customerId ?? null,
+                    legacyData: {
+                      template: 'finished_output',
+                      lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue,
+                      productName: itemName, quantity: lot.quantity, unit,
+                      producedDate: lot.producedDate || lot.receivedDate,
+                      sourceBatch: sourceBatch?.batchCode || sourceBatch?.batchNumber || undefined,
+                      expiryDate: lot.expiryDate,
+                    },
+                    entityType: 'lot', entityId: lot.id,
+                    displayName: itemName, secondaryName: lot.lotNumber,
+                    toast, recordPrint: (d) => recordPrint.mutate(d),
                   });
                 } else {
-                  printBarcodeLabel({
-                    template: "raw_intake",
-                    lotNumber: lot.lotNumber,
-                    barcodeValue: lot.barcodeValue,
-                    itemName,
-                    quantity: lot.quantity,
-                    unit,
-                    sourceLabel: lot.supplierName || lot.sourceName || undefined,
-                    receivedDate: lot.receivedDate,
-                    expiryDate: lot.expiryDate,
-                    supplierLot: lot.supplierLot,
-                    templateSettings: rawIntakeTemplate ? parseLabelTemplateSettings(rawIntakeTemplate.settings) : undefined,
+                  await printAndRecord({
+                    kind: 'raw_intake',
+                    customerId: lot.customerId ?? null,
+                    legacyData: {
+                      template: 'raw_intake',
+                      lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue,
+                      itemName, quantity: lot.quantity, unit,
+                      sourceLabel: lot.supplierName || lot.sourceName || undefined,
+                      receivedDate: lot.receivedDate, expiryDate: lot.expiryDate,
+                      supplierLot: lot.supplierLot,
+                    },
+                    entityType: 'lot', entityId: lot.id,
+                    displayName: itemName, secondaryName: lot.lotNumber,
+                    toast, recordPrint: (d) => recordPrint.mutate(d),
                   });
                 }
               }}

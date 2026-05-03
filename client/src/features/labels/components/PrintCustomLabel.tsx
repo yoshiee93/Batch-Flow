@@ -7,17 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Printer } from "lucide-react";
 import {
   useLabelTemplates,
+  useRecordPrint,
   parseLabelTemplateSettings,
   type LabelTemplate,
 } from "@/features/labels/api";
 import { printLayoutLabel, type LabelDataContext } from "@/lib/labelLayoutPrint";
-import { printBarcodeLabel } from "@/lib/barcodePrint";
+import { printBarcodeLabel, type LabelData } from "@/lib/barcodePrint";
 import { useToast } from "@/hooks/use-toast";
 
 const NO_TEMPLATE = "__none__";
 
 export default function PrintCustomLabel() {
   const { data: templates = [] } = useLabelTemplates();
+  const recordPrint = useRecordPrint();
   const { toast } = useToast();
   const [templateId, setTemplateId] = useState<string>(NO_TEMPLATE);
   const [productName, setProductName] = useState("");
@@ -50,55 +52,59 @@ export default function PrintCustomLabel() {
     };
 
     const settings = selected ? parseLabelTemplateSettings(selected.settings) : null;
-
-    if (settings?.layout && (settings.layout.elements?.length ?? 0) > 0) {
-      await printLayoutLabel(settings.layout, ctx, productName || lotNumber || batchCode || "Custom Label");
-      return;
-    }
-
-    // Fallback: legacy printer using template type (or finished_output as default).
+    const displayName = productName || lotNumber || batchCode || "Custom Label";
     const labelType = selected?.labelType ?? "finished_output";
     const bc = barcodeValue || lotNumber || batchCode || productName || "LABEL";
+
+    let legacyData: LabelData;
     if (labelType === "raw_intake") {
-      printBarcodeLabel({
+      legacyData = {
         template: "raw_intake",
-        lotNumber: lotNumber || batchCode || "—",
-        barcodeValue: bc,
+        lotNumber: lotNumber || batchCode || "—", barcodeValue: bc,
         itemName: productName || "—",
-        quantity: quantity || "0",
-        unit: unit || "",
-        receivedDate: productionDate || null,
-        expiryDate: expiryDate || null,
-        supplierLot: supplierLot || null,
-        sourceLabel: null,
-        templateSettings: settings,
-      });
+        quantity: quantity || "0", unit: unit || "",
+        receivedDate: productionDate || null, expiryDate: expiryDate || null,
+        supplierLot: supplierLot || null, sourceLabel: null,
+      };
     } else if (labelType === "batch") {
-      printBarcodeLabel({
+      legacyData = {
         template: "batch",
-        batchCode: batchCode || lotNumber || "—",
-        barcodeValue: bc,
+        batchCode: batchCode || lotNumber || "—", barcodeValue: bc,
         productName: productName || "—",
-        quantity: quantity || null,
-        unit: unit || null,
-        productionDate: productionDate || null,
-        status: null,
-        templateSettings: settings,
-      });
+        quantity: quantity || null, unit: unit || null,
+        productionDate: productionDate || null, status: null,
+      };
     } else {
-      printBarcodeLabel({
+      legacyData = {
         template: "finished_output",
-        lotNumber: lotNumber || batchCode || "—",
-        barcodeValue: bc,
+        lotNumber: lotNumber || batchCode || "—", barcodeValue: bc,
         productName: productName || "—",
-        quantity: quantity || "0",
-        unit: unit || "",
-        producedDate: productionDate || null,
-        sourceBatch: batchCode || null,
+        quantity: quantity || "0", unit: unit || "",
+        producedDate: productionDate || null, sourceBatch: batchCode || null,
         expiryDate: expiryDate || null,
-        templateSettings: settings,
-      });
+      };
     }
+
+    if (settings?.layout && (settings.layout.elements?.length ?? 0) > 0) {
+      await printLayoutLabel(settings.layout, ctx, displayName);
+    } else {
+      printBarcodeLabel({ ...legacyData, templateSettings: settings ?? undefined });
+    }
+
+    recordPrint.mutate({
+      labelKind: "custom",
+      templateId: selected?.id ?? null,
+      templateName: selected?.name ?? null,
+      entityType: null, entityId: null,
+      displayName,
+      secondaryName: lotNumber || batchCode || null,
+      snapshot: {
+        ctx,
+        legacyData,
+        templateTypeForResolve: labelType,
+        customerId: null,
+      },
+    });
   }
 
   return (

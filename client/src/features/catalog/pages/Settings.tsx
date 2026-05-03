@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList, Leaf,
-  Database, Download, Upload, ShieldAlert, Tag, Wrench, ShieldCheck, Construction, Printer,
+  Database, Download, Upload, ShieldAlert, Tag, Wrench, ShieldCheck, Construction, Printer, History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useProducts, useUpdateProduct, type Category, type Product } from '@/features/catalog/api';
@@ -25,6 +25,7 @@ import { queryClient } from '@/lib/queryClient';
 import LabelTemplatesPanel from '@/features/labels/pages/Labels';
 import CustomLabelBuilder from '@/features/labels/components/CustomLabelBuilder';
 import PrintCustomLabel from '@/features/labels/components/PrintCustomLabel';
+import PrintHistoryPanel from '@/features/labels/components/PrintHistoryPanel';
 
 const TAB_VALUES = ['general', 'production', 'labels', 'data', 'security'] as const;
 type TabValue = typeof TAB_VALUES[number];
@@ -706,6 +707,7 @@ export default function Settings() {
         ? [
             { id: 'builder', label: 'Custom Label Builder', icon: Construction, render: () => <CustomLabelBuilder /> },
             { id: 'print', label: 'Print Custom Label', icon: Printer, render: () => <PrintCustomLabel /> },
+            { id: 'history', label: 'Print History', icon: History, render: () => <PrintHistoryPanel /> },
           ]
         : []),
     ],

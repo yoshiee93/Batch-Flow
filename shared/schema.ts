@@ -446,6 +446,27 @@ export const insertLabelTemplateSchema = createInsertSchema(labelTemplates, {
   settings: z.record(z.unknown()).optional(),
 }).omit({ id: true, createdAt: true, updatedAt: true });
 
+export const printHistory = pgTable("print_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  printedAt: timestamp("printed_at").notNull().defaultNow(),
+  printedByUserId: varchar("printed_by_user_id").references(() => users.id),
+  labelKind: text("label_kind").notNull(),
+  templateId: varchar("template_id"),
+  templateName: text("template_name"),
+  entityType: text("entity_type"),
+  entityId: varchar("entity_id"),
+  displayName: text("display_name").notNull(),
+  secondaryName: text("secondary_name"),
+  snapshot: jsonb("snapshot").notNull(),
+});
+
+export const insertPrintHistorySchema = createInsertSchema(printHistory, {
+  snapshot: z.record(z.unknown()),
+}).omit({ id: true, printedAt: true });
+export type InsertPrintHistory = z.infer<typeof insertPrintHistorySchema>;
+export type PrintHistory = typeof printHistory.$inferSelect;
+export type PrintLabelKind = "raw_intake" | "finished_output" | "batch" | "custom";
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
