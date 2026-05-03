@@ -26,6 +26,8 @@ import LabelTemplatesPanel from '@/features/labels/pages/Labels';
 import CustomLabelBuilder from '@/features/labels/components/CustomLabelBuilder';
 import PrintCustomLabel from '@/features/labels/components/PrintCustomLabel';
 import PrintHistoryPanel from '@/features/labels/components/PrintHistoryPanel';
+import ActivityLogPanel from '@/features/security/components/ActivityLogPanel';
+import { Activity } from 'lucide-react';
 
 const TAB_VALUES = ['general', 'production', 'labels', 'data', 'security'] as const;
 type TabValue = typeof TAB_VALUES[number];
@@ -728,6 +730,9 @@ export default function Settings() {
     ],
     security: [
       { id: 'roles', label: 'User Roles & Permissions', icon: ShieldCheck, render: renderSecurityRoles },
+      ...(isAdmin
+        ? [{ id: 'activity-log', label: 'Activity Log', icon: Activity, render: () => <ActivityLogPanel /> }]
+        : []),
     ],
   };
 

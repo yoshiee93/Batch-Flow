@@ -7,6 +7,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedIfEmpty } from "./seed";
 import { labelsRepository } from "./domains/labels/repository";
+import { requestContextMiddleware } from "./lib/requestContext";
 
 const app = express();
 const httpServer = createServer(app);
@@ -40,6 +41,8 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+app.use(requestContextMiddleware);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

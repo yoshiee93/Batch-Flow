@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, boolean, pgEnum, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, boolean, pgEnum, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -331,7 +331,10 @@ export const auditLogs = pgTable("audit_logs", {
   changes: text("changes"),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  createdAtIdx: index("audit_logs_created_at_idx").on(t.createdAt.desc()),
+  entityIdx: index("audit_logs_entity_idx").on(t.entityType, t.entityId),
+}));
 
 export const usersRelations = relations(users, ({ many }) => ({
   batches: many(batches),

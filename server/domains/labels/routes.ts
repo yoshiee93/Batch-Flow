@@ -4,6 +4,7 @@ import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../lib/authMiddleware";
 import { labelsRepository, printHistoryRepository } from "./repository";
 import { insertLabelTemplateSchema, insertPrintHistorySchema } from "@shared/schema";
+import { createAuditLog } from "../../lib/auditLog";
 
 const adminOnly = requireRole("admin");
 
@@ -33,13 +34,16 @@ labelsRouter.get("/label-templates/:id", adminOnly, asyncHandler(async (req, res
 
 labelsRouter.post("/label-templates", adminOnly, asyncHandler(async (req, res) => {
   const data = insertLabelTemplateSchema.parse(req.body);
-  res.status(201).json(await labelsRepository.createTemplate(data));
+  const created = await labelsRepository.createTemplate(data);
+  await createAuditLog({ entityType: "label_template", entityId: created.id, action: "create", changes: JSON.stringify(data) });
+  res.status(201).json(created);
 }));
 
 labelsRouter.patch("/label-templates/:id", adminOnly, asyncHandler(async (req, res) => {
   const data = insertLabelTemplateSchema.partial().parse(req.body);
   const template = await labelsRepository.updateTemplate(req.params.id, data);
   if (!template) return res.status(404).json({ error: "Template not found" });
+  await createAuditLog({ entityType: "label_template", entityId: req.params.id, action: "update", changes: JSON.stringify(data) });
   res.json(template);
 }));
 
@@ -50,6 +54,7 @@ labelsRouter.delete("/label-templates/:id", adminOnly, asyncHandler(async (req, 
     return res.status(400).json({ error: "Cannot delete a system default template" });
   }
   await labelsRepository.deleteTemplate(req.params.id);
+  await createAuditLog({ entityType: "label_template", entityId: req.params.id, action: "delete", changes: JSON.stringify({ name: template.name, labelType: template.labelType }) });
   res.status(204).send();
 }));
 
