@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import {
   insertCustomerSchema, insertOrderSchema, insertOrderItemSchema,
 } from "@shared/schema";
@@ -72,9 +73,24 @@ customersRouter.delete("/orders/:id", adminOnly, asyncHandler(async (req, res) =
   res.status(204).send();
 }));
 
+const orderItemPayloadSchema = insertOrderItemSchema.extend({
+  quantity: z.string().refine((v) => {
+    const n = parseFloat(v);
+    return !isNaN(n) && n > 0;
+  }, { message: "Quantity must be greater than 0" }),
+  productId: z.string().min(1, "Product is required"),
+});
 customersRouter.post("/orders/:id/items", adminOnly, asyncHandler(async (req, res) => {
-  const data = insertOrderItemSchema.parse({ ...req.body, orderId: req.params.id });
+  const data = orderItemPayloadSchema.parse({ ...req.body, orderId: req.params.id });
   res.status(201).json(await svc.createOrderItem(data));
+}));
+
+customersRouter.post("/orders/:id/complete-validate", adminOnly, asyncHandler(async (req, res) => {
+  const items = await svc.getOrderItems(req.params.id);
+  if (!items || items.length === 0) {
+    return res.status(400).json({ error: "Order must have at least one line item before it can be completed" });
+  }
+  res.json({ ok: true });
 }));
 
 customersRouter.delete("/order-items/:id", adminOnly, asyncHandler(async (req, res) => {

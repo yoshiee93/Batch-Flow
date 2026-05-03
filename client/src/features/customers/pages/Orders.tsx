@@ -66,10 +66,9 @@ export default function Orders() {
   });
   const newOrder = createOrderForm.watch();
   const setNewOrder = (next: Partial<CreateOrderValues> | ((prev: CreateOrderValues) => CreateOrderValues)) => {
-    const value = typeof next === 'function' ? next(createOrderForm.getValues()) : next;
-    (Object.keys(value) as (keyof CreateOrderValues)[]).forEach((k) => {
-      createOrderForm.setValue(k, (value as any)[k] as any, { shouldValidate: false, shouldDirty: true });
-    });
+    const current = createOrderForm.getValues();
+    const partial = typeof next === 'function' ? next(current) : next;
+    createOrderForm.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
   };
   const [editOrder, setEditOrder] = useState({
     customerName: '',
@@ -639,26 +638,44 @@ function EditOrderContent({
   const deleteOrderItem = useDeleteOrderItem();
   const { toast } = useToast();
   
-  const [newItem, setNewItem] = useState({ productId: '', quantity: '' });
+  const addItemSchema = z.object({
+    productId: z.string().min(1, 'Product is required'),
+    quantity: z.string()
+      .min(1, 'Quantity is required')
+      .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, { message: 'Quantity must be greater than 0' }),
+  });
+  type AddItemValues = z.infer<typeof addItemSchema>;
+  const addItemForm = useForm<AddItemValues>({
+    resolver: zodResolver(addItemSchema),
+    defaultValues: { productId: '', quantity: '' },
+    mode: 'onSubmit',
+  });
+  const newItem = addItemForm.watch();
+  const setNewItem = (next: Partial<AddItemValues> | ((prev: AddItemValues) => AddItemValues)) => {
+    const current = addItemForm.getValues();
+    const partial = typeof next === 'function' ? next(current) : next;
+    addItemForm.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
+  };
   const [productSearchOpen, setProductSearchOpen] = useState(false);
 
-  const handleAddItem = async () => {
-    if (!newItem.productId || !newItem.quantity) {
-      toast({ title: "Missing fields", description: "Please select a product and enter quantity", variant: "destructive" });
-      return;
-    }
+  const handleAddItem = addItemForm.handleSubmit(async (values) => {
     try {
       await createOrderItem.mutateAsync({
         orderId: order.id,
-        productId: newItem.productId,
-        quantity: newItem.quantity,
+        productId: values.productId,
+        quantity: values.quantity,
       });
       toast({ title: "Item added", description: "Order item added successfully" });
-      setNewItem({ productId: '', quantity: '' });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to add order item", variant: "destructive" });
+      addItemForm.reset({ productId: '', quantity: '' });
+    } catch (error: any) {
+      if (error instanceof ApiValidationError) {
+        const unmatched = applyServerFieldErrors(error, addItemForm.setError, ['productId', 'quantity']);
+        if (!unmatched.handled) toast({ title: 'Error', description: error.message || 'Failed to add order item', variant: 'destructive' });
+      } else {
+        toast({ title: "Error", description: error?.message || "Failed to add order item", variant: "destructive" });
+      }
     }
-  };
+  });
 
   const handleRemoveItem = async (itemId: string) => {
     try {
@@ -858,6 +875,9 @@ function EditOrderContent({
                   placeholder="0.00"
                   data-testid="input-add-quantity"
                 />
+                {addItemForm.formState.errors.quantity && (
+                  <p className="text-sm text-destructive" data-testid="error-add-quantity">{addItemForm.formState.errors.quantity.message}</p>
+                )}
               </div>
               <Button
                 onClick={handleAddItem}

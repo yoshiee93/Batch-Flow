@@ -74,10 +74,9 @@ export default function Production() {
   });
   const newBatch = createBatchForm.watch();
   const setNewBatch = (next: Partial<CreateBatchValues> | ((prev: CreateBatchValues) => CreateBatchValues)) => {
-    const value = typeof next === 'function' ? next(createBatchForm.getValues()) : next;
-    (Object.keys(value) as (keyof CreateBatchValues)[]).forEach((k) => {
-      createBatchForm.setValue(k, (value as any)[k] ?? '', { shouldValidate: false, shouldDirty: true });
-    });
+    const current = createBatchForm.getValues();
+    const partial = typeof next === 'function' ? next(current) : next;
+    createBatchForm.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
   };
   const [batchNumberEdited, setBatchNumberEdited] = useState(false);
   
@@ -217,7 +216,7 @@ export default function Production() {
     } catch (error: any) {
       if (error instanceof ApiValidationError) {
         const firstField = Object.keys(error.fields)[0];
-        const firstMsg = error.fields[firstField]?.[0];
+        const firstMsg = firstField ? error.fields[firstField] : undefined;
         toast({ title: 'Validation', description: firstMsg || error.message, variant: 'destructive' });
       } else {
         toast({ title: "Error", description: error?.message || "Failed to update batch", variant: "destructive" });

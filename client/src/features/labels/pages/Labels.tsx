@@ -72,6 +72,7 @@ export function LabelTemplatesPanel() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<LabelTemplate | null>(null);
   const [form, setForm] = useState<TemplateFormData>({ ...EMPTY_FORM });
+  const [pendingDefaultOverwrite, setPendingDefaultOverwrite] = useState<{ existingName: string } | null>(null);
 
   const isAdmin = role === 'admin';
   const { data: templates = [], isLoading, isError } = useLabelTemplates({ enabled: isAdmin });
@@ -217,8 +218,32 @@ export function LabelTemplatesPanel() {
           <Switch
             id="tpl-default"
             checked={form.isDefault}
-            onCheckedChange={v => setForm(p => ({ ...p, isDefault: v }))}
+            onCheckedChange={v => {
+              if (v) {
+                const existing = templates.find(t =>
+                  t.isDefault &&
+                  t.labelType === form.labelType &&
+                  (t.customerId || '') === (form.customerId || '') &&
+                  t.id !== selectedTemplate?.id
+                );
+                if (existing) {
+                  setPendingDefaultOverwrite({ existingName: existing.name });
+                  return;
+                }
+              }
+              setForm(p => ({ ...p, isDefault: v }));
+            }}
             data-testid="switch-is-default"
+          />
+          <ConfirmDialog
+            open={pendingDefaultOverwrite !== null}
+            onOpenChange={(o) => { if (!o) setPendingDefaultOverwrite(null); }}
+            title="Replace default template?"
+            description={`"${pendingDefaultOverwrite?.existingName ?? ''}" is currently the default for this label type. Setting this template as default will replace it.`}
+            confirmLabel="Replace default"
+            variant="overwrite"
+            onConfirm={() => { setForm(p => ({ ...p, isDefault: true })); setPendingDefaultOverwrite(null); }}
+            testId="confirm-overwrite-default-template"
           />
           <div>
             <Label htmlFor="tpl-default" className="cursor-pointer font-medium">Set as default template</Label>

@@ -97,10 +97,9 @@ export default function Inventory() {
   const productRhf = useForm<ProductFormValues>({ resolver: zodResolver(productSchema), defaultValues: productFormDefaults, mode: 'onSubmit' });
   const productForm = productRhf.watch();
   const setProductForm = (next: Partial<ProductFormValues> | ((prev: ProductFormValues) => ProductFormValues)) => {
-    const value = typeof next === 'function' ? next(productRhf.getValues()) : next;
-    (Object.keys(value) as (keyof ProductFormValues)[]).forEach((k) => {
-      productRhf.setValue(k, (value as any)[k] as any, { shouldValidate: false, shouldDirty: true });
-    });
+    const current = productRhf.getValues();
+    const partial = typeof next === 'function' ? next(current) : next;
+    productRhf.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
   };
 
   const [isReceiveStockOpen, setIsReceiveStockOpen] = useState(false);
@@ -137,10 +136,9 @@ export default function Inventory() {
   });
   const receiveForm = receiveRhf.watch();
   const setReceiveForm = (next: Partial<ReceiveFormValues> | ((prev: ReceiveFormValues) => ReceiveFormValues)) => {
-    const value = typeof next === 'function' ? next(receiveRhf.getValues()) : next;
-    (Object.keys(value) as (keyof ReceiveFormValues)[]).forEach((k) => {
-      receiveRhf.setValue(k, (value as any)[k] as any, { shouldValidate: false, shouldDirty: true });
-    });
+    const current = receiveRhf.getValues();
+    const partial = typeof next === 'function' ? next(current) : next;
+    receiveRhf.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
   };
   const [receivedLot, setReceivedLot] = useState<LotWithDetails | null>(null);
   const [itemSearchOpen, setItemSearchOpen] = useState(false);
