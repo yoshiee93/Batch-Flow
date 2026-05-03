@@ -6,6 +6,8 @@ export interface DashboardStats {
   pendingOrders: number;
   lowStockAlerts: number;
   totalProducts: number;
+  batchesCreatedToday: number;
+  labelsPrintedToday: number;
 }
 
 export function useDashboardStats() {
