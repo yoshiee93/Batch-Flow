@@ -10,9 +10,11 @@ const inventoryOrAdmin = requireRole("inventory", "admin");
 export const inventoryRouter = Router();
 
 const receiveStockSchema = z.object({
-  itemId: z.string().min(1),
+  itemId: z.string().min(1, "Item is required"),
   itemType: z.enum(["material", "product"]),
-  quantity: z.string().min(1),
+  quantity: z.string()
+    .min(1, "Quantity is required")
+    .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, { message: "Quantity must be a positive number" }),
   supplierName: z.string().optional(),
   sourceName: z.string().optional(),
   supplierLot: z.string().optional(),
@@ -103,10 +105,6 @@ inventoryRouter.get("/products/:id/lots", asyncHandler(async (req, res) => {
 
 inventoryRouter.post("/receive-stock", inventoryOrAdmin, asyncHandler(async (req, res) => {
   const data = receiveStockSchema.parse(req.body);
-  const qty = parseFloat(data.quantity);
-  if (isNaN(qty) || qty <= 0) {
-    return res.status(400).json({ error: "quantity must be a positive number" });
-  }
   res.status(201).json(await svc.receiveStock(data));
 }));
 

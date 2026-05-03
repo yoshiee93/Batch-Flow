@@ -364,6 +364,7 @@ export function LabelTemplatesPanel() {
                             confirmLabel="Delete"
                             variant="destructive"
                             onConfirm={() => handleDelete(t)}
+                            pending={deleteTemplate.isPending}
                             testId={`confirm-delete-template-${t.id}`}
                           />
                         )}

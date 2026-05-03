@@ -542,6 +542,7 @@ export default function Inventory() {
                 confirmLabel="Delete"
                 variant="destructive"
                 onConfirm={() => handleDeleteMaterial(material)}
+                pending={deleteMaterial.isPending}
                 testId={`confirm-delete-material-${material.id}`}
               />
             </div>
@@ -591,6 +592,7 @@ export default function Inventory() {
                 confirmLabel="Delete"
                 variant="destructive"
                 onConfirm={() => handleDeleteProduct(product)}
+                pending={deleteProduct.isPending}
                 testId={`confirm-delete-product-${product.id}`}
               />
             </div>

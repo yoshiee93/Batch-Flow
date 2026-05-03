@@ -1025,6 +1025,7 @@ export default function Production() {
         confirmLabel="Delete"
         variant="destructive"
         onConfirm={handleDeleteBatch}
+        pending={deleteBatch.isPending}
         testId="confirm-delete-batch"
       />
     </div>

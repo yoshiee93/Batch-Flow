@@ -577,6 +577,7 @@ export default function Settings() {
                               confirmLabel="Delete"
                               variant="destructive"
                               onConfirm={() => handleDelete(category)}
+                              pending={deleteCategory.isPending}
                               testId={`confirm-delete-category-${category.id}`}
                             />
                           )}

@@ -410,6 +410,8 @@ export default function Orders() {
                       onComplete={handleCompleteOrder}
                       onViewClick={handleViewClick}
                       products={products}
+                      isDeletePending={deleteOrder.isPending}
+                      isCompletePending={completeOrder.isPending}
                     />
                   ))}
                   {currentOrders.length === 0 && (
@@ -448,6 +450,7 @@ export default function Orders() {
                       onViewClick={handleViewClick}
                       onDelete={handleDeleteOrder}
                       products={products}
+                      isArchivedDeletePending={deleteOrder.isPending}
                     />
                   ))}
                   {archivedOrders.length === 0 && (
@@ -597,7 +600,11 @@ export default function Orders() {
                 {viewingOrder && viewingOrder.status !== 'shipped' && viewingOrder.status !== 'cancelled' && (
                   <ConfirmDialog
                     trigger={
-                      <Button className="bg-green-600 hover:bg-green-700">
+                      <Button
+                        className="bg-green-600 hover:bg-green-700"
+                        disabled={viewingOrder.items.length === 0}
+                        title={viewingOrder.items.length === 0 ? 'Order must have at least one line item before it can be completed' : undefined}
+                      >
                         <Truck size={14} className="mr-2" /> Complete Order
                       </Button>
                     }
@@ -609,6 +616,7 @@ export default function Orders() {
                       handleCompleteOrder(viewingOrder.id);
                       setIsViewDialogOpen(false);
                     }}
+                    pending={completeOrder.isPending}
                     testId="confirm-complete-order-view"
                   />
                 )}
@@ -915,7 +923,7 @@ function EditOrderContent({
   );
 }
 
-function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, onViewClick, products }: { 
+function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, onViewClick, products, isDeletePending, isCompletePending }: { 
   order: OrderWithAllocation; 
   onStatusChange: (id: string, status: string) => void;
   onEditClick: (order: Order) => void;
@@ -923,6 +931,8 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
   onComplete: (id: string) => void;
   onViewClick: (order: OrderWithAllocation) => void;
   products: Product[];
+  isDeletePending: boolean;
+  isCompletePending: boolean;
 }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
@@ -1013,8 +1023,10 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
                 {order.status !== 'shipped' && order.status !== 'cancelled' && (
                   <DropdownMenuItem 
                     onClick={() => setIsCompleteDialogOpen(true)}
+                    disabled={order.items.length === 0}
                     className="text-green-600"
                     data-testid={`button-complete-order-${order.id}`}
+                    title={order.items.length === 0 ? 'Order must have at least one line item before it can be completed' : undefined}
                   >
                     <Truck size={14} className="mr-2" /> Complete Order
                   </DropdownMenuItem>
@@ -1042,6 +1054,7 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
           confirmLabel="Delete"
           variant="destructive"
           onConfirm={() => onDelete(order)}
+          pending={isDeletePending}
           testId={`confirm-delete-order-${order.id}`}
         />
         <ConfirmDialog
@@ -1052,6 +1065,7 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
           confirmLabel="Complete Order"
           variant="overwrite"
           onConfirm={() => { onComplete(order.id); setIsCompleteDialogOpen(false); }}
+          pending={isCompletePending}
           testId={`confirm-complete-order-${order.id}`}
         />
       </TableCell>
@@ -1059,11 +1073,12 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
   );
 }
 
-function ArchivedOrderRow({ order, onViewClick, onDelete, products }: { 
+function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDeletePending }: { 
   order: OrderWithAllocation; 
   onViewClick: (order: OrderWithAllocation) => void;
   onDelete: (order: Order) => void;
   products: Product[];
+  isArchivedDeletePending: boolean;
 }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { canManageOrders } = useRole();
@@ -1148,6 +1163,7 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products }: {
           confirmLabel="Delete"
           variant="destructive"
           onConfirm={() => onDelete(order)}
+          pending={isArchivedDeletePending}
           testId={`confirm-delete-archived-order-${order.id}`}
         />
       </TableCell>
