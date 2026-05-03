@@ -97,12 +97,12 @@ export default function Forecast() {
   const forecastByDay = useMemo(() => {
     const m = new Map<string, number>();
     for (const f of forecasts) {
-      if (compareProductId && f.productId !== compareProductId) continue;
+      if (compareMode && compareProductId && f.productId !== compareProductId) continue;
       const k = f.expectedDate.slice(0, 10);
       m.set(k, (m.get(k) ?? 0) + parseFloat(f.quantity));
     }
     return m;
-  }, [forecasts, compareProductId]);
+  }, [forecasts, compareMode, compareProductId]);
 
   const forecastDates = useMemo(() => forecasts.map(f => parseISO(f.expectedDate)), [forecasts]);
   const dayForecasts = useMemo(() => {
