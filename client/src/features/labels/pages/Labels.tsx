@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Plus, Loader2, AlertCircle, Pencil, Trash2, Tag, Star, ShieldOff } from 'lucide-react';
 import {
   useLabelTemplates, useCreateLabelTemplate, useUpdateLabelTemplate, useDeleteLabelTemplate,
@@ -324,8 +324,8 @@ export function LabelTemplatesPanel() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                         {!(t.isDefault && !t.customerId) && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
+                          <ConfirmDialog
+                            trigger={
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -333,22 +333,14 @@ export function LabelTemplatesPanel() {
                               >
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Template</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete "{t.name}"? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(t)} data-testid="button-confirm-delete-template">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                            }
+                            title="Delete Template"
+                            description={`Are you sure you want to delete "${t.name}"? This action cannot be undone.`}
+                            confirmLabel="Delete"
+                            variant="destructive"
+                            onConfirm={() => handleDelete(t)}
+                            testId={`confirm-delete-template-${t.id}`}
+                          />
                         )}
                       </div>
                     </TableCell>

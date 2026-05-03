@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
@@ -566,25 +566,19 @@ export default function Settings() {
                             <Pencil className="h-4 w-4" />
                           </Button>
                           {!category.isDefault && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
+                            <ConfirmDialog
+                              trigger={
                                 <Button variant="ghost" size="icon" data-testid={`button-delete-category-${category.id}`}>
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Category</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete "{category.name}"? Products using this category will need to be reassigned.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(category)}>Delete</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                              }
+                              title="Delete Category"
+                              description={`Are you sure you want to delete "${category.name}"? Products using this category will need to be reassigned.`}
+                              confirmLabel="Delete"
+                              variant="destructive"
+                              onConfirm={() => handleDelete(category)}
+                              testId={`confirm-delete-category-${category.id}`}
+                            />
                           )}
                         </div>
                       )}
@@ -871,35 +865,19 @@ export default function Settings() {
         </div>
       </Tabs>
 
-      <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <ShieldAlert className="h-5 w-5" />
-              Confirm Database Restore
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2 text-sm">
-                <p>You are about to restore the database from <strong>{pendingImportFile?.name}</strong>.</p>
-                <p className="text-destructive font-medium">This will permanently overwrite ALL existing data in the system, including batches, lots, orders, inventory, and users.</p>
-                <p>This action cannot be undone. Make sure you have a current backup before proceeding.</p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-import" onClick={() => setPendingImportFile(null)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={handleImportConfirm}
-              data-testid="button-confirm-import"
-            >
-              Yes, Overwrite Everything
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={isImportConfirmOpen}
+        onOpenChange={(open) => {
+          setIsImportConfirmOpen(open);
+          if (!open) setPendingImportFile(null);
+        }}
+        title="Confirm Database Restore"
+        description={`You are about to restore the database from ${pendingImportFile?.name ?? 'the selected file'}. This will permanently overwrite ALL existing data in the system, including batches, lots, orders, inventory, and users. This action cannot be undone — make sure you have a current backup before proceeding.`}
+        confirmLabel="Yes, Overwrite Everything"
+        variant="overwrite"
+        onConfirm={() => handleImportConfirm()}
+        testId="confirm-import-overwrite"
+      />
 
       <Dialog open={isFruitCodeDialogOpen} onOpenChange={setIsFruitCodeDialogOpen}>
         <DialogContent>

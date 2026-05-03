@@ -8,7 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { applyServerFieldErrors } from '@/lib/applyServerFieldErrors';
+import { ApiValidationError } from '@/lib/fetchApi';
 import { Search, Plus, Loader2, AlertCircle, Pencil, Trash2, Package, Box, Layers, Printer, QrCode, CheckCircle2, Download } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -75,12 +80,68 @@ export default function Inventory() {
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [productForm, setProductForm] = useState({
-    sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: '' as string | null, fruitCode: '', isReceivable: false,
+
+  const productSchema = z.object({
+    sku: z.string().optional().or(z.literal('')),
+    name: z.string().min(1, 'Name is required'),
+    description: z.string().optional().or(z.literal('')),
+    unit: z.string().min(1, 'Unit is required'),
+    minStock: z.string().refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, { message: 'Min stock must be a non-negative number' }),
+    currentStock: z.string().refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, { message: 'Current stock must be a non-negative number' }),
+    categoryId: z.string().nullable(),
+    fruitCode: z.string().optional().or(z.literal('')),
+    isReceivable: z.boolean(),
   });
+  type ProductFormValues = z.infer<typeof productSchema>;
+  const productFormDefaults: ProductFormValues = { sku: '', name: '', description: '', unit: 'KG', minStock: '0', currentStock: '0', categoryId: null, fruitCode: '', isReceivable: false };
+  const productRhf = useForm<ProductFormValues>({ resolver: zodResolver(productSchema), defaultValues: productFormDefaults, mode: 'onSubmit' });
+  const productForm = productRhf.watch();
+  const setProductForm = (next: Partial<ProductFormValues> | ((prev: ProductFormValues) => ProductFormValues)) => {
+    const value = typeof next === 'function' ? next(productRhf.getValues()) : next;
+    (Object.keys(value) as (keyof ProductFormValues)[]).forEach((k) => {
+      productRhf.setValue(k, (value as any)[k] as any, { shouldValidate: false, shouldDirty: true });
+    });
+  };
 
   const [isReceiveStockOpen, setIsReceiveStockOpen] = useState(false);
-  const [receiveForm, setReceiveForm] = useState(EMPTY_RECEIVE_FORM);
+  const receiveSchema = z.object({
+    itemId: z.string().min(1, 'Item is required'),
+    itemType: z.union([z.literal(''), z.enum(['material', 'product'])]).refine((v) => v === 'material' || v === 'product', { message: 'Item is required' }),
+    quantity: z.string()
+      .min(1, 'Quantity is required')
+      .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, { message: 'Quantity must be a positive number' }),
+    supplierName: z.string().optional().or(z.literal('')),
+    sourceName: z.string().optional().or(z.literal('')),
+    supplierLot: z.string().optional().or(z.literal('')),
+    sourceType: z.union([z.literal(''), z.enum(['supplier', 'farmer', 'internal_batch'])]),
+    receivedDate: z.string().optional().or(z.literal('')),
+    expiryDate: z.string().optional().or(z.literal('')),
+    notes: z.string().optional().or(z.literal('')),
+  });
+  type ReceiveFormValues = {
+    itemId: string;
+    itemType: '' | 'material' | 'product';
+    quantity: string;
+    supplierName: string;
+    sourceName: string;
+    supplierLot: string;
+    sourceType: '' | 'supplier' | 'farmer' | 'internal_batch';
+    receivedDate: string;
+    expiryDate: string;
+    notes: string;
+  };
+  const receiveRhf = useForm<ReceiveFormValues>({
+    resolver: zodResolver(receiveSchema),
+    defaultValues: EMPTY_RECEIVE_FORM as unknown as ReceiveFormValues,
+    mode: 'onSubmit',
+  });
+  const receiveForm = receiveRhf.watch();
+  const setReceiveForm = (next: Partial<ReceiveFormValues> | ((prev: ReceiveFormValues) => ReceiveFormValues)) => {
+    const value = typeof next === 'function' ? next(receiveRhf.getValues()) : next;
+    (Object.keys(value) as (keyof ReceiveFormValues)[]).forEach((k) => {
+      receiveRhf.setValue(k, (value as any)[k] as any, { shouldValidate: false, shouldDirty: true });
+    });
+  };
   const [receivedLot, setReceivedLot] = useState<LotWithDetails | null>(null);
   const [itemSearchOpen, setItemSearchOpen] = useState(false);
   const [receiveCategoryFilter, setReceiveCategoryFilter] = useState<string>('all');
@@ -228,7 +289,20 @@ export default function Inventory() {
   };
 
   const handleUpdateMaterial = async () => {
-    if (!selectedMaterial || !materialForm.name) return;
+    if (!selectedMaterial) return;
+    const materialUpdateSchema = z.object({
+      name: z.string().min(1, 'Name is required'),
+      sku: z.string().optional().or(z.literal('')),
+      unit: z.string().min(1, 'Unit is required'),
+      minStock: z.string().refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, 'Must be ≥ 0'),
+      currentStock: z.string().refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, 'Must be ≥ 0'),
+    });
+    const parsed = materialUpdateSchema.safeParse(materialForm);
+    if (!parsed.success) {
+      const first = parsed.error.errors[0];
+      toast({ title: 'Validation', description: `${first.path.join('.')}: ${first.message}`, variant: 'destructive' });
+      return;
+    }
     try {
       await updateMaterial.mutateAsync({
         id: selectedMaterial.id, sku: materialForm.sku, name: materialForm.name, description: materialForm.description || null,
@@ -253,23 +327,27 @@ export default function Inventory() {
     }
   };
 
-  const handleCreateProduct = async () => {
-    if (!productForm.name) return;
+  const handleCreateProduct = productRhf.handleSubmit(async (values) => {
     try {
       await createProduct.mutateAsync({
-        sku: productForm.sku, name: productForm.name, description: productForm.description || null,
-        unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock,
-        categoryId: productForm.categoryId || null,
-        fruitCode: productForm.fruitCode || null,
-        isReceivable: productForm.isReceivable,
+        sku: values.sku || '', name: values.name, description: values.description || null,
+        unit: values.unit, minStock: values.minStock, currentStock: values.currentStock,
+        categoryId: values.categoryId || null,
+        fruitCode: values.fruitCode || null,
+        isReceivable: values.isReceivable,
       });
-      toast({ title: "Product created", description: `${productForm.name} added to inventory` });
+      toast({ title: "Product created", description: `${values.name} added to inventory` });
       setIsCreateProductOpen(false);
-      resetProductForm();
-    } catch {
-      toast({ title: "Error", description: "Failed to create product", variant: "destructive" });
+      productRhf.reset(productFormDefaults);
+    } catch (error) {
+      if (error instanceof ApiValidationError) {
+        const unmatched = applyServerFieldErrors(error, productRhf.setError, ['sku','name','description','unit','minStock','currentStock','categoryId','fruitCode','isReceivable']);
+        if (!unmatched.handled) toast({ title: "Error", description: error.message || "Failed to create product", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: (error as Error)?.message || "Failed to create product", variant: "destructive" });
+      }
     }
-  };
+  });
 
   const handleEditProductClick = (product: Product) => {
     setSelectedProduct(product);
@@ -283,24 +361,29 @@ export default function Inventory() {
     setIsEditProductOpen(true);
   };
 
-  const handleUpdateProduct = async () => {
-    if (!selectedProduct || !productForm.name) return;
+  const handleUpdateProduct = productRhf.handleSubmit(async (values) => {
+    if (!selectedProduct) return;
     try {
       await updateProduct.mutateAsync({
-        id: selectedProduct.id, sku: productForm.sku, name: productForm.name, description: productForm.description || null,
-        unit: productForm.unit, minStock: productForm.minStock, currentStock: productForm.currentStock,
-        categoryId: productForm.categoryId || null,
-        fruitCode: productForm.fruitCode || null,
-        isReceivable: productForm.isReceivable,
+        id: selectedProduct.id, sku: values.sku || '', name: values.name, description: values.description || null,
+        unit: values.unit, minStock: values.minStock, currentStock: values.currentStock,
+        categoryId: values.categoryId || null,
+        fruitCode: values.fruitCode || null,
+        isReceivable: values.isReceivable,
       });
-      toast({ title: "Product updated", description: `${productForm.name} updated successfully` });
+      toast({ title: "Product updated", description: `${values.name} updated successfully` });
       setIsEditProductOpen(false);
       setSelectedProduct(null);
-      resetProductForm();
-    } catch {
-      toast({ title: "Error", description: "Failed to update product", variant: "destructive" });
+      productRhf.reset(productFormDefaults);
+    } catch (error) {
+      if (error instanceof ApiValidationError) {
+        const unmatched = applyServerFieldErrors(error, productRhf.setError, ['sku','name','description','unit','minStock','currentStock','categoryId','fruitCode','isReceivable']);
+        if (!unmatched.handled) toast({ title: "Error", description: error.message || "Failed to update product", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: (error as Error)?.message || "Failed to update product", variant: "destructive" });
+      }
     }
-  };
+  });
 
   const handleDeleteProduct = async (product: Product) => {
     try {
@@ -311,34 +394,25 @@ export default function Inventory() {
     }
   };
 
-  const handleReceiveStock = async () => {
-    if (!receiveForm.itemId || !receiveForm.itemType || !receiveForm.quantity) {
-      toast({ title: "Missing fields", description: "Please select an item and enter quantity", variant: "destructive" });
-      return;
-    }
-    const qty = parseFloat(receiveForm.quantity);
-    if (isNaN(qty) || qty <= 0) {
-      toast({ title: "Invalid quantity", description: "Quantity must be a positive number", variant: "destructive" });
-      return;
-    }
+  const handleReceiveStock = receiveRhf.handleSubmit(async (values) => {
     try {
       const result = await receiveStock.mutateAsync({
-        itemId: receiveForm.itemId,
-        itemType: receiveForm.itemType as 'material' | 'product',
-        quantity: receiveForm.quantity,
-        supplierName: receiveForm.supplierName || undefined,
-        sourceName: receiveForm.sourceName || undefined,
-        supplierLot: receiveForm.supplierLot || undefined,
-        sourceType: receiveForm.sourceType || undefined,
-        receivedDate: receiveForm.receivedDate || undefined,
-        expiryDate: receiveForm.expiryDate || undefined,
-        notes: receiveForm.notes || undefined,
+        itemId: values.itemId,
+        itemType: values.itemType as 'material' | 'product',
+        quantity: values.quantity,
+        supplierName: values.supplierName || undefined,
+        sourceName: values.sourceName || undefined,
+        supplierLot: values.supplierLot || undefined,
+        sourceType: (values.sourceType || undefined) as 'supplier' | 'farmer' | 'internal_batch' | undefined,
+        receivedDate: values.receivedDate || undefined,
+        expiryDate: values.expiryDate || undefined,
+        notes: values.notes || undefined,
       });
-      const selectedItem = receivableItems.find(i => i.id === receiveForm.itemId);
+      const selectedItem = receivableItems.find(i => i.id === values.itemId);
       const itemName = selectedItem?.name || 'item';
       const lotWithDetails: LotWithDetails = {
         ...result.lot,
-        ...(receiveForm.itemType === 'material' ? { materialName: itemName } : { productName: itemName }),
+        ...(values.itemType === 'material' ? { materialName: itemName } : { productName: itemName }),
       };
       setReceivedLot(lotWithDetails);
       setReceivedTemplateName(null);
@@ -346,10 +420,15 @@ export default function Inventory() {
         setReceivedTemplateName(tmpl ? tmpl.name : null);
       });
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'Failed to receive stock';
-      toast({ title: "Error", description: msg, variant: "destructive" });
+      if (error instanceof ApiValidationError) {
+        const unmatched = applyServerFieldErrors(error, receiveRhf.setError, ['itemId','itemType','quantity','supplierName','supplierLot','sourceType','receivedDate','expiryDate','notes']);
+        if (!unmatched.handled) toast({ title: "Error", description: error.message || "Failed to receive stock", variant: "destructive" });
+      } else {
+        const msg = error instanceof Error ? error.message : 'Failed to receive stock';
+        toast({ title: "Error", description: msg, variant: "destructive" });
+      }
     }
-  };
+  });
 
   async function handlePrintReceivedLot(lot: LotWithDetails) {
     const itemName = lot.materialName || lot.productName || getLotItemName(lot as Lot);
@@ -378,7 +457,7 @@ export default function Inventory() {
   }
 
   const handleOpenReceive = () => {
-    setReceiveForm(EMPTY_RECEIVE_FORM);
+    receiveRhf.reset(EMPTY_RECEIVE_FORM as unknown as ReceiveFormValues);
     setReceivedLot(null);
     setReceivedTemplateName(null);
     setReceiveCategoryFilter('all');
@@ -391,7 +470,7 @@ export default function Inventory() {
     setReceivedLot(null);
     setReceivedTemplateName(null);
     setRecentReceivePrints([]);
-    setReceiveForm(EMPTY_RECEIVE_FORM);
+    receiveRhf.reset(EMPTY_RECEIVE_FORM as unknown as ReceiveFormValues);
     setReceiveCategoryFilter('all');
   };
 
@@ -454,23 +533,19 @@ export default function Inventory() {
               <Button variant="ghost" size="icon" onClick={() => handleEditMaterialClick(material)} data-testid={`button-edit-material-${material.id}`}>
                 <Pencil className="h-4 w-4" />
               </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
+              <ConfirmDialog
+                trigger={
                   <Button variant="ghost" size="icon" data-testid={`button-delete-material-${material.id}`}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Material</AlertDialogTitle>
-                    <AlertDialogDescription>Are you sure you want to delete {material.name}?</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeleteMaterial(material)}>Delete</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                }
+                title="Delete Material"
+                description={`Are you sure you want to delete ${material.name}?`}
+                confirmLabel="Delete"
+                variant="destructive"
+                onConfirm={() => handleDeleteMaterial(material)}
+                testId={`confirm-delete-material-${material.id}`}
+              />
             </div>
           )}
         </TableCell>
@@ -507,23 +582,19 @@ export default function Inventory() {
               <Button variant="ghost" size="icon" onClick={() => handleEditProductClick(product)} data-testid={`button-edit-product-${product.id}`}>
                 <Pencil className="h-4 w-4" />
               </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
+              <ConfirmDialog
+                trigger={
                   <Button variant="ghost" size="icon" data-testid={`button-delete-product-${product.id}`}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Product</AlertDialogTitle>
-                    <AlertDialogDescription>Are you sure you want to delete {product.name}?</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeleteProduct(product)}>Delete</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                }
+                title="Delete Product"
+                description={`Are you sure you want to delete ${product.name}?`}
+                confirmLabel="Delete"
+                variant="destructive"
+                onConfirm={() => handleDeleteProduct(product)}
+                testId={`confirm-delete-product-${product.id}`}
+              />
             </div>
           )}
         </TableCell>
@@ -973,6 +1044,12 @@ export default function Inventory() {
                           </Command>
                         </PopoverContent>
                       </Popover>
+                      {receiveRhf.formState.errors.itemId && (
+                        <p className="text-sm text-destructive" data-testid="error-receive-item">{receiveRhf.formState.errors.itemId.message}</p>
+                      )}
+                      {receiveRhf.formState.errors.itemType && (
+                        <p className="text-sm text-destructive" data-testid="error-receive-item-type">{receiveRhf.formState.errors.itemType.message}</p>
+                      )}
                     </div>
                   );
                 })()}
@@ -989,6 +1066,9 @@ export default function Inventory() {
                     onChange={(e) => setReceiveForm({ ...receiveForm, quantity: e.target.value })}
                     data-testid="input-receive-quantity"
                   />
+                  {receiveRhf.formState.errors.quantity && (
+                    <p className="text-sm text-destructive" data-testid="error-receive-quantity">{receiveRhf.formState.errors.quantity.message}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Source Type</Label>
@@ -1089,6 +1169,9 @@ export default function Inventory() {
             <div className="space-y-2">
               <Label>Name *</Label>
               <Input placeholder="e.g. Freeze Dried Strawberry" value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} data-testid="input-product-name" />
+              {productRhf.formState.errors.name && (
+                <p className="text-sm text-destructive" data-testid="error-product-name">{productRhf.formState.errors.name.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
@@ -1246,6 +1329,9 @@ export default function Inventory() {
             <div className="space-y-2">
               <Label>Name *</Label>
               <Input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} data-testid="input-edit-product-name" />
+              {productRhf.formState.errors.name && (
+                <p className="text-sm text-destructive" data-testid="error-edit-product-name">{productRhf.formState.errors.name.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Description</Label>

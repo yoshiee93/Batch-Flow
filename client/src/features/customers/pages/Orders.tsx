@@ -22,7 +22,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { applyServerFieldErrors } from '@/lib/applyServerFieldErrors';
+import { ApiValidationError } from '@/lib/fetchApi';
 import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem, useDeleteOrderItem, useDeleteOrder, useCustomers, useOrdersWithAllocation, useCompleteOrder, type Order, type OrderItem, type Product, type Customer, type OrderWithAllocation } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
@@ -46,13 +51,26 @@ export default function Orders() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [viewingOrder, setViewingOrder] = useState<OrderWithAllocation | null>(null);
-  const [newOrder, setNewOrder] = useState({
-    orderNumber: '',
-    customerName: '',
-    customerId: '',
-    priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent',
-    dueDate: '',
+  const createOrderSchema = z.object({
+    orderNumber: z.string().min(1, 'Order number is required'),
+    customerName: z.string().min(1, 'Customer is required'),
+    customerId: z.string().optional().or(z.literal('')),
+    priority: z.enum(['low', 'normal', 'high', 'urgent']),
+    dueDate: z.string().min(1, 'Due date is required'),
   });
+  type CreateOrderValues = z.infer<typeof createOrderSchema>;
+  const createOrderForm = useForm<CreateOrderValues>({
+    resolver: zodResolver(createOrderSchema),
+    defaultValues: { orderNumber: '', customerName: '', customerId: '', priority: 'normal', dueDate: '' },
+    mode: 'onSubmit',
+  });
+  const newOrder = createOrderForm.watch();
+  const setNewOrder = (next: Partial<CreateOrderValues> | ((prev: CreateOrderValues) => CreateOrderValues)) => {
+    const value = typeof next === 'function' ? next(createOrderForm.getValues()) : next;
+    (Object.keys(value) as (keyof CreateOrderValues)[]).forEach((k) => {
+      createOrderForm.setValue(k, (value as any)[k] as any, { shouldValidate: false, shouldDirty: true });
+    });
+  };
   const [editOrder, setEditOrder] = useState({
     customerName: '',
     customerId: '',
@@ -111,25 +129,20 @@ export default function Orders() {
     }
   };
 
-  const handleCreateOrder = async () => {
-    if (!newOrder.orderNumber || !newOrder.customerName || !newOrder.dueDate) {
-      toast({ title: "Missing fields", description: "Please fill in all required fields", variant: "destructive" });
-      return;
-    }
+  const handleCreateOrder = createOrderForm.handleSubmit(async (values) => {
     try {
       const createdOrder = await createOrder.mutateAsync({
-        orderNumber: newOrder.orderNumber,
-        customerName: newOrder.customerName,
-        customerId: newOrder.customerId || null,
-        priority: newOrder.priority,
-        dueDate: new Date(newOrder.dueDate).toISOString(),
+        orderNumber: values.orderNumber,
+        customerName: values.customerName,
+        customerId: values.customerId || null,
+        priority: values.priority,
+        dueDate: new Date(values.dueDate).toISOString(),
         status: 'pending',
       });
-      toast({ title: "Order created", description: `Order ${newOrder.orderNumber} created. Add products below.` });
+      toast({ title: "Order created", description: `Order ${values.orderNumber} created. Add products below.` });
       setIsCreateDialogOpen(false);
-      setNewOrder({ orderNumber: '', customerName: '', customerId: '', priority: 'normal', dueDate: '' });
-      
-      // Open edit dialog to add products
+      createOrderForm.reset({ orderNumber: '', customerName: '', customerId: '', priority: 'normal', dueDate: '' });
+
       if (createdOrder) {
         setSelectedOrder(createdOrder);
         setEditOrder({
@@ -142,9 +155,14 @@ export default function Orders() {
         setIsEditDialogOpen(true);
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to create order", variant: "destructive" });
+      if (error instanceof ApiValidationError) {
+        const unmatched = applyServerFieldErrors(error, createOrderForm.setError, ['orderNumber','customerName','customerId','priority','dueDate']);
+        if (!unmatched.handled) toast({ title: "Error", description: error.message || "Failed to create order", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: (error as Error)?.message || "Failed to create order", variant: "destructive" });
+      }
     }
-  };
+  });
 
   const handleEditClick = (order: Order) => {
     setSelectedOrder(order);
@@ -253,6 +271,9 @@ export default function Orders() {
                   onChange={(e) => setNewOrder({ ...newOrder, orderNumber: e.target.value })}
                   data-testid="input-order-number"
                 />
+                {createOrderForm.formState.errors.orderNumber && (
+                  <p className="text-sm text-destructive" data-testid="error-order-number">{createOrderForm.formState.errors.orderNumber.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customer">Customer *</Label>
@@ -287,6 +308,9 @@ export default function Orders() {
                     data-testid="input-customer-name-manual"
                   />
                 )}
+                {createOrderForm.formState.errors.customerName && (
+                  <p className="text-sm text-destructive" data-testid="error-customer-name">{createOrderForm.formState.errors.customerName.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="priority">Priority</Label>
@@ -311,6 +335,9 @@ export default function Orders() {
                   onChange={(e) => setNewOrder({ ...newOrder, dueDate: e.target.value })}
                   data-testid="input-due-date"
                 />
+                {createOrderForm.formState.errors.dueDate && (
+                  <p className="text-sm text-destructive" data-testid="error-due-date">{createOrderForm.formState.errors.dueDate.message}</p>
+                )}
               </div>
             </div>
             <DialogFooter>
@@ -559,34 +586,22 @@ export default function Orders() {
                   <Pencil className="mr-2 h-4 w-4" /> Edit Order
                 </Button>
                 {viewingOrder && viewingOrder.status !== 'shipped' && viewingOrder.status !== 'cancelled' && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
+                  <ConfirmDialog
+                    trigger={
                       <Button className="bg-green-600 hover:bg-green-700">
                         <Truck size={14} className="mr-2" /> Complete Order
                       </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Complete Order</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will mark the order as shipped and deduct the reserved stock from inventory.
-                          This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-green-600 hover:bg-green-700"
-                          onClick={() => {
-                            handleCompleteOrder(viewingOrder.id);
-                            setIsViewDialogOpen(false);
-                          }}
-                        >
-                          Complete Order
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                    }
+                    title="Complete Order"
+                    description="This will mark the order as shipped and deduct the reserved stock from inventory. This action cannot be undone."
+                    confirmLabel="Complete Order"
+                    variant="overwrite"
+                    onConfirm={() => {
+                      handleCompleteOrder(viewingOrder.id);
+                      setIsViewDialogOpen(false);
+                    }}
+                    testId="confirm-complete-order-view"
+                  />
                 )}
               </>
             )}
@@ -986,49 +1001,26 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Order</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete order {order.orderNumber}? This will also remove all associated items. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => onDelete(order)} data-testid="button-confirm-delete-order">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        <AlertDialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Complete Order</AlertDialogTitle>
-              <AlertDialogDescription asChild>
-                <div>
-                  Complete order {order.orderNumber} for {order.customerName}? This will:
-                  <ul className="list-disc ml-4 mt-2 space-y-1">
-                    <li>Mark the order as shipped</li>
-                    <li>Deduct stock from inventory for all items</li>
-                    <li>Log stock movements for traceability</li>
-                  </ul>
-                </div>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={() => { onComplete(order.id); setIsCompleteDialogOpen(false); }} 
-                className="bg-green-600 hover:bg-green-700"
-                data-testid="button-confirm-complete-order"
-              >
-                Complete Order
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          title="Delete Order"
+          description={`Are you sure you want to delete order ${order.orderNumber}? This will also remove all associated items. This action cannot be undone.`}
+          confirmLabel="Delete"
+          variant="destructive"
+          onConfirm={() => onDelete(order)}
+          testId={`confirm-delete-order-${order.id}`}
+        />
+        <ConfirmDialog
+          open={isCompleteDialogOpen}
+          onOpenChange={setIsCompleteDialogOpen}
+          title="Complete Order"
+          description={`Complete order ${order.orderNumber} for ${order.customerName}? This will mark the order as shipped, deduct stock from inventory for all items, and log stock movements for traceability.`}
+          confirmLabel="Complete Order"
+          variant="overwrite"
+          onConfirm={() => { onComplete(order.id); setIsCompleteDialogOpen(false); }}
+          testId={`confirm-complete-order-${order.id}`}
+        />
       </TableCell>
     </TableRow>
   );
@@ -1115,22 +1107,16 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products }: {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Archived Order</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete order {order.orderNumber}? This will remove the order record. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => onDelete(order)} data-testid="button-confirm-delete-archived-order">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          title="Delete Archived Order"
+          description={`Are you sure you want to delete order ${order.orderNumber}? This will remove the order record. This action cannot be undone.`}
+          confirmLabel="Delete"
+          variant="destructive"
+          onConfirm={() => onDelete(order)}
+          testId={`confirm-delete-archived-order-${order.id}`}
+        />
       </TableCell>
     </TableRow>
   );

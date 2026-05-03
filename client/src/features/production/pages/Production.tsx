@@ -7,7 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { applyServerFieldErrors } from '@/lib/applyServerFieldErrors';
+import { ApiValidationError } from '@/lib/fetchApi';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -55,12 +60,25 @@ export default function Production() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   
-  const [newBatch, setNewBatch] = useState({
-    batchNumber: '',
-    productId: '',
-    recipeId: '',
-    startDate: format(new Date(), 'yyyy-MM-dd'),
+  const createBatchSchema = z.object({
+    productId: z.string().min(1, 'Product is required'),
+    recipeId: z.string().optional().or(z.literal('')),
+    startDate: z.string().min(1, 'Batch date is required'),
+    batchNumber: z.string().min(1, 'Batch number is required'),
   });
+  type CreateBatchValues = z.infer<typeof createBatchSchema>;
+  const createBatchForm = useForm<CreateBatchValues>({
+    resolver: zodResolver(createBatchSchema),
+    defaultValues: { batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') },
+    mode: 'onSubmit',
+  });
+  const newBatch = createBatchForm.watch();
+  const setNewBatch = (next: Partial<CreateBatchValues> | ((prev: CreateBatchValues) => CreateBatchValues)) => {
+    const value = typeof next === 'function' ? next(createBatchForm.getValues()) : next;
+    (Object.keys(value) as (keyof CreateBatchValues)[]).forEach((k) => {
+      createBatchForm.setValue(k, (value as any)[k] ?? '', { shouldValidate: false, shouldDirty: true });
+    });
+  };
   const [batchNumberEdited, setBatchNumberEdited] = useState(false);
   
   const [editForm, setEditForm] = useState({
@@ -128,20 +146,16 @@ export default function Production() {
     }
   }, [batchNumberEdited, newBatch.productId, newBatch.startDate, products, categories]);
 
-  const handleCreateBatch = async () => {
-    if (!newBatch.batchNumber || !newBatch.productId) {
-      toast({ title: "Missing fields", description: "Please fill in batch number and product", variant: "destructive" });
-      return;
-    }
+  const handleCreateBatch = createBatchForm.handleSubmit(async (values) => {
     try {
       const payload: Partial<Batch> = {
-        batchNumber: newBatch.batchNumber,
-        productId: newBatch.productId,
+        batchNumber: values.batchNumber,
+        productId: values.productId,
         plannedQuantity: "0",
         status: 'in_progress',
-        startDate: newBatch.startDate || null,
+        startDate: values.startDate || null,
       };
-      if (newBatch.recipeId) payload.recipeId = newBatch.recipeId;
+      if (values.recipeId) payload.recipeId = values.recipeId;
       const created = await createBatch.mutateAsync(payload);
       toast({
         title: "Batch created",
@@ -150,12 +164,19 @@ export default function Production() {
           : `Batch ${created.batchNumber} created successfully`,
       });
       setIsCreateDialogOpen(false);
-      setNewBatch({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
+      createBatchForm.reset({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
       setBatchNumberEdited(false);
     } catch (error) {
-      toast({ title: "Error", description: "Failed to create batch", variant: "destructive" });
+      if (error instanceof ApiValidationError) {
+        const unmatched = applyServerFieldErrors(error, createBatchForm.setError, ['batchNumber', 'productId', 'recipeId', 'startDate']);
+        if (!unmatched.handled) {
+          toast({ title: "Error", description: error.message || "Failed to create batch", variant: "destructive" });
+        }
+      } else {
+        toast({ title: "Error", description: (error as Error)?.message || "Failed to create batch", variant: "destructive" });
+      }
     }
-  };
+  });
 
   const handleEditClick = (batch: Batch) => {
     setSelectedBatch(batch);
@@ -168,8 +189,20 @@ export default function Production() {
     setIsEditDialogOpen(true);
   };
 
+  const editBatchSchema = z.object({
+    actualQuantity: z.string().optional().or(z.literal('')).refine((v) => !v || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0), { message: 'Must be a non-negative number' }),
+    wasteQuantity: z.string().optional().or(z.literal('')).refine((v) => !v || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0), { message: 'Must be a non-negative number' }),
+    millingQuantity: z.string().optional().or(z.literal('')).refine((v) => !v || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0), { message: 'Must be a non-negative number' }),
+    notes: z.string().optional().or(z.literal('')),
+  });
   const handleUpdateBatch = async () => {
     if (!selectedBatch) return;
+    const parsed = editBatchSchema.safeParse(editForm);
+    if (!parsed.success) {
+      const first = parsed.error.errors[0];
+      toast({ title: 'Validation', description: `${first.path.join('.')}: ${first.message}`, variant: 'destructive' });
+      return;
+    }
     try {
       await updateBatch.mutateAsync({
         id: selectedBatch.id,
@@ -181,8 +214,14 @@ export default function Production() {
       toast({ title: "Batch updated", description: `Batch ${selectedBatch.batchNumber} updated successfully` });
       setIsEditDialogOpen(false);
       setSelectedBatch(null);
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to update batch", variant: "destructive" });
+    } catch (error: any) {
+      if (error instanceof ApiValidationError) {
+        const firstField = Object.keys(error.fields)[0];
+        const firstMsg = error.fields[firstField]?.[0];
+        toast({ title: 'Validation', description: firstMsg || error.message, variant: 'destructive' });
+      } else {
+        toast({ title: "Error", description: error?.message || "Failed to update batch", variant: "destructive" });
+      }
     }
   };
 
@@ -435,6 +474,9 @@ export default function Production() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="product">Product *</Label>
+                {createBatchForm.formState.errors.productId && (
+                  <p className="text-sm text-destructive" data-testid="error-create-batch-product">{createBatchForm.formState.errors.productId.message}</p>
+                )}
                 {productsByCategory.length > 0 && (
                   <Select value={createBatchCategoryFilter} onValueChange={(v) => {
                     setCreateBatchCategoryFilter(v);
@@ -544,6 +586,9 @@ export default function Production() {
                   onChange={(e) => setNewBatch({ ...newBatch, startDate: e.target.value })}
                   data-testid="input-batch-date"
                 />
+                {createBatchForm.formState.errors.startDate && (
+                  <p className="text-sm text-destructive" data-testid="error-create-batch-start-date">{createBatchForm.formState.errors.startDate.message}</p>
+                )}
                 <p className="text-xs text-muted-foreground">Defaults to today. Change if recording a previous day's batch.</p>
               </div>
               <div className="space-y-2">
@@ -581,12 +626,15 @@ export default function Production() {
                       ? <span className="text-amber-600 dark:text-amber-500">⚠ {batchCodeDiagnostic.reason}{" "}<Link href="/settings" className="underline hover:text-amber-700">Open Settings</Link></span>
                       : "Select a product above to auto-generate the batch number."}
                 </p>
+                {createBatchForm.formState.errors.batchNumber && (
+                  <p className="text-sm text-destructive" data-testid="error-create-batch-number">{createBatchForm.formState.errors.batchNumber.message}</p>
+                )}
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => {
                 setIsCreateDialogOpen(false);
-                setNewBatch({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
+                createBatchForm.reset({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
                 setBatchNumberEdited(false);
               }}>Cancel</Button>
               <Button onClick={handleCreateBatch} disabled={createBatch.isPending} data-testid="button-submit-batch">
@@ -969,22 +1017,16 @@ export default function Production() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Batch</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete batch {selectedBatch?.batchNumber}? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteBatch} data-testid="button-confirm-delete-batch">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        title="Delete Batch"
+        description={`Are you sure you want to delete batch ${selectedBatch?.batchNumber}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleDeleteBatch}
+        testId="confirm-delete-batch"
+      />
     </div>
   );
 }
@@ -1465,11 +1507,35 @@ function BatchOutputsEditor({
 }) {
   const [newOutputForm, setNewOutputForm] = useState({ productId: '', quantity: '' });
   const [productSearchOpen, setProductSearchOpen] = useState(false);
-  const [wasteQuantity, setWasteQuantity] = useState(initialWaste);
-  const [millingQuantity, setMillingQuantity] = useState(initialMilling);
-  const [wetQuantity, setWetQuantity] = useState(initialWet);
-  const [cleaningTime, setCleaningTime] = useState(initialCleaningTime || '');
-  const [numberOfStaff, setNumberOfStaff] = useState(initialNumberOfStaff != null ? String(initialNumberOfStaff) : '');
+  const finalizeSchema = z.object({
+    wasteQuantity: z.string().refine((v) => v === '' || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0), { message: 'Waste must be a non-negative number' }),
+    millingQuantity: z.string().refine((v) => v === '' || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0), { message: 'Milling must be a non-negative number' }),
+    wetQuantity: z.string().refine((v) => v === '' || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0), { message: 'Wet must be a non-negative number' }),
+    cleaningTime: z.string().refine((v) => v === '' || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0), { message: 'Cleaning time must be a non-negative number' }),
+    numberOfStaff: z.string().refine((v) => v === '' || (Number.isInteger(parseFloat(v)) && parseInt(v) >= 0), { message: 'Number of staff must be a non-negative integer' }),
+  });
+  type FinalizeValues = z.infer<typeof finalizeSchema>;
+  const finalizeForm = useForm<FinalizeValues>({
+    resolver: zodResolver(finalizeSchema),
+    defaultValues: {
+      wasteQuantity: initialWaste,
+      millingQuantity: initialMilling,
+      wetQuantity: initialWet,
+      cleaningTime: initialCleaningTime || '',
+      numberOfStaff: initialNumberOfStaff != null ? String(initialNumberOfStaff) : '',
+    },
+    mode: 'onSubmit',
+  });
+  const wasteQuantity = finalizeForm.watch('wasteQuantity');
+  const millingQuantity = finalizeForm.watch('millingQuantity');
+  const wetQuantity = finalizeForm.watch('wetQuantity');
+  const cleaningTime = finalizeForm.watch('cleaningTime');
+  const numberOfStaff = finalizeForm.watch('numberOfStaff');
+  const setWasteQuantity = (v: string) => finalizeForm.setValue('wasteQuantity', v, { shouldDirty: true });
+  const setMillingQuantity = (v: string) => finalizeForm.setValue('millingQuantity', v, { shouldDirty: true });
+  const setWetQuantity = (v: string) => finalizeForm.setValue('wetQuantity', v, { shouldDirty: true });
+  const setCleaningTime = (v: string) => finalizeForm.setValue('cleaningTime', v, { shouldDirty: true });
+  const setNumberOfStaff = (v: string) => finalizeForm.setValue('numberOfStaff', v, { shouldDirty: true });
   const [markCompleted, setMarkCompleted] = useState(false);
   const [finalizeResult, setFinalizeResult] = useState<FinalizeResult | null>(null);
   const [summaryBatchPrintedAt, setSummaryBatchPrintedAt] = useState<string | null>(null);
@@ -1481,12 +1547,15 @@ function BatchOutputsEditor({
   const { data: batchData } = useBatch(batchId);
   
   useEffect(() => {
-    setWasteQuantity(initialWaste);
-    setMillingQuantity(initialMilling);
-    setWetQuantity(initialWet);
-    setCleaningTime(initialCleaningTime || '');
-    setNumberOfStaff(initialNumberOfStaff != null ? String(initialNumberOfStaff) : '');
+    finalizeForm.reset({
+      wasteQuantity: initialWaste,
+      millingQuantity: initialMilling,
+      wetQuantity: initialWet,
+      cleaningTime: initialCleaningTime || '',
+      numberOfStaff: initialNumberOfStaff != null ? String(initialNumberOfStaff) : '',
+    });
     setMarkCompleted(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchId, initialWaste, initialMilling, initialWet, initialCleaningTime, initialNumberOfStaff]);
   
   const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
@@ -1543,15 +1612,15 @@ function BatchOutputsEditor({
     }
   };
   
-  const handleFinalize = async () => {
+  const handleFinalize = finalizeForm.handleSubmit(async (values) => {
     try {
       const result = await finalizeBatch.mutateAsync({
         batchId,
-        wasteQuantity: wasteQuantity || "0",
-        millingQuantity: millingQuantity || "0",
-        wetQuantity: wetQuantity || "0",
-        cleaningTime: cleaningTime || undefined,
-        numberOfStaff: numberOfStaff ? parseInt(numberOfStaff) : undefined,
+        wasteQuantity: values.wasteQuantity || "0",
+        millingQuantity: values.millingQuantity || "0",
+        wetQuantity: values.wetQuantity || "0",
+        cleaningTime: values.cleaningTime || undefined,
+        numberOfStaff: values.numberOfStaff ? parseInt(values.numberOfStaff) : undefined,
         markCompleted,
       });
       if (markCompleted) {
@@ -1561,9 +1630,14 @@ function BatchOutputsEditor({
         onClose();
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to finalize batch", variant: "destructive" });
+      if (error instanceof ApiValidationError) {
+        const unmatched = applyServerFieldErrors(error, finalizeForm.setError, ['wasteQuantity','millingQuantity','wetQuantity','cleaningTime','numberOfStaff']);
+        if (!unmatched.handled) toast({ title: "Error", description: error.message || "Failed to finalize batch", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: (error as Error)?.message || "Failed to finalize batch", variant: "destructive" });
+      }
     }
-  };
+  });
   
   const totalOutputQuantity = outputs.reduce((sum, o) => sum + parseFloat(o.quantity), 0);
 
@@ -1966,14 +2040,17 @@ function BatchOutputsEditor({
               <div className="space-y-2">
                 <Label htmlFor="waste">Waste (KG)</Label>
                 <Input id="waste" type="number" step="0.01" value={wasteQuantity} onChange={(e) => setWasteQuantity(e.target.value)} placeholder="0.00" data-testid="input-finalize-waste" />
+                {finalizeForm.formState.errors.wasteQuantity && <p className="text-sm text-destructive" data-testid="error-finalize-waste">{finalizeForm.formState.errors.wasteQuantity.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="milling">Milling (KG)</Label>
                 <Input id="milling" type="number" step="0.01" value={millingQuantity} onChange={(e) => setMillingQuantity(e.target.value)} placeholder="0.00" data-testid="input-finalize-milling" />
+                {finalizeForm.formState.errors.millingQuantity && <p className="text-sm text-destructive" data-testid="error-finalize-milling">{finalizeForm.formState.errors.millingQuantity.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="wet">Wet (KG)</Label>
                 <Input id="wet" type="number" step="0.01" value={wetQuantity} onChange={(e) => setWetQuantity(e.target.value)} placeholder="0.00" data-testid="input-finalize-wet" />
+                {finalizeForm.formState.errors.wetQuantity && <p className="text-sm text-destructive" data-testid="error-finalize-wet">{finalizeForm.formState.errors.wetQuantity.message}</p>}
               </div>
             </div>
           </div>
@@ -1984,10 +2061,12 @@ function BatchOutputsEditor({
               <div className="space-y-2">
                 <Label htmlFor="cleaningTime">Cleaning Time (mins)</Label>
                 <Input id="cleaningTime" type="number" step="1" min="0" value={cleaningTime} onChange={(e) => setCleaningTime(e.target.value)} placeholder="0" data-testid="input-finalize-cleaning-time" />
+                {finalizeForm.formState.errors.cleaningTime && <p className="text-sm text-destructive" data-testid="error-finalize-cleaning-time">{finalizeForm.formState.errors.cleaningTime.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="numberOfStaff">Number of Staff</Label>
                 <Input id="numberOfStaff" type="number" step="1" min="0" value={numberOfStaff} onChange={(e) => setNumberOfStaff(e.target.value)} placeholder="0" data-testid="input-finalize-number-of-staff" />
+                {finalizeForm.formState.errors.numberOfStaff && <p className="text-sm text-destructive" data-testid="error-finalize-number-of-staff">{finalizeForm.formState.errors.numberOfStaff.message}</p>}
               </div>
             </div>
           </div>
