@@ -22,6 +22,14 @@ export interface TemplateCreate {
 
 export type TemplateUpdate = Partial<TemplateCreate>;
 
+export function useTemplate(id: string | null | undefined, options?: { enabled?: boolean }) {
+  return useQuery<Template>({
+    queryKey: ["template", id],
+    queryFn: () => fetchApi(`/templates/${id}`),
+    enabled: !!id && options?.enabled !== false,
+  });
+}
+
 export function useTemplates(kind?: string, options?: { enabled?: boolean }) {
   return useQuery<Template[]>({
     queryKey: ["templates", kind ?? "all"],

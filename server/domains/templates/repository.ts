@@ -5,7 +5,9 @@ import {
   type Template, type InsertTemplate,
 } from "@shared/schema";
 
-async function clearOtherDefaults(tx: any, kind: string, customerId: string | null, exceptId?: string) {
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function clearOtherDefaults(tx: Tx, kind: string, customerId: string | null, exceptId?: string) {
   const customerCond = customerId ? eq(templates.customerId, customerId) : isNull(templates.customerId);
   const baseConds = [eq(templates.kind, kind), customerCond, eq(templates.isDefault, true)];
   if (exceptId) baseConds.push(ne(templates.id, exceptId));

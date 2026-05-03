@@ -49,7 +49,7 @@ templatesRouter.post("/templates", asyncHandler(async (req, res) => {
     return res.status(400).json({ error: `Template kind "${data.kind}" does not support customer-specific templates` });
   }
   const validatedPayload = validateTemplatePayload(data.kind, data.payload ?? {});
-  const created = await templatesRepository.create({ ...data, payload: validatedPayload as any });
+  const created = await templatesRepository.create({ ...data, payload: validatedPayload });
   await createAuditLog({
     entityType: "template",
     entityId: created.id,
@@ -73,7 +73,7 @@ templatesRouter.patch("/templates/:id", asyncHandler(async (req, res) => {
   }
   const next: Partial<typeof data> = { ...data };
   if (data.payload !== undefined) {
-    next.payload = validateTemplatePayload(existing.kind, data.payload) as any;
+    next.payload = validateTemplatePayload(existing.kind, data.payload);
   }
   const updated = await templatesRepository.update(req.params.id, next);
   await createAuditLog({
