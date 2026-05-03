@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Construction, Type, Tag as TagIcon, Barcode as BarcodeIcon, QrCode, Minus, Square, Trash2, Save, RotateCcw, Printer, Loader2 } from "lucide-react";
+import { Construction, Type, Tag as TagIcon, Barcode as BarcodeIcon, QrCode, Minus, Square, Trash2, Save, RotateCcw, Printer, Loader2, Image as ImageIcon, Upload } from "lucide-react";
 import {
   useLabelTemplates,
   useUpdateLabelTemplate,
@@ -14,7 +15,7 @@ import {
   type LabelTemplate,
   type LabelTemplateType,
 } from "@/features/labels/api";
-import type { LabelElement, LabelFieldKey, LabelLayout, LabelTextAlign, LabelRotation } from "@shared/schema";
+import type { LabelElement, LabelFieldKey, LabelLayout, LabelTextAlign, LabelRotation, LabelBorderStyle, LabelImageObjectFit } from "@shared/schema";
 import {
   ALL_FIELD_KEYS,
   SAMPLE_CONTEXT,
@@ -59,6 +60,56 @@ export default function CustomLabelBuilder() {
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceImageIdRef = useRef<string | null>(null);
+  const MAX_IMAGE_BYTES = 1_048_576; // ~1 MB
+
+  function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleImageFile(file: File, targetId: string | null) {
+    if (!/^image\/(png|jpeg|jpg|gif|svg\+xml|webp)$/i.test(file.type)) {
+      toast({ title: "Unsupported image", description: "Use PNG, JPEG, GIF, SVG, or WEBP.", variant: "destructive" });
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast({ title: "Image too large", description: "Image must be 1 MB or smaller.", variant: "destructive" });
+      return;
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      if (targetId) {
+        updateElement(targetId, { dataUrl, alt: file.name } as Partial<LabelElement>);
+      } else {
+        const newEl = createElement("image") as LabelElement & { dataUrl: string; alt?: string };
+        newEl.dataUrl = dataUrl;
+        newEl.alt = file.name;
+        setLayout(prev => ({ ...prev, elements: [...(prev.elements ?? []), newEl] }));
+        setActiveElementId(newEl.id);
+      }
+    } catch {
+      toast({ title: "Could not read image", variant: "destructive" });
+    }
+  }
+
+  function pickImageFile(targetId: string | null) {
+    replaceImageIdRef.current = targetId;
+    fileInputRef.current?.click();
+  }
+
+  async function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset so same file can be re-selected later
+    if (!file) return;
+    await handleImageFile(file, replaceImageIdRef.current);
+    replaceImageIdRef.current = null;
+  }
 
   const filteredTemplates = useMemo(
     () => templates.filter(t => t.labelType === filterType),
@@ -361,6 +412,15 @@ export default function CustomLabelBuilder() {
           <Button size="sm" variant="outline" onClick={() => addElement("qr")} data-testid="button-add-qr"><QrCode className="h-4 w-4 mr-1" />QR</Button>
           <Button size="sm" variant="outline" onClick={() => addElement("line")} data-testid="button-add-line"><Minus className="h-4 w-4 mr-1" />Line</Button>
           <Button size="sm" variant="outline" onClick={() => addElement("box")} data-testid="button-add-box"><Square className="h-4 w-4 mr-1" />Box</Button>
+          <Button size="sm" variant="outline" onClick={() => pickImageFile(null)} data-testid="button-add-image"><ImageIcon className="h-4 w-4 mr-1" />Image</Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
+            className="hidden"
+            onChange={onFileChosen}
+            data-testid="input-image-file"
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -450,6 +510,7 @@ export default function CustomLabelBuilder() {
                 element={activeElement}
                 onChange={(patch) => updateElement(activeElement.id, patch)}
                 onDelete={() => removeElement(activeElement.id)}
+                onReplaceImage={() => pickImageFile(activeElement.id)}
               />
             )}
           </div>
@@ -469,7 +530,8 @@ function ElementPreview({ el, qrSvg }: { el: LabelElement; qrSvg?: string }) {
           fontSize: `${(el.fontSize ?? 12)}px`,
           textAlign: el.align ?? "left",
           fontWeight: el.bold ? 700 : 400,
-          lineHeight: 1.1, overflow: "hidden",
+          lineHeight: 1.15, overflow: "hidden",
+          whiteSpace: "pre-wrap", wordWrap: "break-word",
           transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
         }}>{el.text}</div>
       );
@@ -482,7 +544,8 @@ function ElementPreview({ el, qrSvg }: { el: LabelElement; qrSvg?: string }) {
           fontSize: `${(el.fontSize ?? 12)}px`,
           textAlign: el.align ?? "left",
           fontWeight: el.bold ? 700 : 400,
-          lineHeight: 1.1, overflow: "hidden",
+          lineHeight: 1.15, overflow: "hidden",
+          whiteSpace: "pre-wrap", wordWrap: "break-word",
           transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
         }}>{el.prefix ?? ""}{value}</div>
       );
@@ -509,7 +572,31 @@ function ElementPreview({ el, qrSvg }: { el: LabelElement; qrSvg?: string }) {
     case "line":
       return <div style={{ width: "100%", borderTop: `${(el.stroke ?? 0.5) * PX_PER_MM}px solid #000` }} />;
     case "box":
-      return <div style={{ width: "100%", height: "100%", border: `${(el.stroke ?? 0.5) * PX_PER_MM}px solid #000` }} />;
+      return (
+        <div style={{
+          width: "100%", height: "100%",
+          border: `${(el.stroke ?? 0.5) * PX_PER_MM}px ${el.borderStyle ?? "solid"} ${el.borderColor ?? "#000000"}`,
+        }} />
+      );
+    case "image":
+      if (!el.dataUrl) {
+        return (
+          <div style={{
+            width: "100%", height: "100%",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: "1px dashed #aaa", color: "#888", fontSize: 10, gap: 4,
+          }}>
+            <ImageIcon className="h-3 w-3" /> No image
+          </div>
+        );
+      }
+      return (
+        <img
+          src={el.dataUrl}
+          alt={el.alt ?? ""}
+          style={{ width: "100%", height: "100%", objectFit: el.objectFit ?? "contain", display: "block" }}
+        />
+      );
   }
 }
 
@@ -517,10 +604,12 @@ function ElementProperties({
   element,
   onChange,
   onDelete,
+  onReplaceImage,
 }: {
   element: LabelElement;
   onChange: (patch: Partial<LabelElement>) => void;
   onDelete: () => void;
+  onReplaceImage: () => void;
 }) {
   return (
     <div className="space-y-2 rounded-md border p-3 text-sm" data-testid="props-element">
@@ -549,8 +638,13 @@ function ElementProperties({
       {element.type === "text" && (
         <>
           <div className="space-y-1">
-            <Label className="text-xs">Text</Label>
-            <Input value={element.text} onChange={(e) => onChange({ text: e.target.value })} data-testid="input-prop-text" />
+            <Label className="text-xs">Text (multi-line supported)</Label>
+            <Textarea
+              value={element.text}
+              onChange={(e) => onChange({ text: e.target.value })}
+              rows={3}
+              data-testid="input-prop-text"
+            />
           </div>
           <TextStyleProps element={element} onChange={onChange} />
         </>
@@ -567,8 +661,14 @@ function ElementProperties({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Prefix (optional)</Label>
-            <Input value={element.prefix ?? ""} onChange={(e) => onChange({ prefix: e.target.value } as Partial<LabelElement>)} placeholder="e.g. 'Lot: '" data-testid="input-prop-prefix" />
+            <Label className="text-xs">Prefix (optional, multi-line)</Label>
+            <Textarea
+              value={element.prefix ?? ""}
+              onChange={(e) => onChange({ prefix: e.target.value } as Partial<LabelElement>)}
+              placeholder="e.g. 'Lot: '"
+              rows={2}
+              data-testid="input-prop-prefix"
+            />
           </div>
           <TextStyleProps element={element} onChange={onChange} />
         </>
@@ -594,6 +694,75 @@ function ElementProperties({
       )}
       {(element.type === "line" || element.type === "box") && (
         <NumField label="Stroke (mm)" value={element.stroke ?? 0.5} step={0.1} onChange={(v) => onChange({ stroke: v } as Partial<LabelElement>)} testId="input-prop-stroke" />
+      )}
+      {element.type === "box" && (
+        <>
+          <div className="space-y-1">
+            <Label className="text-xs">Border Style</Label>
+            <Select
+              value={element.borderStyle ?? "solid"}
+              onValueChange={(v) => onChange({ borderStyle: v as LabelBorderStyle } as Partial<LabelElement>)}
+            >
+              <SelectTrigger data-testid="select-prop-border-style"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="solid">Solid</SelectItem>
+                <SelectItem value="dashed">Dashed</SelectItem>
+                <SelectItem value="dotted">Dotted</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Border Color</Label>
+            <Input
+              type="color"
+              value={element.borderColor ?? "#000000"}
+              onChange={(e) => onChange({ borderColor: e.target.value } as Partial<LabelElement>)}
+              data-testid="input-prop-border-color"
+              className="h-9 p-1"
+            />
+          </div>
+        </>
+      )}
+      {element.type === "image" && (
+        <>
+          <div className="space-y-1">
+            <Label className="text-xs">Object Fit</Label>
+            <Select
+              value={element.objectFit ?? "contain"}
+              onValueChange={(v) => onChange({ objectFit: v as LabelImageObjectFit } as Partial<LabelElement>)}
+            >
+              <SelectTrigger data-testid="select-prop-object-fit"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contain">Contain (keep aspect)</SelectItem>
+                <SelectItem value="cover">Cover (fill, may crop)</SelectItem>
+                <SelectItem value="fill">Fill (stretch)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Alt text (optional)</Label>
+            <Input
+              value={element.alt ?? ""}
+              onChange={(e) => onChange({ alt: e.target.value } as Partial<LabelElement>)}
+              data-testid="input-prop-alt"
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onReplaceImage}
+            className="w-full"
+            data-testid="button-replace-image"
+          >
+            <Upload className="h-4 w-4 mr-1" />
+            {element.dataUrl ? "Replace Image…" : "Choose Image…"}
+          </Button>
+          {element.dataUrl ? (
+            <div className="text-[10px] text-muted-foreground truncate">
+              {element.alt || "image"} · {Math.round((element.dataUrl.length * 0.75) / 1024)} KB
+            </div>
+          ) : null}
+        </>
       )}
     </div>
   );

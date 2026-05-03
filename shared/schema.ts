@@ -66,9 +66,29 @@ export interface LabelLineElement extends LabelElementBase {
   stroke?: number;
 }
 
+export type LabelBorderStyle = "solid" | "dashed" | "dotted";
+
 export interface LabelBoxElement extends LabelElementBase {
   type: "box";
   stroke?: number;
+  borderStyle?: LabelBorderStyle;
+  borderColor?: string;
+}
+
+export type LabelImageObjectFit = "contain" | "cover" | "fill";
+
+/**
+ * Image element. The image is stored inline as a data URL on the element
+ * itself — no separate asset library is needed for v1. Uploads are handled
+ * client-side: the builder reads a chosen file with FileReader and writes
+ * a data URL into `dataUrl`. Print/preview render this directly via <img>.
+ * Size cap is enforced in the builder (~1 MB).
+ */
+export interface LabelImageElement extends LabelElementBase {
+  type: "image";
+  dataUrl: string;
+  alt?: string;
+  objectFit?: LabelImageObjectFit;
 }
 
 export type LabelElement =
@@ -77,7 +97,8 @@ export type LabelElement =
   | LabelBarcodeElement
   | LabelQrElement
   | LabelLineElement
-  | LabelBoxElement;
+  | LabelBoxElement
+  | LabelImageElement;
 
 export interface LabelLayout {
   version: number;

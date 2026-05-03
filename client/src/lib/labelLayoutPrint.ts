@@ -129,7 +129,9 @@ export function createElement(type: LabelElement["type"]): LabelElement {
     case "line":
       return { ...base, type: "line", width: 50, height: 0.5, stroke: 0.5 };
     case "box":
-      return { ...base, type: "box", width: 30, height: 16, stroke: 0.5 };
+      return { ...base, type: "box", width: 30, height: 16, stroke: 0.5, borderStyle: "solid", borderColor: "#000000" };
+    case "image":
+      return { ...base, type: "image", width: 30, height: 20, dataUrl: "", objectFit: "contain" };
   }
 }
 
@@ -180,7 +182,7 @@ async function elementHtml(el: LabelElement, ctx: LabelDataContext): Promise<str
       const align = el.align ?? "left";
       const fs = el.fontSize ?? 12;
       const weight = el.bold ? 700 : 400;
-      return `<div style="${wrapStyle}font-size:${fs}px;text-align:${align};font-weight:${weight};line-height:1.1;overflow:hidden;">${esc(el.text)}</div>`;
+      return `<div style="${wrapStyle}font-size:${fs}px;text-align:${align};font-weight:${weight};line-height:1.15;overflow:hidden;white-space:pre-wrap;word-wrap:break-word;">${esc(el.text)}</div>`;
     }
     case "field": {
       const align = el.align ?? "left";
@@ -188,7 +190,7 @@ async function elementHtml(el: LabelElement, ctx: LabelDataContext): Promise<str
       const weight = el.bold ? 700 : 400;
       const value = resolveField(el.fieldKey, ctx);
       const text = el.prefix ? `${el.prefix}${value}` : value;
-      return `<div style="${wrapStyle}font-size:${fs}px;text-align:${align};font-weight:${weight};line-height:1.1;overflow:hidden;">${esc(text)}</div>`;
+      return `<div style="${wrapStyle}font-size:${fs}px;text-align:${align};font-weight:${weight};line-height:1.15;overflow:hidden;white-space:pre-wrap;word-wrap:break-word;">${esc(text)}</div>`;
     }
     case "barcode": {
       const value = resolveBarcodeSource(el.source, ctx);
@@ -214,7 +216,16 @@ async function elementHtml(el: LabelElement, ctx: LabelDataContext): Promise<str
     }
     case "box": {
       const stroke = el.stroke ?? 0.5;
-      return `<div style="${wrapStyle}border:${stroke}mm solid #000;"></div>`;
+      const style = el.borderStyle ?? "solid";
+      const color = el.borderColor ?? "#000000";
+      return `<div style="${wrapStyle}border:${stroke}mm ${style} ${color};"></div>`;
+    }
+    case "image": {
+      if (!el.dataUrl) {
+        return `<div style="${wrapStyle}border:0.2mm dashed #999;display:flex;align-items:center;justify-content:center;font-size:9px;color:#999;">[image]</div>`;
+      }
+      const fit = el.objectFit ?? "contain";
+      return `<div style="${wrapStyle}overflow:hidden;"><img src="${esc(el.dataUrl)}" alt="${esc(el.alt ?? "")}" style="width:100%;height:100%;object-fit:${fit};display:block;" /></div>`;
     }
   }
 }
