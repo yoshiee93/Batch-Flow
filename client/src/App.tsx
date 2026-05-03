@@ -13,7 +13,6 @@ import Production from "@/features/production/pages/Production";
 import Inventory from "@/features/inventory/pages/Inventory";
 import Traceability from "@/features/traceability/pages/Traceability";
 import Settings from "@/features/catalog/pages/Settings";
-import LabelsPage from "@/features/labels/pages/Labels";
 import Calculator from "@/pages/Calculator";
 import NotFound from "@/pages/not-found";
 import BatchDetail from "@/features/production/pages/BatchDetail";
@@ -69,7 +68,7 @@ function Router() {
               </Route>
               <Route path="/calculator" component={Calculator} />
               <Route path="/settings" component={Settings} />
-              <Route path="/labels" component={LabelsPage} />
+              <Route path="/labels"><Redirect to="/settings?tab=labels" /></Route>
               <Route component={NotFound} />
             </Switch>
           </Layout>

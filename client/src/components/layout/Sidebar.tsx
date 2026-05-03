@@ -11,7 +11,6 @@ import {
   Calculator,
   ScanSearch,
   LogOut,
-  Tag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,7 +24,6 @@ const navItems = [
   { label: 'Production', icon: Factory, href: '/production', adminOnly: false },
   { label: 'Inventory', icon: Box, href: '/inventory', adminOnly: false },
   { label: 'Tracking', icon: ScanSearch, href: '/traceability', adminOnly: false },
-  { label: 'Labels', icon: Tag, href: '/labels', adminOnly: true },
   { label: 'Calculator', icon: Calculator, href: '/calculator', adminOnly: false },
 ];
 

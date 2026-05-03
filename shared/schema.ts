@@ -6,6 +6,14 @@ import { z } from "zod";
 export const userRoleEnum = pgEnum("user_role", ["admin", "production", "inventory", "readonly"]);
 export const labelTypeEnum = pgEnum("label_type_enum", ["raw_intake", "finished_output", "batch"]);
 
+export interface LabelLayout {
+  version: number;
+  width?: number;
+  height?: number;
+  unit?: "mm" | "in" | "px";
+  elements?: unknown[];
+}
+
 export interface LabelTemplateSettings {
   showProductionDate?: boolean;
   showMadeInAustralia?: boolean;
@@ -16,6 +24,7 @@ export interface LabelTemplateSettings {
   showSource?: boolean;
   showBarcodeText?: boolean;
   showReceivedDate?: boolean;
+  layout?: LabelLayout;
 }
 
 export const batchStatusEnum = pgEnum("batch_status", ["planned", "in_progress", "quality_check", "completed", "released", "quarantined"]);

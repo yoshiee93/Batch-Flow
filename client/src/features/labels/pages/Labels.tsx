@@ -66,14 +66,15 @@ const FIELD_LABELS: { key: keyof LabelTemplateSettings; label: string; applicabl
   { key: 'showMadeInAustralia', label: 'Made in Australia', applicableTo: ['raw_intake', 'finished_output', 'batch'] },
 ];
 
-export default function LabelsPage() {
+export function LabelTemplatesPanel() {
   const { role } = useRole();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<LabelTemplate | null>(null);
   const [form, setForm] = useState<TemplateFormData>({ ...EMPTY_FORM });
 
-  const { data: templates = [], isLoading, isError } = useLabelTemplates();
+  const isAdmin = role === 'admin';
+  const { data: templates = [], isLoading, isError } = useLabelTemplates({ enabled: isAdmin });
   const { data: customers = [] } = useCustomers();
   const createTemplate = useCreateLabelTemplate();
   const updateTemplate = useUpdateLabelTemplate();
@@ -155,11 +156,11 @@ export default function LabelsPage() {
     }
   }
 
-  if (role !== "admin") {
+  if (!isAdmin) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-muted-foreground">
-        <ShieldOff className="h-12 w-12" />
-        <p className="text-lg font-medium">Admin access required</p>
+      <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground" data-testid="labels-admin-required">
+        <ShieldOff className="h-10 w-10" />
+        <p className="font-medium">Admin access required</p>
         <p className="text-sm">Label templates can only be managed by administrators.</p>
       </div>
     );
@@ -245,7 +246,7 @@ export default function LabelsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-[60vh]">
+      <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -253,20 +254,17 @@ export default function LabelsPage() {
 
   if (isError) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-muted-foreground">
-        <AlertCircle className="h-12 w-12 mb-4" />
+      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <AlertCircle className="h-10 w-10 mb-3" />
         <p>Failed to load label templates</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-mono font-bold" data-testid="page-title-labels">Label Templates</h1>
-          <p className="text-muted-foreground mt-1">Configure field visibility and customer-specific label layouts</p>
-        </div>
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <p className="text-sm text-muted-foreground">Configure field visibility and customer-specific label layouts.</p>
         <Button onClick={openCreate} data-testid="button-create-template">
           <Plus className="h-4 w-4 mr-2" />
           New Template
@@ -398,3 +396,5 @@ export default function LabelsPage() {
     </div>
   );
 }
+
+export default LabelTemplatesPanel;
