@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { ilike, or, sql } from "drizzle-orm";
+import { ilike, or } from "drizzle-orm";
 import { db } from "../../db";
 import { batches, products, materials, customers, lots } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";

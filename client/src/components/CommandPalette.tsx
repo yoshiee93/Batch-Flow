@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { Factory, Package, Box, Users, Tag, Loader2 } from "lucide-react";
 import { fetchApi } from "@/lib/fetchApi";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SearchResult {
   id: string;
@@ -20,11 +21,11 @@ interface SearchResponse {
   lots: SearchResult[];
 }
 
-const GROUPS: { key: keyof SearchResponse; label: string; icon: typeof Factory }[] = [
+const ALL_GROUPS: { key: keyof SearchResponse; label: string; icon: typeof Factory; adminOnly?: boolean }[] = [
   { key: "batches", label: "Batches", icon: Factory },
   { key: "products", label: "Products", icon: Package },
   { key: "materials", label: "Materials", icon: Box },
-  { key: "customers", label: "Customers", icon: Users },
+  { key: "customers", label: "Customers", icon: Users, adminOnly: true },
   { key: "lots", label: "Lots", icon: Tag },
 ];
 
@@ -34,6 +35,9 @@ export function CommandPalette() {
   const [results, setResults] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const groups = ALL_GROUPS.filter(g => !g.adminOnly || isAdmin);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -87,7 +91,7 @@ export function CommandPalette() {
     }
   }
 
-  const hasResults = results && GROUPS.some((g) => results[g.key].length > 0);
+  const hasResults = results && groups.some((g) => results[g.key].length > 0);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -113,7 +117,7 @@ export function CommandPalette() {
                 Type at least 2 characters to search
               </div>
             )}
-            {!loading && results && GROUPS.map((g) => {
+            {!loading && results && groups.map((g) => {
               const items = results[g.key];
               if (items.length === 0) return null;
               const Icon = g.icon;
