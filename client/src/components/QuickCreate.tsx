@@ -28,20 +28,28 @@ export function QuickCreate({ variant = "default" }: { variant?: "default" | "si
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          size="icon"
-          variant={isSidebar ? "ghost" : "default"}
-          className={isSidebar
-            ? "h-8 w-8 text-sidebar-foreground/60 hover:text-sidebar-foreground"
-            : "h-9 w-9 rounded-full shadow-md"
-          }
-          data-testid="button-quick-create"
-          title="Quick create"
-        >
-          <Plus size={isSidebar ? 16 : 18} />
-        </Button>
+        {isSidebar ? (
+          <Button
+            variant="default"
+            className="w-full justify-start gap-2 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
+            data-testid="button-quick-create"
+          >
+            <Plus size={16} />
+            Quick Create
+          </Button>
+        ) : (
+          <Button
+            size="icon"
+            variant="default"
+            className="h-9 w-9 rounded-full shadow-md"
+            data-testid="button-quick-create"
+            title="Quick create"
+          >
+            <Plus size={18} />
+          </Button>
+        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={isSidebar ? "end" : "start"} sideOffset={8}>
+      <DropdownMenuContent align="start" sideOffset={8}>
         {visible.map((action) => (
           <DropdownMenuItem
             key={action.href}

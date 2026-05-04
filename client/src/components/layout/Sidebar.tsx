@@ -67,6 +67,10 @@ export function Sidebar({ className }: { className?: string }) {
         <p className="text-xs text-sidebar-foreground/60 mt-1 font-mono">v2.5</p>
       </div>
       
+      <div className="px-4 pt-4">
+        <QuickCreate variant="sidebar" />
+      </div>
+
       <nav className="flex-1 p-4 space-y-1">
         {navItems.filter(item => {
           if (item.adminOnly && !isAdmin) return false;
@@ -102,7 +106,6 @@ export function Sidebar({ className }: { className?: string }) {
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <QuickCreate variant="sidebar" />
             {isAdmin && (
               <Link href="/settings">
                 <Button variant="ghost" size="icon" className="text-sidebar-foreground/60 hover:text-sidebar-foreground" data-testid="button-settings">
