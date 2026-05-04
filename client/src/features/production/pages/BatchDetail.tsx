@@ -27,6 +27,7 @@ import { useRecordPrint } from '@/features/labels/api';
 import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
 import { useRole } from '@/contexts/AuthContext';
+import LabelPreview from '@/components/LabelPreview';
 
 const batchStatusColors: Record<string, string> = {
   planned: 'bg-gray-100 text-gray-700',
@@ -331,6 +332,22 @@ export default function BatchDetail() {
                       </Button>
                     </div>
                   </div>
+                )}
+                {batch.barcodeValue && (
+                  <LabelPreview
+                    labelType="batch"
+                    customerId={batchCustomerId}
+                    data={{
+                      type: 'batch',
+                      batchCode: batch.batchCode || batch.batchNumber,
+                      barcodeValue: batch.barcodeValue,
+                      productName: product?.name || 'Batch',
+                      quantity: batch.plannedQuantity,
+                      unit: 'KG',
+                      productionDate: batch.startDate,
+                      status: batch.status,
+                    }}
+                  />
                 )}
               </>
             )}

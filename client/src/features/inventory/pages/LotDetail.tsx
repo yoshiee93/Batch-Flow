@@ -27,6 +27,7 @@ import { format } from 'date-fns';
 import { useRecordPrint } from '@/features/labels/api';
 import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
+import LabelPreview from '@/components/LabelPreview';
 
 const lotStatusColors: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
@@ -395,6 +396,38 @@ export default function LotDetail() {
               {lot.barcodePrintedAt ? 'Print Again' : 'Print Label'}
             </Button>
           )}
+          {lot.barcodeValue && (() => {
+            const isFinished = lot.lotType === 'finished_good' || lot.lotType === 'intermediate';
+            const lotLabelType = isFinished ? 'finished_output' as const : 'raw_intake' as const;
+            return (
+              <LabelPreview
+                labelType={lotLabelType}
+                customerId={lot.customerId ?? null}
+                data={isFinished ? {
+                  type: 'finished_output',
+                  lotNumber: lot.lotNumber,
+                  barcodeValue: lot.barcodeValue,
+                  productName: itemName,
+                  quantity: lot.quantity,
+                  unit,
+                  producedDate: lot.producedDate || lot.receivedDate,
+                  sourceBatch: sourceBatch?.batchCode || sourceBatch?.batchNumber || undefined,
+                  expiryDate: lot.expiryDate,
+                } : {
+                  type: 'raw_intake',
+                  lotNumber: lot.lotNumber,
+                  barcodeValue: lot.barcodeValue,
+                  itemName,
+                  quantity: lot.quantity,
+                  unit,
+                  sourceLabel: lot.supplierName || lot.sourceName || undefined,
+                  receivedDate: lot.receivedDate,
+                  expiryDate: lot.expiryDate,
+                  supplierLot: lot.supplierLot,
+                }}
+              />
+            );
+          })()}
           {isAdmin && lot.lotType === 'finished_good' && (
             <Button
               variant="outline"
