@@ -1,5 +1,6 @@
 import { Sidebar, MobileNav } from './Sidebar';
 import { CommandPalette } from '@/components/CommandPalette';
+import { QuickCreate } from '@/components/QuickCreate';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -12,7 +13,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <header className="lg:hidden h-14 border-b bg-card flex items-center px-4 justify-between">
           <div className="font-mono font-bold text-lg">Clear<span className="text-primary">trace</span></div>
-          <MobileNav />
+          <div className="flex items-center gap-2">
+            <QuickCreate />
+            <MobileNav />
+          </div>
         </header>
 
         <main className="flex-1 overflow-auto p-4 md:p-8">

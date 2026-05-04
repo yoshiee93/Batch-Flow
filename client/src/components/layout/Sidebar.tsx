@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
+import { QuickCreate } from '@/components/QuickCreate';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/', adminOnly: false },
@@ -101,6 +102,7 @@ export function Sidebar({ className }: { className?: string }) {
             </span>
           </div>
           <div className="flex items-center gap-1">
+            <QuickCreate variant="sidebar" />
             {isAdmin && (
               <Link href="/settings">
                 <Button variant="ghost" size="icon" className="text-sidebar-foreground/60 hover:text-sidebar-foreground" data-testid="button-settings">
