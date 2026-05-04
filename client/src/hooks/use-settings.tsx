@@ -7,7 +7,7 @@ interface AppSettings {
 
 const defaultSettings: AppSettings = {
   cardsExpandedByDefault: false,
-  quickActionsEnabled: true,
+  quickActionsEnabled: false,
 };
 
 interface SettingsContextType {
