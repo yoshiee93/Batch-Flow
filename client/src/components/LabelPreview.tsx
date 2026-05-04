@@ -153,7 +153,13 @@ export default function LabelPreview({ labelType, customerId, data }: LabelPrevi
   const settings = template ? parseLabelTemplateSettings(template.settings) : null;
   const hasLayout = settings?.layout && (settings.layout.elements?.length ?? 0) > 0;
 
-  if (hasLayout) return null;
+  if (hasLayout) {
+    return (
+      <div className="w-full text-center py-2" data-testid="label-preview-custom-layout">
+        <span className="text-[10px] text-muted-foreground">Preview not available for custom layout templates</span>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full" data-testid="label-preview-section">
