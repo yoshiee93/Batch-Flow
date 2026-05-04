@@ -1,9 +1,12 @@
 import { useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const PREFIX = 'smartDefault:';
 
 export function useSmartDefault(key: string) {
-  const storageKey = `${PREFIX}${key}`;
+  const { user } = useAuth();
+  const userId = user?.id ?? '_anon';
+  const storageKey = `${PREFIX}${userId}:${key}`;
 
   const get = useCallback((): string => {
     try {
