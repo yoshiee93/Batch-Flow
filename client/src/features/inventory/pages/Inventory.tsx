@@ -36,6 +36,7 @@ import { fetchLabelTemplate, useRecordPrint } from '@/features/labels/api';
 import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
 import { useRole } from '@/contexts/AuthContext';
+import { useSmartDefault } from '@/hooks/useSmartDefault';
 
 const EMPTY_RECEIVE_FORM = {
   itemId: '',
@@ -205,6 +206,9 @@ export default function Inventory() {
   const { canReceiveStock, canManageSettings } = useRole();
   const { user: currentUser } = useAuth();
   const { data: usersList = [] } = useUsers();
+  const smartSupplier = useSmartDefault('receiveStock:supplier');
+  const smartReceiveCategory = useSmartDefault('receiveStock:category');
+  const smartProductCategory = useSmartDefault('product:category');
 
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
@@ -239,13 +243,16 @@ export default function Inventory() {
     return params.get('filter') === 'lowstock';
   });
 
+  const [urlActionHandled, setUrlActionHandled] = useState(false);
   useEffect(() => {
+    if (urlActionHandled) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('action') === 'receive' || params.get('filter') === 'lowstock') {
-      if (params.get('action') === 'receive') setIsReceiveStockOpen(true);
+      if (params.get('action') === 'receive') handleOpenReceive();
       window.history.replaceState(null, '', window.location.pathname);
+      setUrlActionHandled(true);
     }
-  }, []);
+  }, [urlActionHandled]);
 
   const filteredMaterials = materials.filter(m => {
     const matchesSearch =
@@ -401,6 +408,7 @@ export default function Inventory() {
         isReceivable: values.isReceivable,
       });
       toast({ title: "Product created", description: `${values.name} added to inventory` });
+      smartProductCategory.set(values.categoryId || '');
       setIsCreateProductOpen(false);
       productRhf.reset(productFormDefaults);
     } catch (error) {
@@ -488,6 +496,8 @@ export default function Inventory() {
       fetchLabelTemplate('raw_intake', result.lot.customerId).then(tmpl => {
         setReceivedTemplateName(tmpl ? tmpl.name : null);
       });
+      smartSupplier.set(values.supplierName || '');
+      smartReceiveCategory.set(receiveCategoryFilter !== 'all' ? receiveCategoryFilter : '');
     } catch (error: unknown) {
       if (error instanceof ApiValidationError) {
         const unmatched = applyServerFieldErrors(error, receiveRhf.setError, ['itemId','itemType','quantity','supplierName','supplierLot','sourceType','receivedDate','expiryDate','notes','productTemperature','visualInspection','receivedById','freight','photos']);
@@ -526,13 +536,17 @@ export default function Inventory() {
   }
 
   const handleOpenReceive = () => {
+    const savedSupplier = smartSupplier.get();
+    const savedCategory = smartReceiveCategory.get();
     receiveRhf.reset({
       ...(EMPTY_RECEIVE_FORM as unknown as ReceiveFormValues),
       receivedById: currentUser?.id ?? '',
+      supplierName: savedSupplier,
+      sourceName: savedSupplier,
     });
     setReceivedLot(null);
     setReceivedTemplateName(null);
-    setReceiveCategoryFilter('all');
+    setReceiveCategoryFilter(savedCategory || 'all');
     setRecentReceivePrints([]);
     setIsReceiveStockOpen(true);
   };
@@ -875,7 +889,7 @@ export default function Inventory() {
         <TabsContent value="all" className="space-y-4">
           {canManageSettings && (
             <div className="flex justify-end gap-2">
-              <Button onClick={() => setIsCreateProductOpen(true)} data-testid="button-new-product">
+              <Button onClick={() => { productRhf.reset({ ...productFormDefaults, categoryId: smartProductCategory.get() || null }); setIsCreateProductOpen(true); }} data-testid="button-new-product">
                 <Plus size={16} className="mr-2" /> New Product
               </Button>
             </div>
