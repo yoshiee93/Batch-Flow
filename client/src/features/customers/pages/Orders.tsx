@@ -412,10 +412,10 @@ export default function Orders() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="poNumber">Customer PO Number</Label>
+                <Label htmlFor="poNumber">Invoice Number</Label>
                 <Input
                   id="poNumber"
-                  placeholder="e.g. PO-12345"
+                  placeholder="e.g. INV-12345"
                   value={newOrder.poNumber || ''}
                   onChange={(e) => setNewOrder({ ...newOrder, poNumber: e.target.value })}
                   data-testid="input-po-number"
@@ -614,7 +614,7 @@ export default function Orders() {
                 </div>
                 {viewingOrder.poNumber && (
                   <div data-testid="view-po-number">
-                    <p className="text-sm text-muted-foreground">Customer PO #</p>
+                    <p className="text-sm text-muted-foreground">Invoice #</p>
                     <p className="font-medium font-mono">{viewingOrder.poNumber}</p>
                   </div>
                 )}
@@ -874,11 +874,11 @@ function EditOrderContent({
           />
         </div>
         <div className="space-y-2">
-          <Label>Customer PO Number</Label>
+          <Label>Invoice Number</Label>
           <Input
             value={editOrder.poNumber || ''}
             onChange={(e) => setEditOrder({ ...editOrder, poNumber: e.target.value })}
-            placeholder="e.g. PO-12345"
+            placeholder="e.g. INV-12345"
             data-testid="input-edit-po-number"
           />
         </div>
@@ -1100,7 +1100,7 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
         <div className="flex flex-col">
           <span>{order.orderNumber}</span>
           {order.poNumber && (
-            <span className="text-xs text-muted-foreground font-normal" data-testid={`text-po-number-${order.id}`}>PO: {order.poNumber}</span>
+            <span className="text-xs text-muted-foreground font-normal" data-testid={`text-po-number-${order.id}`}>Inv: {order.poNumber}</span>
           )}
         </div>
       </TableCell>
@@ -1261,7 +1261,7 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDe
         <div className="flex flex-col">
           <span>{order.orderNumber}</span>
           {order.poNumber && (
-            <span className="text-xs text-muted-foreground font-normal">PO: {order.poNumber}</span>
+            <span className="text-xs text-muted-foreground font-normal">Inv: {order.poNumber}</span>
           )}
         </div>
       </TableCell>
