@@ -110,10 +110,11 @@ export default function Settings() {
   const handleProcessCodeSave = async (category: Category) => {
     const nextCode = (processCodeEdits[category.id] ?? category.processCode ?? '').toUpperCase();
     const currentCode = category.processCode ?? '';
-    const currentMeaning = processCodeDefs.find(d => d.code === currentCode)?.meaning ?? '';
-    const nextMeaning = (processCodeMeaningEdits[category.id] ?? currentMeaning).trim();
+    // Base meaning on the next code's existing definition to avoid clobbering unrelated definitions
+    const meaningForNextCode = processCodeDefs.find(d => d.code === nextCode)?.meaning ?? '';
+    const nextMeaning = (processCodeMeaningEdits[category.id] ?? meaningForNextCode).trim();
     const codeChanged = nextCode !== currentCode;
-    const meaningChanged = nextMeaning !== currentMeaning;
+    const meaningChanged = nextMeaning !== meaningForNextCode;
     if (!codeChanged && !meaningChanged) return;
     try {
       if (codeChanged) {
@@ -131,7 +132,7 @@ export default function Settings() {
           processCode: nextCode || null,
         });
       }
-      if (nextCode && (codeChanged || meaningChanged)) {
+      if (nextCode && nextMeaning && (codeChanged || meaningChanged)) {
         await upsertProcessCodeDef.mutateAsync({ code: nextCode, meaning: nextMeaning });
       }
       toast({ title: "Process code saved", description: nextCode ? `"${category.name}" → ${nextCode}${nextMeaning ? ` (${nextMeaning})` : ''}` : `"${category.name}" code cleared` });
@@ -454,10 +455,12 @@ export default function Settings() {
               <TableBody>
                 {categories.map((category) => {
                   const draftCode = processCodeEdits[category.id] ?? category.processCode ?? '';
-                  const savedMeaning = processCodeDefs.find(d => d.code === (category.processCode ?? ''))?.meaning ?? '';
-                  const draftMeaning = processCodeMeaningEdits[category.id] ?? savedMeaning;
-                  const codeChanged = draftCode.toUpperCase() !== (category.processCode ?? '');
-                  const meaningChanged = draftMeaning.trim() !== savedMeaning;
+                  const upperDraftCode = draftCode.toUpperCase();
+                  // Meaning for the draft code (what already exists for that code in definitions)
+                  const meaningForDraftCode = processCodeDefs.find(d => d.code === upperDraftCode)?.meaning ?? '';
+                  const draftMeaning = processCodeMeaningEdits[category.id] ?? meaningForDraftCode;
+                  const codeChanged = upperDraftCode !== (category.processCode ?? '');
+                  const meaningChanged = draftMeaning.trim() !== meaningForDraftCode;
                   const dirty = codeChanged || meaningChanged;
                   return (
                     <TableRow key={category.id} data-testid={`row-process-code-${category.id}`}>
