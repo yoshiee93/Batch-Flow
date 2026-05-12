@@ -1,11 +1,13 @@
 import { catalogRepository as repo } from "./repository";
 import { createAuditLog } from "../../lib/auditLog";
+import { PROCESS_CODE_MAP } from "@shared/batchCodeConfig";
 import {
   type Category, type InsertCategory,
   type Product, type InsertProduct,
   type Material, type InsertMaterial,
   type Recipe, type InsertRecipe,
   type RecipeItem, type InsertRecipeItem,
+  type ProcessCodeDefinition, type InsertProcessCodeDefinition,
 } from "@shared/schema";
 
 export const catalogService = {
@@ -97,5 +99,23 @@ export const catalogService = {
 
   createRecipeItem(data: InsertRecipeItem): Promise<RecipeItem> {
     return repo.createRecipeItem(data);
+  },
+
+  async getProcessCodeDefinitions(): Promise<ProcessCodeDefinition[]> {
+    const count = await repo.countProcessCodeDefinitions();
+    if (count === 0) {
+      for (const [code, meaning] of Object.entries(PROCESS_CODE_MAP)) {
+        await repo.upsertProcessCodeDefinition({ code, meaning });
+      }
+    }
+    return repo.getProcessCodeDefinitions();
+  },
+
+  async upsertProcessCodeDefinition(data: InsertProcessCodeDefinition): Promise<ProcessCodeDefinition> {
+    return repo.upsertProcessCodeDefinition(data);
+  },
+
+  async deleteProcessCodeDefinition(code: string): Promise<void> {
+    return repo.deleteProcessCodeDefinition(code);
   },
 };

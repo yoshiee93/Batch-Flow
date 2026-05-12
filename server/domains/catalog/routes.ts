@@ -1,7 +1,7 @@
 import { Router } from "express";
 import {
   insertProductSchema, insertMaterialSchema, insertRecipeSchema,
-  insertRecipeItemSchema, insertCategorySchema,
+  insertRecipeItemSchema, insertCategorySchema, insertProcessCodeDefinitionSchema,
 } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../lib/authMiddleware";
@@ -128,4 +128,18 @@ catalogRouter.post("/recipes", adminOnly, asyncHandler(async (req, res) => {
 catalogRouter.post("/recipes/:id/items", adminOnly, asyncHandler(async (req, res) => {
   const data = insertRecipeItemSchema.parse({ ...req.body, recipeId: req.params.id });
   res.status(201).json(await svc.createRecipeItem(data));
+}));
+
+catalogRouter.get("/process-code-definitions", asyncHandler(async (_req, res) => {
+  res.json(await svc.getProcessCodeDefinitions());
+}));
+
+catalogRouter.post("/process-code-definitions", adminOnly, asyncHandler(async (req, res) => {
+  const data = insertProcessCodeDefinitionSchema.parse(req.body);
+  res.status(201).json(await svc.upsertProcessCodeDefinition(data));
+}));
+
+catalogRouter.delete("/process-code-definitions/:code", adminOnly, asyncHandler(async (req, res) => {
+  await svc.deleteProcessCodeDefinition(req.params.code);
+  res.status(204).send();
 }));

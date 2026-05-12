@@ -1,12 +1,13 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../../db";
 import {
-  categories, products, materials, recipes, recipeItems,
+  categories, products, materials, recipes, recipeItems, processCodeDefinitions,
   type Category, type InsertCategory,
   type Product, type InsertProduct,
   type Material, type InsertMaterial,
   type Recipe, type InsertRecipe,
   type RecipeItem, type InsertRecipeItem,
+  type ProcessCodeDefinition, type InsertProcessCodeDefinition,
 } from "@shared/schema";
 
 export const catalogRepository = {
@@ -132,5 +133,27 @@ export const catalogRepository = {
 
   async getProductsWithStock(): Promise<Product[]> {
     return db.select().from(products);
+  },
+
+  async getProcessCodeDefinitions(): Promise<ProcessCodeDefinition[]> {
+    return db.select().from(processCodeDefinitions).orderBy(processCodeDefinitions.code);
+  },
+
+  async countProcessCodeDefinitions(): Promise<number> {
+    const rows = await db.select().from(processCodeDefinitions);
+    return rows.length;
+  },
+
+  async upsertProcessCodeDefinition(data: InsertProcessCodeDefinition): Promise<ProcessCodeDefinition> {
+    const [row] = await db
+      .insert(processCodeDefinitions)
+      .values(data)
+      .onConflictDoUpdate({ target: processCodeDefinitions.code, set: { meaning: data.meaning } })
+      .returning();
+    return row;
+  },
+
+  async deleteProcessCodeDefinition(code: string): Promise<void> {
+    await db.delete(processCodeDefinitions).where(eq(processCodeDefinitions.code, code));
   },
 };

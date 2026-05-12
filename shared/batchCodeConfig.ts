@@ -6,6 +6,11 @@ export const FRUIT_CODE_MAP: Record<string, string> = {
   'PP': 'Passionfruit Pulp',
 };
 
+/**
+ * @deprecated Process code definitions are now managed in the database via the
+ * `process_code_definitions` table. This map is only retained to seed that table
+ * on first startup when the table is empty. Do not import this for runtime lookups.
+ */
 export const PROCESS_CODE_MAP: Record<string, string> = {
   '3': 'Fresh / IQF',
   '4': 'Freeze Dried',

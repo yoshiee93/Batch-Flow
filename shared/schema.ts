@@ -589,6 +589,19 @@ export const insertTemplateSchema = createInsertSchema(templates, {
 export type InsertTemplate = z.infer<typeof insertTemplateSchema>;
 export type Template = typeof templates.$inferSelect;
 
+export const processCodeDefinitions = pgTable("process_code_definitions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  code: varchar("code", { length: 1 }).notNull().unique(),
+  meaning: varchar("meaning", { length: 200 }).notNull(),
+});
+
+export const insertProcessCodeDefinitionSchema = z.object({
+  code: z.string().min(1).max(1),
+  meaning: z.string().min(1).max(200),
+});
+export type InsertProcessCodeDefinition = z.infer<typeof insertProcessCodeDefinitionSchema>;
+export type ProcessCodeDefinition = typeof processCodeDefinitions.$inferSelect;
+
 export const forecastStatusEnum = pgEnum("forecast_status", ["open", "converted", "archived"]);
 
 export const forecastOrders = pgTable("forecast_orders", {

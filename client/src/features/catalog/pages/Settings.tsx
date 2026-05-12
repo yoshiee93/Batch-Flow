@@ -16,8 +16,8 @@ import {
   Database, Download, Upload, ShieldAlert, Tag, Wrench, ShieldCheck, Construction, Printer, History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useProducts, useUpdateProduct, type Category, type Product } from '@/features/catalog/api';
-import { PROCESS_CODE_MAP, FRUIT_CODE_MAP } from '@shared/batchCodeConfig';
+import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useProducts, useUpdateProduct, useProcessCodeDefinitions, useUpsertProcessCodeDefinition, useDeleteProcessCodeDefinition, type Category, type Product } from '@/features/catalog/api';
+import { FRUIT_CODE_MAP } from '@shared/batchCodeConfig';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
 import { useRole } from '@/contexts/AuthContext';
@@ -94,15 +94,82 @@ export default function Settings() {
   }, []);
 
   const [processCodeEdits, setProcessCodeEdits] = useState<Record<string, string>>({});
+  const [newDefCode, setNewDefCode] = useState('');
+  const [newDefMeaning, setNewDefMeaning] = useState('');
+  const [defEdits, setDefEdits] = useState<Record<string, { code: string; meaning: string }>>({});
 
   const { data: categories = [], isLoading, isError } = useCategories();
   const { data: products = [] } = useProducts();
+  const { data: processCodeDefs = [] } = useProcessCodeDefinitions();
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const deleteCategory = useDeleteCategory();
   const updateProduct = useUpdateProduct();
+  const upsertProcessCodeDef = useUpsertProcessCodeDefinition();
+  const deleteProcessCodeDef = useDeleteProcessCodeDefinition();
   const { toast } = useToast();
   const { settings, updateSetting } = useSettings();
+
+  const handleAddProcessCodeDef = async () => {
+    const code = newDefCode.trim().toUpperCase();
+    const meaning = newDefMeaning.trim();
+    if (!code || !meaning) {
+      toast({ title: "Missing fields", description: "Both code and meaning are required", variant: "destructive" });
+      return;
+    }
+    if (code.length !== 1) {
+      toast({ title: "Invalid code", description: "Process code must be exactly one character", variant: "destructive" });
+      return;
+    }
+    try {
+      await upsertProcessCodeDef.mutateAsync({ code, meaning });
+      toast({ title: "Process code added", description: `Code "${code}" saved as "${meaning}"` });
+      setNewDefCode('');
+      setNewDefMeaning('');
+    } catch {
+      toast({ title: "Error", description: "Failed to save process code definition", variant: "destructive" });
+    }
+  };
+
+  const handleSaveDefEdit = async (originalCode: string) => {
+    const edit = defEdits[originalCode];
+    if (!edit) return;
+    const newCode = edit.code.trim().toUpperCase();
+    const meaning = edit.meaning.trim();
+    if (!newCode || newCode.length !== 1) {
+      toast({ title: "Invalid code", description: "Process code must be exactly one character", variant: "destructive" });
+      return;
+    }
+    if (!meaning) {
+      toast({ title: "Missing meaning", description: "Meaning cannot be empty", variant: "destructive" });
+      return;
+    }
+    if (newCode !== originalCode && processCodeDefs.some(d => d.code === newCode)) {
+      toast({ title: "Code already exists", description: `A definition for code "${newCode}" already exists. Delete it first if you want to reassign that code.`, variant: "destructive" });
+      return;
+    }
+    try {
+      if (newCode !== originalCode) {
+        await upsertProcessCodeDef.mutateAsync({ code: newCode, meaning });
+        await deleteProcessCodeDef.mutateAsync(originalCode);
+      } else {
+        await upsertProcessCodeDef.mutateAsync({ code: newCode, meaning });
+      }
+      toast({ title: "Definition updated", description: `Code "${newCode}" updated` });
+      setDefEdits(prev => { const c = { ...prev }; delete c[originalCode]; return c; });
+    } catch {
+      toast({ title: "Error", description: "Failed to update definition", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteProcessCodeDef = async (code: string) => {
+    try {
+      await deleteProcessCodeDef.mutateAsync(code);
+      toast({ title: "Definition removed", description: `Code "${code}" removed` });
+    } catch {
+      toast({ title: "Error", description: "Failed to delete definition", variant: "destructive" });
+    }
+  };
 
   const handleProcessCodeSave = async (category: Category) => {
     const next = (processCodeEdits[category.id] ?? category.processCode ?? '').toUpperCase();
@@ -414,79 +481,220 @@ export default function Settings() {
     </Card>
   );
 
-  const renderProcessCodes = () => (
-    <Card data-testid="card-process-codes">
+  const renderProcessCodeDefinitions = () => (
+    <Card data-testid="card-process-code-definitions">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Wrench className="h-5 w-5" />
-          Process Codes
+          Process Code Definitions
         </CardTitle>
         <CardDescription>
-          Assign a single-character process code to each category for SOP batch code generation. Known codes: 3 = Fresh/IQF, 4 = Freeze Dried, 6 = Frozen.
+          Define what each single-character process code means (e.g. 3 = Fresh/IQF). These definitions are used as the reference lookup when assigning codes to categories below.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        {categories.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Tags className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No categories defined yet</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[160px]">Category</TableHead>
-                  <TableHead className="text-center min-w-[120px]">Process Code</TableHead>
-                  <TableHead className="min-w-[160px]">Meaning</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Save</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {categories.map((category) => {
-                  const draft = processCodeEdits[category.id] ?? category.processCode ?? '';
-                  const dirty = draft.toUpperCase() !== (category.processCode ?? '');
-                  return (
-                    <TableRow key={category.id} data-testid={`row-process-code-${category.id}`}>
-                      <TableCell className="font-medium">{category.name}</TableCell>
-                      <TableCell className="text-center">
-                        <Input
-                          value={draft}
-                          onChange={(e) => setProcessCodeEdits(prev => ({ ...prev, [category.id]: e.target.value.toUpperCase() }))}
-                          placeholder="—"
-                          maxLength={1}
-                          className="w-16 mx-auto text-center font-mono"
-                          disabled={!canManageSettings}
-                          data-testid={`input-process-code-${category.id}`}
-                        />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {draft ? (PROCESS_CODE_MAP[draft.toUpperCase()] || <span className="italic">Custom</span>) : <span className="italic">—</span>}
-                      </TableCell>
+      <CardContent className="space-y-4">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-20 text-center">Code</TableHead>
+                <TableHead>Meaning</TableHead>
+                {canManageSettings && <TableHead className="text-right w-32">Actions</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {processCodeDefs.map((def) => {
+                const edit = defEdits[def.code];
+                const editedCode = edit?.code ?? def.code;
+                const editedMeaning = edit?.meaning ?? def.meaning;
+                const isDirty = editedCode !== def.code || editedMeaning !== def.meaning;
+                return (
+                  <TableRow key={def.code} data-testid={`row-process-code-def-${def.code}`}>
+                    <TableCell className="text-center">
+                      <Input
+                        value={editedCode}
+                        onChange={(e) => setDefEdits(prev => ({
+                          ...prev,
+                          [def.code]: { code: e.target.value.toUpperCase(), meaning: prev[def.code]?.meaning ?? def.meaning },
+                        }))}
+                        maxLength={1}
+                        disabled={!canManageSettings}
+                        className="w-14 mx-auto text-center font-mono font-bold"
+                        data-testid={`input-def-code-${def.code}`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={editedMeaning}
+                        onChange={(e) => setDefEdits(prev => ({
+                          ...prev,
+                          [def.code]: { code: prev[def.code]?.code ?? def.code, meaning: e.target.value },
+                        }))}
+                        disabled={!canManageSettings}
+                        className="max-w-xs"
+                        data-testid={`input-def-meaning-${def.code}`}
+                      />
+                    </TableCell>
+                    {canManageSettings && (
                       <TableCell className="text-right">
-                        {canManageSettings && (
+                        <div className="flex justify-end gap-1">
                           <Button
                             size="sm"
-                            variant={dirty ? 'default' : 'outline'}
-                            disabled={!dirty || updateCategory.isPending}
-                            onClick={() => handleProcessCodeSave(category)}
-                            data-testid={`button-save-process-code-${category.id}`}
+                            variant={isDirty ? 'default' : 'outline'}
+                            disabled={!isDirty || upsertProcessCodeDef.isPending}
+                            onClick={() => handleSaveDefEdit(def.code)}
+                            data-testid={`button-save-def-${def.code}`}
                           >
-                            {updateCategory.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                            {upsertProcessCodeDef.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                             Save
                           </Button>
-                        )}
+                          <ConfirmDialog
+                            trigger={
+                              <Button variant="ghost" size="icon" data-testid={`button-delete-def-${def.code}`}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            }
+                            title="Remove Process Code"
+                            description={`Remove the definition for code "${def.code}" (${def.meaning})? Categories using this code will keep their assigned code but it will show as unrecognised.`}
+                            confirmLabel="Remove"
+                            variant="destructive"
+                            onConfirm={() => handleDeleteProcessCodeDef(def.code)}
+                            pending={deleteProcessCodeDef.isPending}
+                            testId={`confirm-delete-def-${def.code}`}
+                          />
+                        </div>
                       </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                    )}
+                  </TableRow>
+                );
+              })}
+              {processCodeDefs.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={canManageSettings ? 3 : 2} className="text-center text-muted-foreground py-6">
+                    No process code definitions yet
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        {canManageSettings && (
+          <div className="border rounded-md p-4 space-y-3 bg-muted/30">
+            <p className="text-sm font-medium">Add New Definition</p>
+            <div className="flex gap-2 items-end flex-wrap">
+              <div className="space-y-1">
+                <Label htmlFor="new-def-code" className="text-xs">Code (1 char)</Label>
+                <Input
+                  id="new-def-code"
+                  value={newDefCode}
+                  onChange={(e) => setNewDefCode(e.target.value.toUpperCase())}
+                  maxLength={1}
+                  placeholder="e.g. 5"
+                  className="w-20 font-mono text-center"
+                  data-testid="input-new-def-code"
+                />
+              </div>
+              <div className="space-y-1 flex-1 min-w-40">
+                <Label htmlFor="new-def-meaning" className="text-xs">Meaning</Label>
+                <Input
+                  id="new-def-meaning"
+                  value={newDefMeaning}
+                  onChange={(e) => setNewDefMeaning(e.target.value)}
+                  placeholder="e.g. Dehydrated"
+                  data-testid="input-new-def-meaning"
+                />
+              </div>
+              <Button
+                onClick={handleAddProcessCodeDef}
+                disabled={upsertProcessCodeDef.isPending || !newDefCode || !newDefMeaning}
+                data-testid="button-add-process-code-def"
+              >
+                {upsertProcessCodeDef.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                Add
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>
     </Card>
   );
+
+  const renderProcessCodes = () => {
+    const defMap = Object.fromEntries(processCodeDefs.map((d) => [d.code, d.meaning]));
+    return (
+      <Card data-testid="card-process-codes">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Tags className="h-5 w-5" />
+            Category Process Code Assignments
+          </CardTitle>
+          <CardDescription>
+            Assign a single-character process code to each category for SOP batch code generation.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {categories.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Tags className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No categories defined yet</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[160px]">Category</TableHead>
+                    <TableHead className="text-center min-w-[120px]">Process Code</TableHead>
+                    <TableHead className="min-w-[160px]">Meaning</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Save</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {categories.map((category) => {
+                    const draft = processCodeEdits[category.id] ?? category.processCode ?? '';
+                    const dirty = draft.toUpperCase() !== (category.processCode ?? '');
+                    return (
+                      <TableRow key={category.id} data-testid={`row-process-code-${category.id}`}>
+                        <TableCell className="font-medium">{category.name}</TableCell>
+                        <TableCell className="text-center">
+                          <Input
+                            value={draft}
+                            onChange={(e) => setProcessCodeEdits(prev => ({ ...prev, [category.id]: e.target.value.toUpperCase() }))}
+                            placeholder="—"
+                            maxLength={1}
+                            className="w-16 mx-auto text-center font-mono"
+                            disabled={!canManageSettings}
+                            data-testid={`input-process-code-${category.id}`}
+                          />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {draft ? (defMap[draft.toUpperCase()] || <span className="italic">Unknown</span>) : <span className="italic">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {canManageSettings && (
+                            <Button
+                              size="sm"
+                              variant={dirty ? 'default' : 'outline'}
+                              disabled={!dirty || updateCategory.isPending}
+                              onClick={() => handleProcessCodeSave(category)}
+                              data-testid={`button-save-process-code-${category.id}`}
+                            >
+                              {updateCategory.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                              Save
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   const renderLabelTemplates = () => (
     <Card>
@@ -712,7 +920,8 @@ export default function Settings() {
     ],
     production: [
       { id: 'fruit-codes', label: 'Fruit Codes (SOP)', icon: Leaf, render: renderFruitCodes },
-      { id: 'process-codes', label: 'Process Codes', icon: Wrench, render: renderProcessCodes },
+      { id: 'process-code-definitions', label: 'Process Code Definitions', icon: Wrench, render: renderProcessCodeDefinitions },
+      { id: 'process-codes', label: 'Category Process Codes', icon: Tags, render: renderProcessCodes },
     ],
     labels: [
       { id: 'templates', label: 'Templates', icon: Tag, render: renderLabelTemplates },

@@ -226,3 +226,41 @@ export function useRecipeItems(recipeId: string) {
     enabled: !!recipeId,
   });
 }
+
+export interface ProcessCodeDefinition {
+  id: number;
+  code: string;
+  meaning: string;
+}
+
+export function useProcessCodeDefinitions() {
+  return useQuery<ProcessCodeDefinition[]>({
+    queryKey: ["processCodeDefinitions"],
+    queryFn: () => fetchApi("/process-code-definitions"),
+  });
+}
+
+export function useUpsertProcessCodeDefinition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { code: string; meaning: string }) =>
+      fetchApi<ProcessCodeDefinition>("/process-code-definitions", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["processCodeDefinitions"] });
+    },
+  });
+}
+
+export function useDeleteProcessCodeDefinition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) =>
+      fetchApi(`/process-code-definitions/${encodeURIComponent(code)}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["processCodeDefinitions"] });
+    },
+  });
+}
