@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -102,10 +103,14 @@ function getLotTypeBadge(lotType: string | null) {
   }
 }
 
+type CardFilter = 'all' | 'materials' | 'products' | 'lowstock' | 'lots';
+
 export default function Inventory() {
   const [activeTab, setActiveTab] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [lotSearchTerm, setLotSearchTerm] = useState('');
+  const [cardFilter, setCardFilter] = useState<CardFilter>('all');
+  const [selectedProductForBreakdown, setSelectedProductForBreakdown] = useState<Product | null>(null);
 
   const [isEditMaterialOpen, setIsEditMaterialOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
@@ -277,7 +282,8 @@ export default function Inventory() {
       m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (m.sku && m.sku.toLowerCase().includes(searchTerm.toLowerCase()));
     if (!matchesSearch) return false;
-    if (lowStockOnly && parseFloat(m.currentStock) > parseFloat(m.minStock)) return false;
+    if (cardFilter === 'products') return false;
+    if ((lowStockOnly || cardFilter === 'lowstock') && parseFloat(m.currentStock) > parseFloat(m.minStock)) return false;
     return true;
   });
 
@@ -286,7 +292,8 @@ export default function Inventory() {
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()));
     if (!matchesSearch) return false;
-    if (lowStockOnly && parseFloat(p.currentStock) > parseFloat(p.minStock)) return false;
+    if (cardFilter === 'materials') return false;
+    if ((lowStockOnly || cardFilter === 'lowstock') && parseFloat(p.currentStock) > parseFloat(p.minStock)) return false;
     return true;
   });
 
@@ -661,13 +668,20 @@ export default function Inventory() {
   const renderProductRow = (product: Product) => {
     const isLow = parseFloat(product.currentStock) <= parseFloat(product.minStock);
     const productCategory = categories.find(c => c.id === product.categoryId);
+    const hasStock = parseFloat(product.currentStock) > 0;
     return (
-      <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
+      <TableRow
+        key={product.id}
+        data-testid={`row-product-${product.id}`}
+        className={hasStock ? "cursor-pointer hover:bg-muted/60" : undefined}
+        onClick={hasStock ? () => setSelectedProductForBreakdown(product) : undefined}
+      >
         <TableCell className="font-mono font-medium">{product.sku}</TableCell>
         <TableCell>
           <div className="flex items-center gap-2">
             <Package className="h-4 w-4 text-muted-foreground" />
             {product.name}
+            {hasStock && <span className="text-[10px] text-muted-foreground ml-1 hidden sm:inline">click for breakdown</span>}
           </div>
         </TableCell>
         <TableCell className="text-center">
@@ -681,7 +695,7 @@ export default function Inventory() {
         <TableCell className="text-center">
           {isLow ? <Badge variant="destructive">Low</Badge> : <Badge variant="outline" className="text-green-600 border-green-200">OK</Badge>}
         </TableCell>
-        <TableCell className="text-right">
+        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
           {canManageSettings && (
             <div className="flex justify-end gap-1">
               <Button variant="ghost" size="icon" onClick={() => handleEditProductClick(product)} data-testid={`button-edit-product-${product.id}`}>
@@ -800,27 +814,47 @@ export default function Inventory() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card className="p-4">
+        <Card
+          className={cn("p-4 cursor-pointer transition-all hover:shadow-md", cardFilter === 'all' && "ring-2 ring-primary")}
+          onClick={() => { setCardFilter('all'); setLowStockOnly(false); }}
+          data-testid="card-filter-all"
+        >
           <div className="text-sm text-muted-foreground">Total Items</div>
           <div className="text-2xl font-bold font-mono">{materials.length + products.length}</div>
           <div className="text-xs text-muted-foreground">{materials.length} materials, {products.length} goods</div>
         </Card>
-        <Card className="p-4">
+        <Card
+          className={cn("p-4 cursor-pointer transition-all hover:shadow-md", cardFilter === 'materials' && "ring-2 ring-primary")}
+          onClick={() => { setCardFilter(prev => prev === 'materials' ? 'all' : 'materials'); setLowStockOnly(false); if (activeTab === 'lots') setActiveTab('all'); }}
+          data-testid="card-filter-materials"
+        >
           <div className="text-sm text-muted-foreground">Materials Stock</div>
           <div className="text-2xl font-bold font-mono">{totalMaterialStock.toFixed(0)}</div>
           <div className="text-xs text-muted-foreground">{materials.length} items (mixed units)</div>
         </Card>
-        <Card className="p-4">
+        <Card
+          className={cn("p-4 cursor-pointer transition-all hover:shadow-md", cardFilter === 'products' && "ring-2 ring-primary")}
+          onClick={() => { setCardFilter(prev => prev === 'products' ? 'all' : 'products'); setLowStockOnly(false); if (activeTab === 'lots') setActiveTab('all'); }}
+          data-testid="card-filter-products"
+        >
           <div className="text-sm text-muted-foreground">Goods Stock</div>
           <div className="text-2xl font-bold font-mono">{totalProductStock.toFixed(0)}</div>
           <div className="text-xs text-muted-foreground">{products.length} items (mixed units)</div>
         </Card>
-        <Card className="p-4">
+        <Card
+          className={cn("p-4 cursor-pointer transition-all hover:shadow-md", cardFilter === 'lowstock' && "ring-2 ring-amber-500 bg-amber-50/50")}
+          onClick={() => { const next = cardFilter === 'lowstock' ? 'all' : 'lowstock'; setCardFilter(next); setLowStockOnly(false); if (next === 'lowstock' && activeTab === 'lots') setActiveTab('all'); }}
+          data-testid="card-filter-lowstock"
+        >
           <div className="text-sm text-muted-foreground">Low Stock Alerts</div>
           <div className="text-2xl font-bold font-mono text-amber-600">{lowStockMaterials + lowStockProducts}</div>
           <div className="text-xs text-muted-foreground">items below min</div>
         </Card>
-        <Card className="p-4">
+        <Card
+          className={cn("p-4 cursor-pointer transition-all hover:shadow-md", cardFilter === 'lots' && "ring-2 ring-green-500 bg-green-50/50")}
+          onClick={() => { const next = cardFilter === 'lots' ? 'all' : 'lots'; setCardFilter(next); setLowStockOnly(false); if (next === 'lots') setActiveTab('lots'); }}
+          data-testid="card-filter-lots"
+        >
           <div className="text-sm text-muted-foreground">Active Lots</div>
           <div className="text-2xl font-bold font-mono text-green-600">{activeLots}</div>
           <div className="text-xs text-muted-foreground">of {(lots as Lot[]).length} total</div>
@@ -986,6 +1020,81 @@ export default function Inventory() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Product Stock Breakdown Sheet */}
+      <Sheet open={!!selectedProductForBreakdown} onOpenChange={(open) => { if (!open) setSelectedProductForBreakdown(null); }}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto" data-testid="sheet-stock-breakdown">
+          {selectedProductForBreakdown && (() => {
+            const productLots = (lots as Lot[])
+              .filter(l => l.productId === selectedProductForBreakdown.id && l.status === 'active')
+              .sort((a, b) => new Date(b.receivedDate).getTime() - new Date(a.receivedDate).getTime());
+            const lotsTotal = productLots.reduce((sum, l) => sum + parseFloat(l.remainingQuantity || '0'), 0);
+            const unit = selectedProductForBreakdown.unit || 'KG';
+            return (
+              <>
+                <SheetHeader className="mb-4">
+                  <SheetTitle data-testid="text-breakdown-title">{selectedProductForBreakdown.name} — Stock Breakdown</SheetTitle>
+                  <SheetDescription>
+                    Active lots contributing to current stock.
+                  </SheetDescription>
+                </SheetHeader>
+
+                <div className="mb-4 p-3 rounded-md bg-muted/50 text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Recorded stock</span>
+                    <span className="font-mono font-medium">{parseFloat(selectedProductForBreakdown.currentStock).toFixed(2)} {unit}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Active lot total</span>
+                    <span className="font-mono font-medium">{lotsTotal.toFixed(2)} {unit}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Active lots</span>
+                    <span className="font-mono font-medium">{productLots.length}</span>
+                  </div>
+                </div>
+
+                {productLots.length === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-8">
+                    No active lots found for this product. Stock may have been manually adjusted.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {productLots.map(lot => {
+                      const sourceBatch = lot.sourceBatchId ? (batches as any[]).find(b => b.id === lot.sourceBatchId) : null;
+                      return (
+                        <div key={lot.id} className="border rounded-md p-3 space-y-1.5 text-sm" data-testid={`card-lot-breakdown-${lot.id}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-medium">{lot.lotNumber}</span>
+                            <span className="font-mono font-semibold">{parseFloat(lot.remainingQuantity || '0').toFixed(2)} {unit}</span>
+                          </div>
+                          {sourceBatch && (
+                            <div className="text-muted-foreground flex items-center gap-1">
+                              <Layers className="h-3 w-3" />
+                              Batch: <span className="font-mono">{sourceBatch.batchNumber}</span>
+                            </div>
+                          )}
+                          {lot.sourceName && !sourceBatch && (
+                            <div className="text-muted-foreground">{lot.sourceName}</div>
+                          )}
+                          <div className="text-muted-foreground">
+                            {lot.producedDate
+                              ? `Produced ${format(new Date(lot.producedDate), 'dd MMM yyyy')}`
+                              : `Received ${format(new Date(lot.receivedDate), 'dd MMM yyyy')}`}
+                          </div>
+                          {lot.expiryDate && (
+                            <div className="text-amber-600">Expires {format(new Date(lot.expiryDate), 'dd MMM yyyy')}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
 
       {/* Receive Stock Dialog */}
       <Dialog open={isReceiveStockOpen} onOpenChange={(open) => { if (!open) handleCloseReceive(); }}>
