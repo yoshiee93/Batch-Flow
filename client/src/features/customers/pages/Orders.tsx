@@ -786,7 +786,16 @@ function EditOrderContent({
   const setNewItem = (next: Partial<AddItemValues> | ((prev: AddItemValues) => AddItemValues)) => {
     const current = addItemForm.getValues();
     const partial = typeof next === 'function' ? next(current) : next;
-    addItemForm.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
+    (Object.keys(partial) as Array<keyof AddItemValues>).forEach((key) => {
+      const value = partial[key];
+      if (value !== undefined) {
+        addItemForm.setValue(key, value as AddItemValues[typeof key], {
+          shouldValidate: true,
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+    });
   };
   const [productSearchOpen, setProductSearchOpen] = useState(false);
 
