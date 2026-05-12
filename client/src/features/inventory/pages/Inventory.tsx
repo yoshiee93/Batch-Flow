@@ -109,7 +109,10 @@ export default function Inventory() {
   const [activeTab, setActiveTab] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [lotSearchTerm, setLotSearchTerm] = useState('');
-  const [cardFilter, setCardFilter] = useState<CardFilter>('all');
+  const [cardFilter, setCardFilter] = useState<CardFilter>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('filter') === 'lowstock' ? 'lowstock' : 'all';
+  });
   const [selectedProductForBreakdown, setSelectedProductForBreakdown] = useState<Product | null>(null);
 
   const [isEditMaterialOpen, setIsEditMaterialOpen] = useState(false);
@@ -842,7 +845,7 @@ export default function Inventory() {
           <div className="text-xs text-muted-foreground">{products.length} items (mixed units)</div>
         </Card>
         <Card
-          className={cn("p-4 cursor-pointer transition-all hover:shadow-md", cardFilter === 'lowstock' && "ring-2 ring-amber-500 bg-amber-50/50")}
+          className={cn("p-4 cursor-pointer transition-all hover:shadow-md", (cardFilter === 'lowstock' || lowStockOnly) && "ring-2 ring-amber-500 bg-amber-50/50")}
           onClick={() => { const next = cardFilter === 'lowstock' ? 'all' : 'lowstock'; setCardFilter(next); setLowStockOnly(false); setActiveTab(prev => prev === 'lots' ? 'all' : prev); }}
           data-testid="card-filter-lowstock"
         >
