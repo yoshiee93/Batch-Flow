@@ -135,7 +135,16 @@ export default function Inventory() {
   const setProductForm = (next: Partial<ProductFormValues> | ((prev: ProductFormValues) => ProductFormValues)) => {
     const current = productRhf.getValues();
     const partial = typeof next === 'function' ? next(current) : next;
-    productRhf.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
+    (Object.keys(partial) as Array<keyof ProductFormValues>).forEach((key) => {
+      const value = partial[key];
+      if (value !== undefined) {
+        productRhf.setValue(key, value as ProductFormValues[typeof key], {
+          shouldValidate: true,
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+    });
   };
 
   const [isReceiveStockOpen, setIsReceiveStockOpen] = useState(false);
@@ -190,7 +199,16 @@ export default function Inventory() {
   const setReceiveForm = (next: Partial<ReceiveFormValues> | ((prev: ReceiveFormValues) => ReceiveFormValues)) => {
     const current = receiveRhf.getValues();
     const partial = typeof next === 'function' ? next(current) : next;
-    receiveRhf.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
+    (Object.keys(partial) as Array<keyof ReceiveFormValues>).forEach((key) => {
+      const value = partial[key];
+      if (value !== undefined) {
+        receiveRhf.setValue(key, value as ReceiveFormValues[typeof key], {
+          shouldValidate: true,
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+    });
   };
   const [receivedLot, setReceivedLot] = useState<LotWithDetails | null>(null);
   const [itemSearchOpen, setItemSearchOpen] = useState(false);

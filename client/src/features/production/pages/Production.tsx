@@ -81,7 +81,16 @@ export default function Production() {
   const setNewBatch = (next: Partial<CreateBatchValues> | ((prev: CreateBatchValues) => CreateBatchValues)) => {
     const current = createBatchForm.getValues();
     const partial = typeof next === 'function' ? next(current) : next;
-    createBatchForm.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
+    (Object.keys(partial) as Array<keyof CreateBatchValues>).forEach((key) => {
+      const value = partial[key];
+      if (value !== undefined) {
+        createBatchForm.setValue(key, value as CreateBatchValues[typeof key], {
+          shouldValidate: true,
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+    });
   };
   const [batchNumberEdited, setBatchNumberEdited] = useState(false);
   
