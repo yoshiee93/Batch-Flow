@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown, Archive, FlaskConical } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown, Archive, FlaskConical, ArrowUp, ArrowDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -53,8 +53,8 @@ export default function Orders() {
   const [viewingOrder, setViewingOrder] = useState<OrderWithAllocation | null>(null);
   const createOrderSchema = z.object({
     orderNumber: z.string().min(1, 'Order number is required'),
-    customerName: z.string().min(1, 'Customer is required'),
     customerId: z.string().optional().or(z.literal('')),
+    customerName: z.string().min(1, 'Customer is required'),
     priority: z.enum(['low', 'normal', 'high', 'urgent']),
     dueDate: z.string().min(1, 'Due date is required'),
     poNumber: z.string().optional().or(z.literal('')),
@@ -83,8 +83,8 @@ export default function Orders() {
     });
   };
   const editOrderSchema = z.object({
-    customerName: z.string().min(1, 'Customer is required'),
     customerId: z.string().optional().or(z.literal('')),
+    customerName: z.string().min(1, 'Customer is required'),
     priority: z.enum(['low', 'normal', 'high', 'urgent']),
     dueDate: z.string().min(1, 'Due date is required'),
     notes: z.string().optional().or(z.literal('')),
@@ -151,6 +151,49 @@ export default function Orders() {
   const archivedOrders = filteredOrders.filter(o => 
     o.status === 'shipped' || o.status === 'cancelled'
   );
+
+  type SortDir = 'asc' | 'desc';
+  type SortKey = 'orderNumber' | 'customerName' | 'itemsCount' | 'allocationStatus' | 'priority' | 'status' | 'dueDate' | 'completedAt';
+  const [currentSort, setCurrentSort] = useState<{ key: SortKey | null; dir: SortDir }>({ key: null, dir: 'asc' });
+  const [archivedSort, setArchivedSort] = useState<{ key: SortKey | null; dir: SortDir }>({ key: null, dir: 'asc' });
+
+  const priorityRank: Record<string, number> = { low: 0, normal: 1, high: 2, urgent: 3 };
+  const statusRank: Record<string, number> = { pending: 0, in_production: 1, ready: 2, shipped: 3, cancelled: 4 };
+  const allocationRank: Record<string, number> = { awaiting_stock: 0, partially_allocated: 1, ready_to_ship: 2, shipped: 3, cancelled: 4 };
+
+  const compareOrders = (a: OrderWithAllocation, b: OrderWithAllocation, key: SortKey): number => {
+    switch (key) {
+      case 'orderNumber': return a.orderNumber.localeCompare(b.orderNumber);
+      case 'customerName': return (a.customerName || '').localeCompare(b.customerName || '');
+      case 'itemsCount': return a.items.length - b.items.length;
+      case 'allocationStatus': return (allocationRank[a.allocationStatus] ?? -1) - (allocationRank[b.allocationStatus] ?? -1);
+      case 'priority': return (priorityRank[a.priority] ?? -1) - (priorityRank[b.priority] ?? -1);
+      case 'status': return (statusRank[a.status] ?? -1) - (statusRank[b.status] ?? -1);
+      case 'dueDate': return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      case 'completedAt': return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      default: return 0;
+    }
+  };
+
+  const applySort = (orders: OrderWithAllocation[], sort: { key: SortKey | null; dir: SortDir }) => {
+    if (!sort.key) return orders;
+    const key = sort.key;
+    const sign = sort.dir === 'desc' ? -1 : 1;
+    return [...orders].sort((a, b) => sign * compareOrders(a, b, key));
+  };
+
+  const sortedCurrentOrders = applySort(currentOrders, currentSort);
+  const sortedArchivedOrders = applySort(archivedOrders, archivedSort);
+
+  const toggleSort = (
+    sort: { key: SortKey | null; dir: SortDir },
+    setSort: (s: { key: SortKey | null; dir: SortDir }) => void,
+    key: SortKey,
+  ) => {
+    if (sort.key !== key) setSort({ key, dir: 'asc' });
+    else if (sort.dir === 'asc') setSort({ key, dir: 'desc' });
+    else setSort({ key: null, dir: 'asc' });
+  };
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
@@ -253,9 +296,9 @@ export default function Orders() {
     const customer = customers.find(c => c.id === customerId);
     if (customer) {
       if (isCreate) {
-        setNewOrder({ ...newOrder, customerId, customerName: customer.name });
+        setNewOrder({ customerId, customerName: customer.name });
       } else {
-        setEditOrder({ ...editOrder, customerId, customerName: customer.name });
+        setEditOrder({ customerId, customerName: customer.name });
       }
     }
   };
@@ -323,39 +366,20 @@ export default function Orders() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customer">Customer *</Label>
-                {customers.length > 0 ? (
-                  <Select value={newOrder.customerId} onValueChange={(v) => handleCustomerSelect(v, true)}>
-                    <SelectTrigger data-testid="select-customer">
-                      <SelectValue placeholder="Select a customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map(customer => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.code} - {customer.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    id="customerName"
-                    placeholder="e.g. Acme Corporation"
-                    value={newOrder.customerName}
-                    onChange={(e) => setNewOrder({ ...newOrder, customerName: e.target.value })}
-                    data-testid="input-customer-name"
-                  />
-                )}
-                {customers.length > 0 && !newOrder.customerId && (
-                  <Input
-                    placeholder="Or enter customer name manually"
-                    value={newOrder.customerName}
-                    onChange={(e) => setNewOrder({ ...newOrder, customerName: e.target.value, customerId: '' })}
-                    className="mt-2"
-                    data-testid="input-customer-name-manual"
-                  />
-                )}
+                <CustomerCombobox
+                  customers={customers}
+                  customerId={newOrder.customerId}
+                  customerName={newOrder.customerName}
+                  onSelect={(id) => handleCustomerSelect(id, true)}
+                  testId="select-customer"
+                />
                 {createOrderForm.formState.errors.customerName && (
                   <p className="text-sm text-destructive" data-testid="error-customer-name">{createOrderForm.formState.errors.customerName.message}</p>
+                )}
+                {customers.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No customers exist yet. <a href="/customers" className="underline">Add a customer</a> to get started.
+                  </p>
                 )}
               </div>
               <div className="space-y-2">
@@ -457,18 +481,18 @@ export default function Orders() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[100px] sm:w-[140px]">Order #</TableHead>
-                    <TableHead className="min-w-[120px]">Customer</TableHead>
-                    <TableHead className="min-w-[200px]">Items</TableHead>
-                    <TableHead className="text-center min-w-[100px]">Stock</TableHead>
-                    <TableHead className="text-center min-w-[80px]">Priority</TableHead>
-                    <TableHead className="text-center min-w-[80px]">Status</TableHead>
-                    <TableHead className="text-right min-w-[100px]">Due Date</TableHead>
+                    <SortableHead className="w-[100px] sm:w-[140px]" sort={currentSort} sortKey="orderNumber" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-orderNumber">Order #</SortableHead>
+                    <SortableHead className="min-w-[120px]" sort={currentSort} sortKey="customerName" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-customerName">Customer</SortableHead>
+                    <SortableHead className="min-w-[200px]" sort={currentSort} sortKey="itemsCount" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-items">Items</SortableHead>
+                    <SortableHead className="text-center min-w-[100px]" align="center" sort={currentSort} sortKey="allocationStatus" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-stock">Stock</SortableHead>
+                    <SortableHead className="text-center min-w-[80px]" align="center" sort={currentSort} sortKey="priority" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-priority">Priority</SortableHead>
+                    <SortableHead className="text-center min-w-[80px]" align="center" sort={currentSort} sortKey="status" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-status">Status</SortableHead>
+                    <SortableHead className="text-right min-w-[100px]" align="right" sort={currentSort} sortKey="dueDate" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-dueDate">Due Date</SortableHead>
                     <TableHead className="text-right min-w-[80px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {currentOrders.map((order) => (
+                  {sortedCurrentOrders.map((order) => (
                     <OrderRow 
                       key={order.id} 
                       order={order} 
@@ -482,7 +506,7 @@ export default function Orders() {
                       isCompletePending={completeOrder.isPending}
                     />
                   ))}
-                  {currentOrders.length === 0 && (
+                  {sortedCurrentOrders.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No active orders. Click "Create Order" to add a new order.
@@ -501,17 +525,17 @@ export default function Orders() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[100px] sm:w-[140px]">Order #</TableHead>
-                    <TableHead className="min-w-[120px]">Customer</TableHead>
-                    <TableHead className="min-w-[200px]">Items</TableHead>
-                    <TableHead className="text-center min-w-[100px]">Status</TableHead>
-                    <TableHead className="text-center min-w-[80px]">Priority</TableHead>
-                    <TableHead className="text-right min-w-[100px]">Completed</TableHead>
+                    <SortableHead className="w-[100px] sm:w-[140px]" sort={archivedSort} sortKey="orderNumber" onToggle={(k) => toggleSort(archivedSort, setArchivedSort, k)} testId="sort-archived-orderNumber">Order #</SortableHead>
+                    <SortableHead className="min-w-[120px]" sort={archivedSort} sortKey="customerName" onToggle={(k) => toggleSort(archivedSort, setArchivedSort, k)} testId="sort-archived-customerName">Customer</SortableHead>
+                    <SortableHead className="min-w-[200px]" sort={archivedSort} sortKey="itemsCount" onToggle={(k) => toggleSort(archivedSort, setArchivedSort, k)} testId="sort-archived-items">Items</SortableHead>
+                    <SortableHead className="text-center min-w-[100px]" align="center" sort={archivedSort} sortKey="status" onToggle={(k) => toggleSort(archivedSort, setArchivedSort, k)} testId="sort-archived-status">Status</SortableHead>
+                    <SortableHead className="text-center min-w-[80px]" align="center" sort={archivedSort} sortKey="priority" onToggle={(k) => toggleSort(archivedSort, setArchivedSort, k)} testId="sort-archived-priority">Priority</SortableHead>
+                    <SortableHead className="text-right min-w-[100px]" align="right" sort={archivedSort} sortKey="completedAt" onToggle={(k) => toggleSort(archivedSort, setArchivedSort, k)} testId="sort-archived-completed">Completed</SortableHead>
                     <TableHead className="text-right min-w-[80px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {archivedOrders.map((order) => (
+                  {sortedArchivedOrders.map((order) => (
                     <ArchivedOrderRow 
                       key={order.id} 
                       order={order} 
@@ -521,7 +545,7 @@ export default function Orders() {
                       isArchivedDeletePending={deleteOrder.isPending}
                     />
                   ))}
-                  {archivedOrders.length === 0 && (
+                  {sortedArchivedOrders.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No archived orders yet. Completed orders will appear here.
@@ -798,35 +822,13 @@ function EditOrderContent({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Customer *</Label>
-          {customers.length > 0 ? (
-            <Select value={editOrder.customerId} onValueChange={onCustomerSelect}>
-              <SelectTrigger data-testid="select-edit-customer">
-                <SelectValue placeholder="Select a customer" />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map(customer => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {customer.code} - {customer.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <Input
-              value={editOrder.customerName}
-              onChange={(e) => setEditOrder({ ...editOrder, customerName: e.target.value })}
-              data-testid="input-edit-customer-name"
-            />
-          )}
-          {customers.length > 0 && (
-            <Input
-              placeholder="Or enter name manually"
-              value={editOrder.customerName}
-              onChange={(e) => setEditOrder({ ...editOrder, customerName: e.target.value, customerId: '' })}
-              className="mt-2"
-              data-testid="input-edit-customer-name-manual"
-            />
-          )}
+          <CustomerCombobox
+            customers={customers}
+            customerId={editOrder.customerId}
+            customerName={editOrder.customerName}
+            onSelect={onCustomerSelect}
+            testId="select-edit-customer"
+          />
         </div>
         <div className="space-y-2">
           <Label>Priority</Label>
@@ -1339,6 +1341,111 @@ function OrderStatusBadge({ status }: { status: string }) {
     <Badge variant="outline" className={cn("font-mono uppercase text-[10px]", styles[status])}>
       {labels[status] || status}
     </Badge>
+  );
+}
+
+function CustomerCombobox({
+  customers,
+  customerId,
+  customerName,
+  onSelect,
+  testId,
+}: {
+  customers: Customer[];
+  customerId?: string;
+  customerName?: string;
+  onSelect: (id: string) => void;
+  testId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = customers.find(c => c.id === customerId);
+  const label = selected
+    ? `${selected.code} - ${selected.name}`
+    : customerName
+      ? customerName
+      : customers.length === 0
+        ? 'No customers available — add one first'
+        : 'Search customers...';
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={customers.length === 0}
+          className="w-full justify-between font-normal"
+          data-testid={testId}
+        >
+          <span className={cn("truncate", !selected && !customerName && "text-muted-foreground")}>{label}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Type to search customers..." />
+          <CommandList>
+            <CommandEmpty>No customer found.</CommandEmpty>
+            <CommandGroup>
+              {customers.map(customer => (
+                <CommandItem
+                  key={customer.id}
+                  value={`${customer.code} ${customer.name}`}
+                  onSelect={() => {
+                    onSelect(customer.id);
+                    setOpen(false);
+                  }}
+                  data-testid={`${testId}-option-${customer.id}`}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", customerId === customer.id ? "opacity-100" : "opacity-0")} />
+                  <span className="font-mono text-xs text-muted-foreground mr-2">{customer.code}</span>
+                  {customer.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function SortableHead<K extends string>({
+  children,
+  className,
+  align = 'left',
+  sort,
+  sortKey,
+  onToggle,
+  testId,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  align?: 'left' | 'center' | 'right';
+  sort: { key: K | null; dir: 'asc' | 'desc' };
+  sortKey: K;
+  onToggle: (key: K) => void;
+  testId?: string;
+}) {
+  const active = sort.key === sortKey;
+  const Icon = active ? (sort.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown;
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => onToggle(sortKey)}
+        className={cn(
+          "inline-flex items-center gap-1 hover:text-foreground transition-colors select-none",
+          active ? "text-foreground font-semibold" : "text-muted-foreground",
+          align === 'right' && "ml-auto justify-end w-full",
+          align === 'center' && "mx-auto justify-center w-full",
+        )}
+        data-testid={testId}
+      >
+        {children}
+        <Icon className={cn("h-3 w-3", !active && "opacity-50")} />
+      </button>
+    </TableHead>
   );
 }
 
