@@ -721,7 +721,7 @@ export default function Production() {
           </DialogHeader>
           <div className="space-y-6 py-4">
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Output Breakdown (KG)</Label>
+              <Label className="text-sm font-medium">Output Breakdown</Label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-actualQuantity" className="text-xs text-muted-foreground">Product Output</Label>
@@ -897,7 +897,7 @@ export default function Production() {
                     </div>
                     <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1 pt-1 border-t">
                       <div className="text-muted-foreground">Available</div>
-                      <div className="font-mono font-medium">{parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.materialUnit || scannedLot.productUnit || 'KG'}</div>
+                      <div className="font-mono font-medium">{parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.materialUnit || scannedLot.productUnit || ''}</div>
                       {scannedLot.supplierName && <><div className="text-muted-foreground">Source</div><div>{scannedLot.supplierName}</div></>}
                       {scannedLot.expiryDate && <><div className="text-muted-foreground">Expires</div><div>{new Date(scannedLot.expiryDate).toLocaleDateString()}</div></>}
                     </div>
@@ -999,7 +999,7 @@ export default function Production() {
                 </Popover>
                 {recordInputForm.productId && (
                   <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
-                    Available: <span className="font-mono font-medium">{products.find(p => p.id === recordInputForm.productId)?.currentStock || '0'} {products.find(p => p.id === recordInputForm.productId)?.unit || 'KG'}</span>
+                    Available: <span className="font-mono font-medium">{products.find(p => p.id === recordInputForm.productId)?.currentStock || '0'} {products.find(p => p.id === recordInputForm.productId)?.unit || ''}</span>
                     <p className="text-xs mt-1">This product will be tracked for full chain traceability.</p>
                   </div>
                 )}
@@ -1010,7 +1010,7 @@ export default function Production() {
               <Label htmlFor="input-quantity">
                 Quantity to consume *
                 {scannedLot && (
-                  <span className="text-xs text-muted-foreground ml-2">(max: {parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.materialUnit || 'KG'})</span>
+                  <span className="text-xs text-muted-foreground ml-2">(max: {parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.materialUnit || scannedLot.productUnit || ''})</span>
                 )}
               </Label>
               <Input
@@ -1184,7 +1184,6 @@ function BatchMaterialsEditor({
                         className="w-24 h-8 text-sm font-mono"
                         data-testid={`input-edit-material-qty-${bm.id}`}
                       />
-                      <span className="text-xs text-muted-foreground">KG</span>
                       <Button 
                         variant="ghost" 
                         size="icon" 
@@ -1207,7 +1206,7 @@ function BatchMaterialsEditor({
                     </>
                   ) : (
                     <>
-                      <span className="font-mono text-sm font-medium">{bm.quantity} KG</span>
+                      <span className="font-mono text-sm font-medium">{bm.quantity}</span>
                       {!isCompleted && (
                         <>
                           <Button 
@@ -1311,7 +1310,7 @@ function BatchCard({
                       <span className="text-muted-foreground mx-1">→</span>
                       <span className="text-green-600 font-medium">{totalOutputKg.toFixed(1)}</span>
                     </div>
-                    <div className="text-[10px] text-muted-foreground">Input → Output (KG)</div>
+                    <div className="text-[10px] text-muted-foreground">Input → Output</div>
                   </div>
                   <div className="text-center">
                     <Badge variant="outline" className={`font-mono uppercase text-[10px] ${isCompleted ? 'bg-green-100 text-green-700 border-green-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
@@ -1431,13 +1430,13 @@ function BatchCard({
                             <span className="font-medium">{inputName}</span>
                             {inputSku && <span className="text-muted-foreground text-xs ml-2">({inputSku})</span>}
                           </div>
-                          <span className="font-mono text-blue-600">{parseFloat(bm.quantity).toFixed(2)} KG</span>
+                          <span className="font-mono text-blue-600">{parseFloat(bm.quantity).toFixed(2)} {material?.unit || inputProduct?.unit || ''}</span>
                         </div>
                       );
                     })}
                     <div className="flex justify-between pt-2 border-t text-sm font-medium">
                       <span>Total Input</span>
-                      <span className="font-mono text-blue-600">{totalInputKg.toFixed(2)} KG</span>
+                      <span className="font-mono text-blue-600">{totalInputKg.toFixed(2)}</span>
                     </div>
                   </div>
                 )}
@@ -1459,13 +1458,13 @@ function BatchCard({
                             <span className="font-medium">{outputProduct?.name || 'Unknown'}</span>
                             <span className="text-muted-foreground text-xs ml-2">({outputProduct?.sku})</span>
                           </div>
-                          <span className="font-mono text-green-600">{parseFloat(bo.quantity).toFixed(2)} KG</span>
+                          <span className="font-mono text-green-600">{parseFloat(bo.quantity).toFixed(2)} {outputProduct?.unit || ''}</span>
                         </div>
                       );
                     })}
                     <div className="flex justify-between pt-2 border-t text-sm font-medium">
                       <span>Total Output</span>
-                      <span className="font-mono text-green-600">{totalOutputKg.toFixed(2)} KG</span>
+                      <span className="font-mono text-green-600">{totalOutputKg.toFixed(2)}</span>
                     </div>
                   </div>
                 )}
@@ -1475,19 +1474,19 @@ function BatchCard({
                     {waste > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Waste</span>
-                        <span className="font-mono text-red-500">{waste.toFixed(2)} KG</span>
+                        <span className="font-mono text-red-500">{waste.toFixed(2)} {product?.unit || ''}</span>
                       </div>
                     )}
                     {milling > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Milling</span>
-                        <span className="font-mono text-amber-500">{milling.toFixed(2)} KG</span>
+                        <span className="font-mono text-amber-500">{milling.toFixed(2)} {product?.unit || ''}</span>
                       </div>
                     )}
                     {wet > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Wet (Redry)</span>
-                        <span className="font-mono text-blue-500">{wet.toFixed(2)} KG</span>
+                        <span className="font-mono text-blue-500">{wet.toFixed(2)} {product?.unit || ''}</span>
                       </div>
                     )}
                   </div>
@@ -1768,7 +1767,7 @@ function BatchOutputsEditor({
                     batchCode: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
                     barcodeValue: finalizeResult.batch.barcodeValue,
                     productName,
-                    quantity: finalizeResult.batch.plannedQuantity, unit: 'KG',
+                    quantity: finalizeResult.batch.plannedQuantity, unit: allProducts.find(p => p.id === finalizeResult.batch.productId)?.unit || '',
                     productionDate: finalizeResult.batch.startDate,
                     status: finalizeResult.batch.status,
                   },
@@ -1802,7 +1801,7 @@ function BatchOutputsEditor({
                 {ol.barcodeValue && <div className="text-xs text-muted-foreground font-mono">{ol.barcodeValue}</div>}
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="font-mono text-sm">{parseFloat(ol.quantity).toFixed(2)} KG</span>
+                <span className="font-mono text-sm">{parseFloat(ol.quantity).toFixed(2)} {allProducts.find(p => p.id === ol.productId)?.unit || ''}</span>
                 {ol.barcodeValue && (
                   <Button
                     size="sm"
@@ -1817,7 +1816,7 @@ function BatchOutputsEditor({
                           template: 'finished_output',
                           lotNumber: ol.lotNumber, barcodeValue: ol.barcodeValue,
                           productName: ol.productName || 'Output',
-                          quantity: ol.quantity, unit: 'KG',
+                          quantity: ol.quantity, unit: allProducts.find(p => p.id === ol.productId)?.unit || '',
                           producedDate: finalizeResult.batch.endDate,
                           sourceBatch: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
                           expiryDate: ol.expiryDate,
@@ -1930,7 +1929,7 @@ function BatchOutputsEditor({
             </Popover>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="output-quantity">Quantity (KG)</Label>
+            <Label htmlFor="output-quantity">Quantity</Label>
             <div className="flex gap-2">
               <Input
                 id="output-quantity"
@@ -1990,7 +1989,6 @@ function BatchOutputsEditor({
                           className="w-24 h-7 text-sm font-mono"
                           data-testid={`input-edit-output-qty-${output.id}`}
                         />
-                        <span className="text-xs text-muted-foreground">KG</span>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -2013,7 +2011,7 @@ function BatchOutputsEditor({
                       </>
                     ) : (
                       <>
-                        <span className="font-mono">{output.quantity} KG</span>
+                        <span className="font-mono">{output.quantity} {allProducts.find(p => p.id === output.productId)?.unit || ''}</span>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -2041,7 +2039,7 @@ function BatchOutputsEditor({
             })}
             <div className="flex justify-between items-center pt-2 font-medium text-sm">
               <span>Total Output:</span>
-              <span className="font-mono">{totalOutputQuantity.toFixed(2)} KG</span>
+              <span className="font-mono">{totalOutputQuantity.toFixed(2)}</span>
             </div>
           </div>
         )}
@@ -2096,7 +2094,7 @@ function BatchOutputsEditor({
                     {ol.barcodePrintedAt && <div className="text-xs text-green-600">Label printed</div>}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono text-sm">{parseFloat(ol.quantity).toFixed(2)} KG</span>
+                    <span className="font-mono text-sm">{parseFloat(ol.quantity).toFixed(2)} {allProducts.find(p => p.id === ol.productId)?.unit || ''}</span>
                     {ol.barcodeValue && (
                       <Button
                         size="sm"
@@ -2111,7 +2109,7 @@ function BatchOutputsEditor({
                               template: 'finished_output',
                               lotNumber: ol.lotNumber, barcodeValue: ol.barcodeValue,
                               productName: ol.productName || 'Output',
-                              quantity: ol.quantity, unit: 'KG',
+                              quantity: ol.quantity, unit: allProducts.find(p => p.id === ol.productId)?.unit || '',
                               producedDate: batchData?.endDate,
                               sourceBatch: batchData?.batchCode || batchData?.batchNumber,
                               expiryDate: ol.expiryDate,
@@ -2142,17 +2140,17 @@ function BatchOutputsEditor({
             <h4 className="font-medium text-sm">Waste, Milling & Wet</h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="waste">Waste (KG)</Label>
+                <Label htmlFor="waste">Waste</Label>
                 <Input id="waste" type="number" step="0.01" value={wasteQuantity} onChange={(e) => setWasteQuantity(e.target.value)} placeholder="0.00" data-testid="input-finalize-waste" />
                 {finalizeForm.formState.errors.wasteQuantity && <p className="text-sm text-destructive" data-testid="error-finalize-waste">{finalizeForm.formState.errors.wasteQuantity.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="milling">Milling (KG)</Label>
+                <Label htmlFor="milling">Milling</Label>
                 <Input id="milling" type="number" step="0.01" value={millingQuantity} onChange={(e) => setMillingQuantity(e.target.value)} placeholder="0.00" data-testid="input-finalize-milling" />
                 {finalizeForm.formState.errors.millingQuantity && <p className="text-sm text-destructive" data-testid="error-finalize-milling">{finalizeForm.formState.errors.millingQuantity.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="wet">Wet (KG)</Label>
+                <Label htmlFor="wet">Wet</Label>
                 <Input id="wet" type="number" step="0.01" value={wetQuantity} onChange={(e) => setWetQuantity(e.target.value)} placeholder="0.00" data-testid="input-finalize-wet" />
                 {finalizeForm.formState.errors.wetQuantity && <p className="text-sm text-destructive" data-testid="error-finalize-wet">{finalizeForm.formState.errors.wetQuantity.message}</p>}
               </div>

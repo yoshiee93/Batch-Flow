@@ -330,9 +330,9 @@ export default function Inventory() {
   }
 
   function getLotUnit(lot: Lot): string {
-    if (lot.materialId) return materials.find(m => m.id === lot.materialId)?.unit || 'KG';
-    if (lot.productId) return products.find(p => p.id === lot.productId)?.unit || 'KG';
-    return 'KG';
+    if (lot.materialId) return materials.find(m => m.id === lot.materialId)?.unit || '';
+    if (lot.productId) return products.find(p => p.id === lot.productId)?.unit || '';
+    return '';
   }
 
   async function handlePrintLabel(lot: Lot) {
@@ -637,7 +637,7 @@ export default function Inventory() {
             <span className="text-muted-foreground text-xs">-</span>
           )}
         </TableCell>
-        <TableCell className="text-right font-mono">{parseFloat(material.currentStock).toFixed(2)} {material.unit || 'KG'}</TableCell>
+        <TableCell className="text-right font-mono">{parseFloat(material.currentStock).toFixed(2)} {material.unit || ''}</TableCell>
         <TableCell className="text-center">
           {isLow ? <Badge variant="destructive">Low</Badge> : <Badge variant="outline" className="text-green-600 border-green-200">OK</Badge>}
         </TableCell>
@@ -694,7 +694,7 @@ export default function Inventory() {
             <span className="text-muted-foreground text-xs">-</span>
           )}
         </TableCell>
-        <TableCell className="text-right font-mono">{parseFloat(product.currentStock).toFixed(2)} {product.unit || 'KG'}</TableCell>
+        <TableCell className="text-right font-mono">{parseFloat(product.currentStock).toFixed(2)} {product.unit || ''}</TableCell>
         <TableCell className="text-center">
           {isLow ? <Badge variant="destructive">Low</Badge> : <Badge variant="outline" className="text-green-600 border-green-200">OK</Badge>}
         </TableCell>
@@ -1032,7 +1032,7 @@ export default function Inventory() {
               .filter(l => l.productId === selectedProductForBreakdown.id && l.status === 'active')
               .sort((a, b) => new Date(b.receivedDate).getTime() - new Date(a.receivedDate).getTime());
             const lotsTotal = productLots.reduce((sum, l) => sum + parseFloat(l.remainingQuantity || '0'), 0);
-            const unit = selectedProductForBreakdown.unit || 'KG';
+            const unit = selectedProductForBreakdown.unit || '';
             return (
               <>
                 <SheetHeader className="mb-4">

@@ -281,8 +281,8 @@ function fmtDate(d: string | null | undefined) {
 
 function ForwardTraceView({ trace, materials, products }: {
   trace: ForwardTraceResponse;
-  materials: Array<{ id: string; name: string }>;
-  products: Array<{ id: string; name: string }>;
+  materials: Array<{ id: string; name: string; unit?: string }>;
+  products: Array<{ id: string; name: string; unit?: string }>;
 }) {
   const { lot, usedInBatches, outputLots } = trace;
   const lotType = lot.lotType ?? '';
@@ -328,7 +328,7 @@ function ForwardTraceView({ trace, materials, products }: {
                         legacyData: {
                           template: 'finished_output',
                           lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue,
-                          productName: itemName, quantity: lot.quantity, unit: 'KG',
+                          productName: itemName, quantity: lot.quantity, unit: material?.unit || product?.unit || '',
                           producedDate: lot.producedDate || lot.receivedDate,
                           expiryDate: lot.expiryDate,
                           sourceBatch: sourceBatchData ? (sourceBatchData.batchCode || sourceBatchData.batchNumber) : undefined,
@@ -345,7 +345,7 @@ function ForwardTraceView({ trace, materials, products }: {
                         legacyData: {
                           template: 'raw_intake',
                           lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue,
-                          itemName, quantity: lot.quantity, unit: 'KG',
+                          itemName, quantity: lot.quantity, unit: material?.unit || '',
                           sourceLabel: lot.supplierName || lot.sourceName || undefined,
                           receivedDate: lot.receivedDate, expiryDate: lot.expiryDate,
                           supplierLot: lot.supplierLot,
@@ -382,11 +382,11 @@ function ForwardTraceView({ trace, materials, products }: {
             </div>
             <div>
               <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Quantity</div>
-              <div className="font-mono">{parseFloat(lot.quantity).toFixed(2)} KG</div>
+              <div className="font-mono">{parseFloat(lot.quantity).toFixed(2)} {material?.unit || product?.unit || ''}</div>
             </div>
             <div>
               <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Remaining</div>
-              <div className="font-mono">{parseFloat(lot.remainingQuantity).toFixed(2)} KG</div>
+              <div className="font-mono">{parseFloat(lot.remainingQuantity).toFixed(2)} {material?.unit || product?.unit || ''}</div>
             </div>
             {lot.supplierName && (
               <div>
@@ -501,7 +501,7 @@ function ForwardTraceView({ trace, materials, products }: {
                       {usage.batch.status.replace(/_/g, ' ')}
                     </Badge>
                   </div>
-                  <span className="font-mono text-sm shrink-0">{parseFloat(usage.quantityUsed).toFixed(2)} KG used</span>
+                  <span className="font-mono text-sm shrink-0">{parseFloat(usage.quantityUsed).toFixed(2)}{(material?.unit || product?.unit) ? ` ${material?.unit || product?.unit}` : ''} used</span>
                 </div>
               ))}
             </div>
@@ -532,7 +532,7 @@ function ForwardTraceView({ trace, materials, products }: {
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono text-sm">{parseFloat(outputLot.quantity).toFixed(2)} KG</span>
+                    <span className="font-mono text-sm">{parseFloat(outputLot.quantity).toFixed(2)} {products.find(p => p.id === outputLot.productId)?.unit || ''}</span>
                     {outputLot.barcodeValue && (
                       <Button
                         size="sm"
@@ -551,7 +551,7 @@ function ForwardTraceView({ trace, materials, products }: {
                               template: 'finished_output',
                               lotNumber: outputLot.lotNumber, barcodeValue: outputLot.barcodeValue,
                               productName: displayName,
-                              quantity: outputLot.quantity, unit: 'KG',
+                              quantity: outputLot.quantity, unit: outProduct?.unit || '',
                               producedDate: outputLot.producedDate,
                               sourceBatch: srcBatchUsage ? (srcBatchUsage.batch.batchCode || srcBatchUsage.batch.batchNumber) : undefined,
                               expiryDate: outputLot.expiryDate,
@@ -605,7 +605,7 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                   {batch.status.replace(/_/g, ' ')}
                 </Badge>
                 <span className="text-xs text-muted-foreground self-center">
-                  Planned: {parseFloat(batch.plannedQuantity).toFixed(0)} KG
+                  Planned: {parseFloat(batch.plannedQuantity).toFixed(0)} {product?.unit || ''}
                 </span>
               </div>
             </div>
@@ -625,7 +625,7 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                         batchCode: batch.batchCode || batch.batchNumber,
                         barcodeValue: batch.barcodeValue,
                         productName,
-                        quantity: batch.plannedQuantity, unit: 'KG',
+                        quantity: batch.plannedQuantity, unit: product?.unit || '',
                         productionDate: batch.startDate,
                         status: batch.status,
                       },
@@ -679,7 +679,7 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
             <div className="p-3 border rounded-lg bg-muted/30">
               <div className="font-mono font-bold">{recipe.name}</div>
               <div className="text-xs text-muted-foreground mt-1">
-                Version {recipe.version} · Output: {parseFloat(recipe.outputQuantity).toFixed(0)} KG
+                Version {recipe.version} · Output: {parseFloat(recipe.outputQuantity).toFixed(0)} {product?.unit || ''}
               </div>
             </div>
           </CardContent>
@@ -720,7 +720,7 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                       )}
                     </div>
                   </div>
-                  <span className="font-mono text-sm shrink-0">{parseFloat(item.quantityUsed).toFixed(2)} KG</span>
+                  <span className="font-mono text-sm shrink-0">{parseFloat(item.quantityUsed).toFixed(2)} {item.material?.unit || ''}</span>
                 </div>
               ))}
             </div>
@@ -765,7 +765,7 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono text-sm">{parseFloat(ol.quantity).toFixed(2)} KG</span>
+                    <span className="font-mono text-sm">{parseFloat(ol.quantity).toFixed(2)} {products.find(p => p.id === ol.productId)?.unit || ''}</span>
                     {ol.barcodeValue && (
                       <Button
                         size="sm"
@@ -780,7 +780,7 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
                               template: 'finished_output',
                               lotNumber: ol.lotNumber, barcodeValue: ol.barcodeValue,
                               productName: ol.productName || 'Output',
-                              quantity: ol.quantity, unit: 'KG',
+                              quantity: ol.quantity, unit: products.find(p => p.id === ol.productId)?.unit || '',
                               producedDate: batch.endDate,
                               sourceBatch: batch.batchCode || batch.batchNumber,
                               expiryDate: ol.expiryDate,

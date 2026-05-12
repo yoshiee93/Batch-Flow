@@ -65,9 +65,10 @@ function fmtDate(d: string | null | undefined, fmt = 'dd MMM yyyy') {
   try { return format(new Date(d), fmt); } catch { return String(d); }
 }
 
-function fmtQty(q: string | null | undefined, unit = 'KG') {
+function fmtQty(q: string | null | undefined, unit = '') {
   if (!q) return '—';
-  return `${parseFloat(q).toFixed(2)} ${unit}`;
+  const formatted = `${parseFloat(q).toFixed(2)}`;
+  return unit ? `${formatted} ${unit}` : formatted;
 }
 
 function SourceBatchCard({ batchId }: { batchId: string }) {
@@ -134,7 +135,7 @@ export default function LotDetail() {
   const material = lot.materialId ? materials.find(m => m.id === lot.materialId) : null;
   const product = lot.productId ? products.find(p => p.id === lot.productId) : null;
   const itemName = material?.name || product?.name || 'Unknown';
-  const unit = material?.unit || product?.unit || 'KG';
+  const unit = material?.unit || product?.unit || '';
 
   const outputLots: OutputLot[] = lineage?.outputLots ?? [];
 

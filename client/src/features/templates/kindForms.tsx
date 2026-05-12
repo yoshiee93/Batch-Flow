@@ -64,7 +64,7 @@ export function BatchStandardForm({ payload, setPayload, fieldErrors }: FormProp
               else next.defaultUnit = v;
               setPayload(next);
             }}
-            placeholder="KG"
+            placeholder="e.g. KG, CTN, PKT"
             maxLength={10}
             data-testid="input-batch-template-unit"
           />
@@ -105,7 +105,7 @@ export function ProductSpecForm({ payload, setPayload, fieldErrors }: FormProps)
             else next.defaultUnit = v;
             setPayload(next);
           }}
-          placeholder="KG"
+          placeholder="e.g. KG, CTN, PKT"
           maxLength={10}
           data-testid="input-product-template-unit"
         />

@@ -17,7 +17,7 @@ import {
   ShieldCheck, Plus, XCircle, FlaskConical, GanttChart,
 } from 'lucide-react';
 import {
-  useBatch, useProducts, useBatchInputLots, useBatchOutputLots, useStockMovements, useRecipes,
+  useBatch, useProducts, useMaterials, useBatchInputLots, useBatchOutputLots, useStockMovements, useRecipes,
   useAuditLogs, useMarkBatchBarcodePrinted, useMarkBarcodePrinted, useUpdateBatch,
   type Batch, type InputLot, type OutputLot, type StockMovement, type AuditLog
 } from '@/lib/api';
@@ -57,9 +57,10 @@ const movementLabels: Record<string, string> = {
 
 const inflowTypes = new Set(['receipt', 'production_output']);
 
-function fmtQty(q: string | null | undefined, unit = 'KG') {
+function fmtQty(q: string | null | undefined, unit = '') {
   if (!q) return '—';
-  return `${parseFloat(q).toFixed(2)} ${unit}`;
+  const formatted = `${parseFloat(q).toFixed(2)}`;
+  return unit ? `${formatted} ${unit}` : formatted;
 }
 
 function fmtDate(d: string | null | undefined, fmt = 'dd MMM yyyy') {
@@ -77,6 +78,7 @@ export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: batch, isLoading: batchLoading, isError } = useBatch(id!);
   const { data: products = [] } = useProducts();
+  const { data: materials = [] } = useMaterials();
   const { data: recipes = [] } = useRecipes();
   const { data: inputLots = [], isLoading: inputsLoading } = useBatchInputLots(id!);
   const { data: outputLots = [], isLoading: outputsLoading } = useBatchOutputLots(id!);
@@ -214,26 +216,26 @@ export default function BatchDetail() {
               </div>
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Planned Qty</div>
-                <div className="font-mono">{fmtQty(batch.plannedQuantity)}</div>
+                <div className="font-mono">{fmtQty(batch.plannedQuantity, product?.unit)}</div>
               </div>
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Actual Output</div>
-                <div className="font-mono" data-testid="text-actual-qty">{fmtQty(batch.actualQuantity)}</div>
+                <div className="font-mono" data-testid="text-actual-qty">{fmtQty(batch.actualQuantity, product?.unit)}</div>
               </div>
               <div>
                 <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Waste</div>
-                <div className="font-mono">{fmtQty(batch.wasteQuantity)}</div>
+                <div className="font-mono">{fmtQty(batch.wasteQuantity, product?.unit)}</div>
               </div>
               {batch.wetQuantity && parseFloat(batch.wetQuantity) > 0 && (
                 <div>
                   <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Wet Qty</div>
-                  <div className="font-mono">{fmtQty(batch.wetQuantity)}</div>
+                  <div className="font-mono">{fmtQty(batch.wetQuantity, product?.unit)}</div>
                 </div>
               )}
               {batch.millingQuantity && parseFloat(batch.millingQuantity) > 0 && (
                 <div>
                   <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Milling Qty</div>
-                  <div className="font-mono">{fmtQty(batch.millingQuantity)}</div>
+                  <div className="font-mono">{fmtQty(batch.millingQuantity, product?.unit)}</div>
                 </div>
               )}
               {batch.cleaningTime && parseFloat(batch.cleaningTime) > 0 && (
@@ -315,7 +317,7 @@ export default function BatchDetail() {
                               batchCode: batch.batchCode || batch.batchNumber,
                               barcodeValue: batch.barcodeValue,
                               productName: product?.name || 'Batch',
-                              quantity: batch.plannedQuantity, unit: 'KG',
+                              quantity: batch.plannedQuantity, unit: product?.unit || '',
                               productionDate: batch.startDate,
                               status: batch.status,
                             },
@@ -343,7 +345,7 @@ export default function BatchDetail() {
                       barcodeValue: batch.barcodeValue,
                       productName: product?.name || 'Batch',
                       quantity: batch.plannedQuantity,
-                      unit: 'KG',
+                      unit: product?.unit || '',
                       productionDate: batch.startDate,
                       status: batch.status,
                     }}
@@ -369,12 +371,12 @@ export default function BatchDetail() {
               <div className="flex items-center gap-2 text-sm">
                 <Box className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Total Input</span>
-                <span className="ml-auto font-mono font-medium">{totalInputKg.toFixed(2)} KG</span>
+                <span className="ml-auto font-mono font-medium">{totalInputKg.toFixed(2)}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Package className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Total Output</span>
-                <span className="ml-auto font-mono font-medium">{totalOutputKg.toFixed(2)} KG</span>
+                <span className="ml-auto font-mono font-medium">{totalOutputKg.toFixed(2)}{product?.unit ? ` ${product.unit}` : ''}</span>
               </div>
               {yieldPct && (
                 <div className="flex items-center gap-2 text-sm">
@@ -480,9 +482,9 @@ export default function BatchDetail() {
                       </Badge>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="font-mono font-medium text-sm">{fmtQty(il.quantityConsumed)}</div>
+                      <div className="font-mono font-medium text-sm">{fmtQty(il.quantityConsumed, il.materialId ? materials.find(m => m.id === il.materialId)?.unit : il.productId ? products.find(p => p.id === il.productId)?.unit : undefined)}</div>
                       {il.remainingQuantity && (
-                        <div className="text-xs text-muted-foreground font-mono">{fmtQty(il.remainingQuantity)} left</div>
+                        <div className="text-xs text-muted-foreground font-mono">{fmtQty(il.remainingQuantity, il.materialId ? materials.find(m => m.id === il.materialId)?.unit : il.productId ? products.find(p => p.id === il.productId)?.unit : undefined)} left</div>
                       )}
                     </div>
                   </div>
@@ -532,9 +534,9 @@ export default function BatchDetail() {
                     </Badge>
                   </div>
                   <div className="text-right shrink-0 space-y-1">
-                    <div className="font-mono font-medium text-sm">{fmtQty(ol.quantity)}</div>
+                    <div className="font-mono font-medium text-sm">{fmtQty(ol.quantity, ol.productId ? products.find(p => p.id === ol.productId)?.unit : undefined)}</div>
                     {ol.remainingQuantity && (
-                      <div className="text-xs text-muted-foreground font-mono">{fmtQty(ol.remainingQuantity)} left</div>
+                      <div className="text-xs text-muted-foreground font-mono">{fmtQty(ol.remainingQuantity, ol.productId ? products.find(p => p.id === ol.productId)?.unit : undefined)} left</div>
                     )}
                     {ol.barcodeValue && (
                       <Button
@@ -550,7 +552,7 @@ export default function BatchDetail() {
                               template: 'finished_output',
                               lotNumber: ol.lotNumber, barcodeValue: ol.barcodeValue,
                               productName: ol.productName || 'Output',
-                              quantity: ol.quantity, unit: 'KG',
+                              quantity: ol.quantity, unit: products?.find(p => p.id === ol.productId)?.unit || '',
                               producedDate: batch.endDate,
                               sourceBatch: batch.batchCode || batch.batchNumber,
                               expiryDate: ol.expiryDate,

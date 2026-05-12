@@ -127,7 +127,7 @@ function PreviewContent({ data, settings }: { data: PreviewData; settings: Label
             : '';
           return (
             <>
-              {show(settings.showQuantity) && d.quantity && <DetailRow label="Qty:" value={`${d.quantity} ${d.unit ?? 'KG'}`} />}
+              {show(settings.showQuantity) && d.quantity && <DetailRow label="Qty:" value={d.unit ? `${d.quantity} ${d.unit}` : d.quantity} />}
               {show(settings.showProductionDate) && <DetailRow label="Date:" value={fmtDate(d.productionDate)} />}
               {statusLabel && <DetailRow label="Status:" value={statusLabel} />}
             </>
