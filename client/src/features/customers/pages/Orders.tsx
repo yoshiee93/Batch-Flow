@@ -71,7 +71,16 @@ export default function Orders() {
   const setNewOrder = (next: Partial<CreateOrderValues> | ((prev: CreateOrderValues) => CreateOrderValues)) => {
     const current = createOrderForm.getValues();
     const partial = typeof next === 'function' ? next(current) : next;
-    createOrderForm.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
+    (Object.keys(partial) as Array<keyof CreateOrderValues>).forEach((key) => {
+      const value = partial[key];
+      if (value !== undefined) {
+        createOrderForm.setValue(key, value as CreateOrderValues[typeof key], {
+          shouldValidate: true,
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+    });
   };
   const editOrderSchema = z.object({
     customerName: z.string().min(1, 'Customer is required'),
@@ -93,7 +102,16 @@ export default function Orders() {
   const setEditOrder = (next: Partial<EditOrderValues> | ((prev: EditOrderValues) => EditOrderValues)) => {
     const current = editOrderForm.getValues();
     const partial = typeof next === 'function' ? next(current) : next;
-    editOrderForm.reset({ ...current, ...partial }, { keepErrors: true, keepDirty: true, keepTouched: true });
+    (Object.keys(partial) as Array<keyof EditOrderValues>).forEach((key) => {
+      const value = partial[key];
+      if (value !== undefined) {
+        editOrderForm.setValue(key, value as EditOrderValues[typeof key], {
+          shouldValidate: true,
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+    });
   };
   
   const { canManageOrders } = useRole();
