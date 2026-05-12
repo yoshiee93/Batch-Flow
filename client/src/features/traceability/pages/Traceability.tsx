@@ -581,6 +581,7 @@ function ForwardTraceView({ trace, materials, products }: {
 function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; batchId: string }) {
   const { batch, product, recipe, materialsUsed } = trace;
   const { data: outputLots = [], isLoading: outputsLoading } = useBatchOutputLots(batchId);
+  const { data: products = [] } = useProducts();
   const markBatchPrinted = useMarkBatchBarcodePrinted();
   const markLotPrinted = useMarkBarcodePrinted();
   const batchCustomerId = outputLots[0]?.customerId ?? null;
