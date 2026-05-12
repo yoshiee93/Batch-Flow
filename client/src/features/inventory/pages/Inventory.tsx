@@ -816,7 +816,7 @@ export default function Inventory() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card
           className={cn("p-4 cursor-pointer transition-all hover:shadow-md", cardFilter === 'all' && "ring-2 ring-primary")}
-          onClick={() => { setCardFilter('all'); setLowStockOnly(false); }}
+          onClick={() => { setCardFilter('all'); setLowStockOnly(false); setActiveTab(prev => prev === 'lots' ? 'all' : prev); }}
           data-testid="card-filter-all"
         >
           <div className="text-sm text-muted-foreground">Total Items</div>
@@ -825,7 +825,7 @@ export default function Inventory() {
         </Card>
         <Card
           className={cn("p-4 cursor-pointer transition-all hover:shadow-md", cardFilter === 'materials' && "ring-2 ring-primary")}
-          onClick={() => { setCardFilter(prev => prev === 'materials' ? 'all' : 'materials'); setLowStockOnly(false); if (activeTab === 'lots') setActiveTab('all'); }}
+          onClick={() => { setCardFilter(prev => prev === 'materials' ? 'all' : 'materials'); setLowStockOnly(false); setActiveTab('all'); }}
           data-testid="card-filter-materials"
         >
           <div className="text-sm text-muted-foreground">Materials Stock</div>
@@ -834,7 +834,7 @@ export default function Inventory() {
         </Card>
         <Card
           className={cn("p-4 cursor-pointer transition-all hover:shadow-md", cardFilter === 'products' && "ring-2 ring-primary")}
-          onClick={() => { setCardFilter(prev => prev === 'products' ? 'all' : 'products'); setLowStockOnly(false); if (activeTab === 'lots') setActiveTab('all'); }}
+          onClick={() => { setCardFilter(prev => prev === 'products' ? 'all' : 'products'); setLowStockOnly(false); setActiveTab('all'); }}
           data-testid="card-filter-products"
         >
           <div className="text-sm text-muted-foreground">Goods Stock</div>
@@ -843,7 +843,7 @@ export default function Inventory() {
         </Card>
         <Card
           className={cn("p-4 cursor-pointer transition-all hover:shadow-md", cardFilter === 'lowstock' && "ring-2 ring-amber-500 bg-amber-50/50")}
-          onClick={() => { const next = cardFilter === 'lowstock' ? 'all' : 'lowstock'; setCardFilter(next); setLowStockOnly(false); if (next === 'lowstock' && activeTab === 'lots') setActiveTab('all'); }}
+          onClick={() => { const next = cardFilter === 'lowstock' ? 'all' : 'lowstock'; setCardFilter(next); setLowStockOnly(false); setActiveTab(prev => prev === 'lots' ? 'all' : prev); }}
           data-testid="card-filter-lowstock"
         >
           <div className="text-sm text-muted-foreground">Low Stock Alerts</div>
@@ -852,7 +852,7 @@ export default function Inventory() {
         </Card>
         <Card
           className={cn("p-4 cursor-pointer transition-all hover:shadow-md", cardFilter === 'lots' && "ring-2 ring-green-500 bg-green-50/50")}
-          onClick={() => { const next = cardFilter === 'lots' ? 'all' : 'lots'; setCardFilter(next); setLowStockOnly(false); if (next === 'lots') setActiveTab('lots'); }}
+          onClick={() => { const next = cardFilter === 'lots' ? 'all' : 'lots'; setCardFilter(next); setLowStockOnly(false); setActiveTab(next === 'lots' ? 'lots' : 'all'); }}
           data-testid="card-filter-lots"
         >
           <div className="text-sm text-muted-foreground">Active Lots</div>
@@ -1061,7 +1061,7 @@ export default function Inventory() {
                 ) : (
                   <div className="space-y-3">
                     {productLots.map(lot => {
-                      const sourceBatch = lot.sourceBatchId ? (batches as any[]).find(b => b.id === lot.sourceBatchId) : null;
+                      const sourceBatch = lot.sourceBatchId ? batches.find(b => b.id === lot.sourceBatchId) : null;
                       return (
                         <div key={lot.id} className="border rounded-md p-3 space-y-1.5 text-sm" data-testid={`card-lot-breakdown-${lot.id}`}>
                           <div className="flex items-center justify-between">
