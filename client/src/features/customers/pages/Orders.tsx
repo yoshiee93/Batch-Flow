@@ -53,7 +53,7 @@ export default function Orders() {
   const [viewingOrder, setViewingOrder] = useState<OrderWithAllocation | null>(null);
   const createOrderSchema = z.object({
     orderNumber: z.string().min(1, 'Order number is required'),
-    customerId: z.string().optional().or(z.literal('')),
+    customerId: z.string().min(1, 'Please select a customer'),
     customerName: z.string().min(1, 'Customer is required'),
     priority: z.enum(['low', 'normal', 'high', 'urgent']),
     dueDate: z.string().min(1, 'Due date is required'),
@@ -83,7 +83,7 @@ export default function Orders() {
     });
   };
   const editOrderSchema = z.object({
-    customerId: z.string().optional().or(z.literal('')),
+    customerId: z.string().min(1, 'Please select a customer'),
     customerName: z.string().min(1, 'Customer is required'),
     priority: z.enum(['low', 'normal', 'high', 'urgent']),
     dueDate: z.string().min(1, 'Due date is required'),
@@ -373,8 +373,10 @@ export default function Orders() {
                   onSelect={(id) => handleCustomerSelect(id, true)}
                   testId="select-customer"
                 />
-                {createOrderForm.formState.errors.customerName && (
-                  <p className="text-sm text-destructive" data-testid="error-customer-name">{createOrderForm.formState.errors.customerName.message}</p>
+                {(createOrderForm.formState.errors.customerId || createOrderForm.formState.errors.customerName) && (
+                  <p className="text-sm text-destructive" data-testid="error-customer-name">
+                    {createOrderForm.formState.errors.customerId?.message || createOrderForm.formState.errors.customerName?.message}
+                  </p>
                 )}
                 {customers.length === 0 && (
                   <p className="text-xs text-muted-foreground">
