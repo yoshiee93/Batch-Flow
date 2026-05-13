@@ -803,7 +803,7 @@ export default function Production() {
           setBarcodeError('');
         }
       }}>
-        <DialogContent className="w-full sm:max-w-lg">
+        <DialogContent className="w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Record Input for {selectedBatch?.batchNumber}</DialogTitle>
             <DialogDescription>Add raw materials or finished products used in production. This will deduct from inventory.</DialogDescription>
@@ -1962,7 +1962,7 @@ function BatchOutputsEditor({
         ) : outputs.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">No outputs recorded yet</p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
             {outputs.map((output) => {
               const product = allProducts.find(p => p.id === output.productId);
               const isEditing = editingOutputId === output.id;
@@ -2080,7 +2080,7 @@ function BatchOutputsEditor({
               )}
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
               {outputLots.map((ol: OutputLot) => (
                 <div
                   key={ol.lotId}

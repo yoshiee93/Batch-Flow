@@ -562,7 +562,7 @@ export default function Orders() {
       </Tabs>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="w-full sm:max-w-2xl">
+        <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Order {selectedOrder?.orderNumber}</DialogTitle>
             <DialogDescription>Update order details and manage order items</DialogDescription>
@@ -914,9 +914,9 @@ function EditOrderContent({
           </div>
         ) : (
           <>
-            <div className="rounded-md border mb-4">
+            <div className="rounded-md border mb-4 max-h-[280px] overflow-y-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow>
                     <TableHead>Product</TableHead>
                     <TableHead className="text-right">Quantity</TableHead>
