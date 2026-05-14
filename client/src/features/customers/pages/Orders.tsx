@@ -1226,9 +1226,6 @@ function EditOrderContent({
                   <Label>Quantity{(() => { const p = products.find(pp => pp.id === newItem.productId); return p?.unit ? ` (${p.unit})` : ''; })()}</Label>
                   <Input type="number" step="0.01" value={newItem.quantity}
                     onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })} placeholder="0.00" data-testid="input-add-quantity" />
-                  {addItemForm.formState.errors.quantity && (
-                    <p className="text-sm text-destructive" data-testid="error-add-quantity">{addItemForm.formState.errors.quantity.message}</p>
-                  )}
                 </div>
                 <Button onClick={handleAddItem} disabled={!addItemForm.formState.isValid || createOrderItem.isPending} data-testid="button-add-item">
                   {createOrderItem.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
