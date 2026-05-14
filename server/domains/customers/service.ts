@@ -192,17 +192,22 @@ export const customersService = {
       for (const alloc of allocations) {
         if (alloc.quantityAllocated <= 0) continue;
 
+        const item = items.find(i => i.id === alloc.orderItemId);
+        if (!item) throw new Error(`Order item ${alloc.orderItemId} not found in order`);
+
         const [lot] = await tx.select().from(lots).where(eq(lots.id, alloc.lotId));
         if (!lot) throw new Error(`Lot ${alloc.lotId} not found`);
         if (lot.status !== "active") throw new Error(`Lot ${lot.lotNumber} is not active`);
+
+        // Integrity check: ensure lot belongs to the correct product
+        if (lot.productId !== item.productId) {
+          throw new Error(`Lot ${lot.lotNumber} is not a lot of the allocated product — cross-product allocation is not allowed`);
+        }
 
         const remaining = parseFloat(lot.remainingQuantity);
         if (alloc.quantityAllocated > remaining + 0.001) {
           throw new Error(`Cannot allocate ${alloc.quantityAllocated} from lot ${lot.lotNumber}: only ${remaining} remaining`);
         }
-
-        const item = items.find(i => i.id === alloc.orderItemId);
-        if (!item) throw new Error(`Order item ${alloc.orderItemId} not found in order`);
 
         await tx.insert(orderItemAllocations).values({
           orderId,
@@ -242,7 +247,7 @@ export const customersService = {
       else newStatus = "pending";
 
       const [updatedOrder] = await tx.update(orders)
-        .set({ status: newStatus } as any)
+        .set({ status: newStatus as Order["status"] })
         .where(eq(orders.id, orderId))
         .returning();
 
@@ -286,7 +291,7 @@ export const customersService = {
     const shippedAt = data.shippedAt ?? new Date();
     const [updatedOrder] = await db.update(orders)
       .set({
-        status: "shipped" as any,
+        status: "shipped" as Order["status"],
         shippedAt,
         shippingCarrier: data.shippingCarrier ?? null,
         trackingReference: data.trackingReference ?? null,

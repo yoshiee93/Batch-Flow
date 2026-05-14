@@ -108,8 +108,8 @@ export const customersRepository = {
     await db.update(products).set({ currentStock: newStock }).where(eq(products.id, productId));
   },
 
-  async updateOrderStatus(id: string, status: OrderStatus): Promise<Order> {
-    const [updated] = await db.update(orders).set({ status } as any).where(eq(orders.id, id)).returning();
+  async updateOrderStatus(id: string, status: typeof orders.status._.data): Promise<Order> {
+    const [updated] = await db.update(orders).set({ status }).where(eq(orders.id, id)).returning();
     return updated;
   },
 

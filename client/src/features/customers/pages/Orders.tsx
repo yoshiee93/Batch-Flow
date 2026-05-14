@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,9 +31,9 @@ import { ApiValidationError } from '@/lib/fetchApi';
 import {
   useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem,
   useDeleteOrderItem, useDeleteOrder, useCustomers, useOrdersWithAllocation, useCompleteOrder,
-  useOrderStockCheck, usePackOrder, useShipOrder,
+  useOrderStockCheck, usePackOrder, useShipOrder, useOrderAllocations,
   type Order, type OrderItem, type Product, type Customer, type OrderWithAllocation,
-  type StockCheckItem, type OrderStockCheck,
+  type StockCheckItem, type OrderStockCheck, type OrderAllocation,
 } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
@@ -626,58 +626,7 @@ export default function Orders() {
                 )}
               </div>
 
-              <div>
-                <h4 className="font-semibold mb-3">Products Requested ({viewingOrder.items.length})</h4>
-                {viewingOrder.items.length === 0 ? (
-                  <p className="text-muted-foreground text-sm italic">No items in this order</p>
-                ) : (
-                  <div className="space-y-3">
-                    {viewingOrder.items.map((item) => {
-                      const product = products.find(p => p.id === item.productId);
-                      const currentStock = product ? parseFloat(product.currentStock) : 0;
-                      const needed = parseFloat(item.quantity);
-                      const reserved = parseFloat(item.reservedQuantity);
-                      const unit = product?.unit || '';
-                      const stockStatus = reserved >= needed ? 'ready' : reserved > 0 ? 'partial' : 'waiting';
-
-                      return (
-                        <Collapsible key={item.id} defaultOpen={settings.cardsExpandedByDefault} className="group">
-                          <div className="border rounded-lg overflow-hidden">
-                            <CollapsibleTrigger className="w-full p-3 flex justify-between items-center hover:bg-muted/50 transition-colors">
-                              <div className="flex items-center gap-2 text-left">
-                                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
-                                <div>
-                                  <p className="font-medium">{item.productName}</p>
-                                  {product?.sku && <p className="text-xs text-muted-foreground">{product.sku}</p>}
-                                </div>
-                              </div>
-                              {stockStatus === 'ready' && <Badge className="bg-green-100 text-green-700"><CheckCircle2 size={12} className="mr-1" /> Ready</Badge>}
-                              {stockStatus === 'partial' && <Badge className="bg-amber-100 text-amber-700"><Clock size={12} className="mr-1" /> Partial</Badge>}
-                              {stockStatus === 'waiting' && <Badge className="bg-slate-100 text-slate-600"><AlertCircle size={12} className="mr-1" /> Waiting</Badge>}
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                              <div className="grid grid-cols-3 gap-2 text-sm p-3 pt-0 border-t">
-                                <div>
-                                  <p className="text-muted-foreground">Ordered</p>
-                                  <p className="font-mono">{needed.toFixed(2)} {unit}</p>
-                                </div>
-                                <div>
-                                  <p className="text-muted-foreground">Reserved</p>
-                                  <p className="font-mono">{reserved.toFixed(2)} {unit}</p>
-                                </div>
-                                <div>
-                                  <p className="text-muted-foreground">In Stock</p>
-                                  <p className={cn("font-mono", currentStock < needed && "text-destructive")}>{currentStock.toFixed(2)} {unit}</p>
-                                </div>
-                              </div>
-                            </CollapsibleContent>
-                          </div>
-                        </Collapsible>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <ViewStockCheckPanel orderId={viewingOrder.id} items={viewingOrder.items} products={products} status={viewingOrder.status} />
 
               {viewingOrder.notes && (
                 <div>
@@ -754,22 +703,39 @@ function PackOrderDialog({
   order: OrderWithAllocation;
   onClose: () => void;
 }) {
-  const { data: stockCheck, isLoading } = useOrderStockCheck(open ? order.id : null);
+  const { data: stockCheck, isLoading: stockLoading } = useOrderStockCheck(open ? order.id : null);
+  // Fetch existing allocations when re-packing a partially-packed order
+  const { data: existingAllocations, isLoading: allocLoading } = useOrderAllocations(
+    open && order.status === 'partially_packed' ? order.id : null
+  );
+  const isLoading = stockLoading || allocLoading;
   const packOrder = usePackOrder();
   const { toast } = useToast();
   const [allocations, setAllocations] = useState<AllocState>({});
 
+  // Keep a stable ref to existing allocations so the init effect doesn't loop
+  const existingAllocsRef = useRef<OrderAllocation[]>([]);
   useEffect(() => {
-    if (stockCheck) {
-      const initial: AllocState = {};
-      for (const item of stockCheck.items) {
-        initial[item.orderItemId] = {};
-        for (const lot of item.availableLots) {
-          initial[item.orderItemId][lot.lotId] = '';
-        }
-      }
-      setAllocations(initial);
+    existingAllocsRef.current = existingAllocations ?? [];
+  }, [existingAllocations]);
+
+  // Initialize allocation inputs when stockCheck loads (or order changes)
+  useEffect(() => {
+    if (!stockCheck) return;
+    const prevByLot: Record<string, number> = {};
+    for (const a of existingAllocsRef.current) {
+      prevByLot[a.lotId] = (prevByLot[a.lotId] ?? 0) + parseFloat(a.quantityAllocated);
     }
+    const initial: AllocState = {};
+    for (const item of stockCheck.items) {
+      initial[item.orderItemId] = {};
+      for (const lot of item.availableLots) {
+        const prevQty = prevByLot[lot.lotId];
+        initial[item.orderItemId][lot.lotId] = prevQty != null ? prevQty.toFixed(3) : '';
+      }
+    }
+    setAllocations(initial);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stockCheck]);
 
   const getTotalAllocated = (item: StockCheckItem) => {
@@ -1495,6 +1461,140 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDe
 }
 
 // ─── Shared Components ────────────────────────────────────────────────────────
+
+// ─── View Stock Check Panel ───────────────────────────────────────────────────
+
+function ViewStockCheckPanel({
+  orderId,
+  items,
+  products,
+  status,
+}: {
+  orderId: string;
+  items: OrderWithAllocation['items'];
+  products: Product[];
+  status: string;
+}) {
+  const isArchived = status === 'shipped' || status === 'completed' || status === 'cancelled';
+  const isPacked = status === 'packed';
+  const { data: stockCheck, isLoading } = useOrderStockCheck(isArchived || isPacked ? null : orderId);
+
+  if (items.length === 0) {
+    return (
+      <div>
+        <h4 className="font-semibold mb-3">Products Requested (0)</h4>
+        <p className="text-muted-foreground text-sm italic">No items in this order</p>
+      </div>
+    );
+  }
+
+  // For packed/shipped orders, show a simple summary from order items
+  if (isPacked || isArchived) {
+    return (
+      <div>
+        <h4 className="font-semibold mb-3">
+          Products Requested ({items.length})
+          {isPacked && <Badge className="ml-2 bg-green-100 text-green-700 border-green-200 text-[10px]"><CheckCircle2 size={10} className="mr-1" /> Packed</Badge>}
+          {status === 'shipped' && <Badge className="ml-2 bg-slate-100 text-slate-700 border-slate-200 text-[10px]"><Truck size={10} className="mr-1" /> Shipped</Badge>}
+        </h4>
+        <div className="space-y-2">
+          {items.map(item => {
+            const product = products.find(p => p.id === item.productId);
+            const qty = parseFloat(item.quantity);
+            return (
+              <div key={item.id} className="border rounded-md px-3 py-2 flex items-center justify-between text-sm">
+                <div>
+                  <p className="font-medium">{item.productName}</p>
+                  {product?.sku && <p className="text-xs text-muted-foreground">{product.sku}</p>}
+                </div>
+                <span className="font-mono text-muted-foreground">{qty.toFixed(2)} {product?.unit ?? ''}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div>
+        <h4 className="font-semibold mb-3">Products Requested ({items.length})</h4>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Checking stock availability…
+        </div>
+      </div>
+    );
+  }
+
+  const allAvailable = stockCheck?.allAvailable ?? false;
+  const anyAvailable = stockCheck?.hasAnyAvailable ?? false;
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-3">
+        <h4 className="font-semibold">Products Requested ({items.length})</h4>
+        {stockCheck && (
+          <Badge className={cn(
+            "text-[10px]",
+            allAvailable ? "bg-green-100 text-green-700 border-green-200" :
+            anyAvailable ? "bg-amber-100 text-amber-700 border-amber-200" :
+            "bg-slate-100 text-slate-600 border-slate-200"
+          )}>
+            {allAvailable
+              ? <><CheckCircle2 size={10} className="mr-1" /> All In Stock</>
+              : anyAvailable
+              ? <><Clock size={10} className="mr-1" /> Partial Stock</>
+              : <><AlertCircle size={10} className="mr-1" /> Stock Shortage</>}
+          </Badge>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        {items.map(item => {
+          const product = products.find(p => p.id === item.productId);
+          const checkItem = stockCheck?.items.find(c => c.orderItemId === item.id);
+          const required = parseFloat(item.quantity);
+          const available = checkItem?.available ?? 0;
+          const shortfall = checkItem?.shortfall ?? 0;
+          const unit = checkItem?.unit ?? product?.unit ?? '';
+
+          const stockStatus = shortfall === 0 ? 'ready' : available > 0 ? 'partial' : 'waiting';
+
+          return (
+            <div key={item.id} className="border rounded-lg overflow-hidden">
+              <div className="p-3 flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{item.productName}</p>
+                  {product?.sku && <p className="text-xs text-muted-foreground">{product.sku}</p>}
+                </div>
+                {stockStatus === 'ready' && <Badge className="bg-green-100 text-green-700 text-[10px]"><CheckCircle2 size={10} className="mr-1" /> In Stock</Badge>}
+                {stockStatus === 'partial' && <Badge className="bg-amber-100 text-amber-700 text-[10px]"><Clock size={10} className="mr-1" /> Partial</Badge>}
+                {stockStatus === 'waiting' && <Badge className="bg-slate-100 text-slate-600 text-[10px]"><AlertCircle size={10} className="mr-1" /> No Stock</Badge>}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-sm px-3 pb-3 border-t pt-2">
+                <div>
+                  <p className="text-muted-foreground text-xs">Required</p>
+                  <p className="font-mono">{required.toFixed(2)} {unit}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Available</p>
+                  <p className={cn("font-mono", available < required && "text-amber-700")}>{available.toFixed(2)} {unit}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Short by</p>
+                  <p className={cn("font-mono", shortfall > 0 ? "text-destructive font-medium" : "text-muted-foreground")}>
+                    {shortfall > 0 ? `-${shortfall.toFixed(2)} ${unit}` : '—'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function OrderStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
