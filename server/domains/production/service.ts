@@ -202,28 +202,36 @@ export const productionService = {
 
   async recordBatchProductInput(batchId: string, productId: string, quantity: string, sourceLotId?: string): Promise<BatchMaterial> {
     const quantityNum = parseFloat(quantity);
+
+    // --- Validate all constraints before any writes ---
     const product = await repo.getProductById(productId);
     if (!product) throw new Error("Product not found");
 
     const currentStock = parseFloat(product.currentStock || "0");
     if (quantityNum > currentStock) throw new Error(`Insufficient stock. Available: ${currentStock} ${product.unit}`);
 
+    let sourceLot = null;
+    if (sourceLotId) {
+      sourceLot = await repo.getLotById(sourceLotId);
+      if (sourceLot) {
+        const lotRemaining = parseFloat(sourceLot.remainingQuantity || "0");
+        if (quantityNum > lotRemaining) {
+          throw new Error(`Quantity exceeds available lot stock. Only ${lotRemaining.toFixed(2)} available in lot ${sourceLot.lotNumber}.`);
+        }
+      }
+    }
+
+    // --- All constraints satisfied — now perform writes ---
     const newStock = (currentStock - quantityNum).toFixed(2);
     await repo.updateProductStock(productId, newStock);
 
-    if (sourceLotId) {
-      const lot = await repo.getLotById(sourceLotId);
-      if (lot) {
-        const lotRemaining = parseFloat(lot.remainingQuantity || "0");
-        if (quantityNum > lotRemaining) {
-          throw new Error(`Quantity exceeds available lot stock. Only ${lotRemaining.toFixed(2)} available in lot ${lot.lotNumber}.`);
-        }
-        const newRemainingQty = (lotRemaining - quantityNum).toFixed(2);
-        const newStatus = parseFloat(newRemainingQty) <= 0
-          ? 'consumed'
-          : (lot.status as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired');
-        await repo.updateLotRemainingAndStatus(sourceLotId, newRemainingQty, newStatus);
-      }
+    if (sourceLot && sourceLotId) {
+      const lotRemaining = parseFloat(sourceLot.remainingQuantity || "0");
+      const newRemainingQty = (lotRemaining - quantityNum).toFixed(2);
+      const newStatus = parseFloat(newRemainingQty) <= 0
+        ? 'consumed'
+        : (sourceLot.status as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired');
+      await repo.updateLotRemainingAndStatus(sourceLotId, newRemainingQty, newStatus);
     }
 
     const batchMaterial = await repo.insertBatchMaterial({ batchId, materialId: null, productId, lotId: null, sourceLotId: sourceLotId || null, quantity });
@@ -288,39 +296,58 @@ export const productionService = {
     const delta = newQty - oldQty;
     if (delta === 0) return bm;
 
+    // --- Validate all constraints before any writes ---
+    let material = null;
     if (bm.materialId) {
-      const material = await repo.getMaterialById(bm.materialId);
+      material = await repo.getMaterialById(bm.materialId);
       if (!material) throw new Error("Material not found");
       const materialStock = parseFloat(material.currentStock || "0");
       if (delta > 0 && delta > materialStock) throw new Error(`Insufficient stock. Available: ${materialStock} KG`);
-      await repo.updateMaterialStock(bm.materialId, (materialStock - delta).toFixed(2));
     }
+    let product = null;
     if (bm.productId && !bm.materialId) {
-      const product = await repo.getProductById(bm.productId);
+      product = await repo.getProductById(bm.productId);
       if (!product) throw new Error("Product not found");
       const productStock = parseFloat(product.currentStock || "0");
       if (delta > 0 && delta > productStock) throw new Error(`Insufficient product stock. Available: ${productStock}`);
+    }
+    let inputLot = null;
+    if (bm.lotId) {
+      inputLot = await repo.getLotById(bm.lotId);
+      if (inputLot && delta > 0) {
+        const lotRemaining = parseFloat(inputLot.remainingQuantity || "0");
+        if (delta > lotRemaining) throw new Error(`Insufficient lot stock. Available: ${lotRemaining.toFixed(2)}`);
+      }
+    }
+    let sourceLot = null;
+    if (bm.sourceLotId) {
+      sourceLot = await repo.getLotById(bm.sourceLotId);
+      if (sourceLot && delta > 0) {
+        const lotRemaining = parseFloat(sourceLot.remainingQuantity || "0");
+        if (delta > lotRemaining) throw new Error(`Insufficient source lot stock. Available: ${lotRemaining.toFixed(2)}`);
+      }
+    }
+
+    // --- All constraints satisfied — now perform writes ---
+    if (material && bm.materialId) {
+      const materialStock = parseFloat(material.currentStock || "0");
+      await repo.updateMaterialStock(bm.materialId, (materialStock - delta).toFixed(2));
+    }
+    if (product && bm.productId) {
+      const productStock = parseFloat(product.currentStock || "0");
       await repo.updateProductStock(bm.productId, (productStock - delta).toFixed(2));
     }
-    if (bm.lotId) {
-      const lot = await repo.getLotById(bm.lotId);
-      if (lot) {
-        const lotRemaining = parseFloat(lot.remainingQuantity || "0");
-        if (delta > 0 && delta > lotRemaining) throw new Error(`Insufficient lot stock. Available: ${lotRemaining.toFixed(2)}`);
-        const newLotRemaining = (lotRemaining - delta).toFixed(2);
-        const newLotStatus = parseFloat(newLotRemaining) <= 0 ? 'consumed' : (lot.status === 'consumed' ? 'active' : lot.status) as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired';
-        await repo.updateLotRemainingAndStatus(bm.lotId, newLotRemaining, newLotStatus);
-      }
+    if (inputLot && bm.lotId) {
+      const lotRemaining = parseFloat(inputLot.remainingQuantity || "0");
+      const newLotRemaining = (lotRemaining - delta).toFixed(2);
+      const newLotStatus = parseFloat(newLotRemaining) <= 0 ? 'consumed' : (inputLot.status === 'consumed' ? 'active' : inputLot.status) as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired';
+      await repo.updateLotRemainingAndStatus(bm.lotId, newLotRemaining, newLotStatus);
     }
-    if (bm.sourceLotId) {
-      const lot = await repo.getLotById(bm.sourceLotId);
-      if (lot) {
-        const lotRemaining = parseFloat(lot.remainingQuantity || "0");
-        if (delta > 0 && delta > lotRemaining) throw new Error(`Insufficient source lot stock. Available: ${lotRemaining.toFixed(2)}`);
-        const newLotRemaining = (lotRemaining - delta).toFixed(2);
-        const newLotStatus = parseFloat(newLotRemaining) <= 0 ? 'consumed' : (lot.status === 'consumed' ? 'active' : lot.status) as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired';
-        await repo.updateLotRemainingAndStatus(bm.sourceLotId, newLotRemaining, newLotStatus);
-      }
+    if (sourceLot && bm.sourceLotId) {
+      const lotRemaining = parseFloat(sourceLot.remainingQuantity || "0");
+      const newLotRemaining = (lotRemaining - delta).toFixed(2);
+      const newLotStatus = parseFloat(newLotRemaining) <= 0 ? 'consumed' : (sourceLot.status === 'consumed' ? 'active' : sourceLot.status) as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired';
+      await repo.updateLotRemainingAndStatus(bm.sourceLotId, newLotRemaining, newLotStatus);
     }
 
     const updated = await repo.updateBatchMaterialQty(id, newQuantity);
