@@ -193,9 +193,11 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
       `);
     }
 
-    // Build the full set of user IDs now present in the DB (backup users + kept admin)
-    const importedUserIds = new Set<string>(backupUserIds);
-    if (currentAdminId) importedUserIds.add(currentAdminId);
+    // Query the actual users table to get the real set of IDs present after user import
+    const actualUserRows = await tx.execute(sql`SELECT id FROM users`);
+    const importedUserIds = new Set<string>(
+      actualUserRows.rows.map((r: Record<string, unknown>) => r.id as string)
+    );
 
     if (t.customers?.length) await tx.insert(customers).values(t.customers.map(parseDates));
     if (t.categories?.length) await tx.insert(categories).values(t.categories.map(parseDates));
