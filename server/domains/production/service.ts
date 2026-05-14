@@ -242,7 +242,16 @@ export const productionService = {
       const lot = await repo.getLotById(bm.lotId);
       if (lot) {
         const restoredQuantity = (parseFloat(lot.remainingQuantity || "0") + parseFloat(bm.quantity)).toFixed(2);
-        await repo.updateLotRemaining(bm.lotId, restoredQuantity);
+        const restoredStatus = parseFloat(restoredQuantity) > 0 && lot.status === 'consumed' ? 'active' : lot.status as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired';
+        await repo.updateLotRemainingAndStatus(bm.lotId, restoredQuantity, restoredStatus);
+      }
+    }
+    if (bm.sourceLotId) {
+      const lot = await repo.getLotById(bm.sourceLotId);
+      if (lot) {
+        const restoredQuantity = (parseFloat(lot.remainingQuantity || "0") + parseFloat(bm.quantity)).toFixed(2);
+        const restoredStatus = parseFloat(restoredQuantity) > 0 && lot.status === 'consumed' ? 'active' : lot.status as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired';
+        await repo.updateLotRemainingAndStatus(bm.sourceLotId, restoredQuantity, restoredStatus);
       }
     }
     if (bm.materialId) {
@@ -252,8 +261,15 @@ export const productionService = {
         await repo.updateMaterialStock(bm.materialId, restoredStock);
       }
     }
+    if (bm.productId && !bm.materialId) {
+      const product = await repo.getProductById(bm.productId);
+      if (product) {
+        const restoredStock = (parseFloat(product.currentStock || "0") + parseFloat(bm.quantity)).toFixed(2);
+        await repo.updateProductStock(bm.productId, restoredStock);
+      }
+    }
 
-    await createStockMovement({ movementType: "adjustment", materialId: bm.materialId, lotId: bm.lotId, batchId: bm.batchId, quantity: bm.quantity, reference: "Batch input removed - reversal" });
+    await createStockMovement({ movementType: "adjustment", materialId: bm.materialId, productId: bm.productId, lotId: bm.lotId || bm.sourceLotId, batchId: bm.batchId, quantity: bm.quantity, reference: "Batch input removed - reversal" });
     await repo.deleteBatchMaterialById(id);
     await createAuditLog({ entityType: "batch_material", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
   },
@@ -279,16 +295,36 @@ export const productionService = {
       if (delta > 0 && delta > materialStock) throw new Error(`Insufficient stock. Available: ${materialStock} KG`);
       await repo.updateMaterialStock(bm.materialId, (materialStock - delta).toFixed(2));
     }
+    if (bm.productId && !bm.materialId) {
+      const product = await repo.getProductById(bm.productId);
+      if (!product) throw new Error("Product not found");
+      const productStock = parseFloat(product.currentStock || "0");
+      if (delta > 0 && delta > productStock) throw new Error(`Insufficient product stock. Available: ${productStock}`);
+      await repo.updateProductStock(bm.productId, (productStock - delta).toFixed(2));
+    }
     if (bm.lotId) {
       const lot = await repo.getLotById(bm.lotId);
       if (lot) {
-        const newLotRemaining = (parseFloat(lot.remainingQuantity || "0") - delta).toFixed(2);
-        await repo.updateLotRemaining(bm.lotId, newLotRemaining);
+        const lotRemaining = parseFloat(lot.remainingQuantity || "0");
+        if (delta > 0 && delta > lotRemaining) throw new Error(`Insufficient lot stock. Available: ${lotRemaining.toFixed(2)}`);
+        const newLotRemaining = (lotRemaining - delta).toFixed(2);
+        const newLotStatus = parseFloat(newLotRemaining) <= 0 ? 'consumed' : (lot.status === 'consumed' ? 'active' : lot.status) as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired';
+        await repo.updateLotRemainingAndStatus(bm.lotId, newLotRemaining, newLotStatus);
+      }
+    }
+    if (bm.sourceLotId) {
+      const lot = await repo.getLotById(bm.sourceLotId);
+      if (lot) {
+        const lotRemaining = parseFloat(lot.remainingQuantity || "0");
+        if (delta > 0 && delta > lotRemaining) throw new Error(`Insufficient source lot stock. Available: ${lotRemaining.toFixed(2)}`);
+        const newLotRemaining = (lotRemaining - delta).toFixed(2);
+        const newLotStatus = parseFloat(newLotRemaining) <= 0 ? 'consumed' : (lot.status === 'consumed' ? 'active' : lot.status) as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired';
+        await repo.updateLotRemainingAndStatus(bm.sourceLotId, newLotRemaining, newLotStatus);
       }
     }
 
     const updated = await repo.updateBatchMaterialQty(id, newQuantity);
-    await createStockMovement({ movementType: "adjustment", materialId: bm.materialId, lotId: bm.lotId, batchId: bm.batchId, quantity: (-delta).toFixed(2), reference: `Batch input adjusted: ${oldQty} -> ${newQty} KG` });
+    await createStockMovement({ movementType: "adjustment", materialId: bm.materialId, productId: bm.productId, lotId: bm.lotId || bm.sourceLotId, batchId: bm.batchId, quantity: (-delta).toFixed(2), reference: `Batch input adjusted: ${oldQty} -> ${newQty}` });
     await createAuditLog({ entityType: "batch_material", entityId: id, action: "update", changes: JSON.stringify({ oldQuantity: oldQty, newQuantity: newQty, delta }) });
 
     return updated;

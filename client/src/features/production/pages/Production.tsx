@@ -119,6 +119,7 @@ export default function Production() {
   const [createBatchCategoryFilter, setCreateBatchCategoryFilter] = useState<string>('all');
   const [inputProductCategoryFilter, setInputProductCategoryFilter] = useState<string>('all');
   const [selectedSourceLotId, setSelectedSourceLotId] = useState<string>('');
+  const [sourceLotSearchOpen, setSourceLotSearchOpen] = useState(false);
   
   const { canManageBatches } = useRole();
 
@@ -1099,31 +1100,57 @@ export default function Production() {
                 )}
                 {recordInputForm.productId && (
                   <div className="space-y-1.5 pt-1">
-                    <Label htmlFor="select-source-lot">Source Lot *</Label>
-                    <Select
-                      value={selectedSourceLotId}
-                      onValueChange={setSelectedSourceLotId}
-                    >
-                      <SelectTrigger id="select-source-lot" data-testid="select-source-lot">
-                        <SelectValue placeholder={availableProductLots.length === 0 ? 'No active lots available' : 'Select a lot…'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableProductLots.length === 0 ? (
-                          <SelectItem value="__none" disabled>No active lots with stock</SelectItem>
-                        ) : (
-                          availableProductLots.map(lot => (
-                            <SelectItem key={lot.id} value={lot.id} data-testid={`option-source-lot-${lot.id}`}>
-                              {lot.lotNumber} — {parseFloat(lot.remainingQuantity || '0').toFixed(2)} {products.find(p => p.id === recordInputForm.productId)?.unit || ''}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <Label>Source Lot *</Label>
+                    <Popover open={sourceLotSearchOpen} onOpenChange={setSourceLotSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={sourceLotSearchOpen}
+                          className="w-full justify-between font-normal"
+                          data-testid="select-source-lot"
+                        >
+                          {selectedSourceLotId
+                            ? (() => {
+                                const sl = availableProductLots.find(l => l.id === selectedSourceLotId) || (scannedLot?.id === selectedSourceLotId ? scannedLot : null);
+                                return sl ? `${(sl as { lotNumber: string }).lotNumber} — ${parseFloat((sl as { remainingQuantity?: string }).remainingQuantity || '0').toFixed(2)} ${products.find(p => p.id === recordInputForm.productId)?.unit || ''}` : 'Select a lot…';
+                              })()
+                            : availableProductLots.length === 0 ? 'No active lots available' : 'Search lots…'}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search by lot number…" />
+                          <CommandList className="max-h-[200px] overflow-y-auto">
+                            <CommandEmpty>No lots found.</CommandEmpty>
+                            <CommandGroup>
+                              {availableProductLots.map(lot => (
+                                <CommandItem
+                                  key={lot.id}
+                                  value={lot.lotNumber}
+                                  onSelect={() => {
+                                    setSelectedSourceLotId(lot.id);
+                                    setSourceLotSearchOpen(false);
+                                  }}
+                                  data-testid={`option-source-lot-${lot.id}`}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", selectedSourceLotId === lot.id ? "opacity-100" : "opacity-0")} />
+                                  <span className="font-mono">{lot.lotNumber}</span>
+                                  <span className="ml-2 text-muted-foreground text-xs">{parseFloat(lot.remainingQuantity || '0').toFixed(2)} {products.find(p => p.id === recordInputForm.productId)?.unit || ''}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     {selectedSourceLotId && (() => {
-                      const sl = availableProductLots.find(l => l.id === selectedSourceLotId);
+                      const sl = availableProductLots.find(l => l.id === selectedSourceLotId) || (scannedLot?.id === selectedSourceLotId ? scannedLot : null);
+                      const rem = parseFloat((sl as { remainingQuantity?: string } | null)?.remainingQuantity || '0');
                       return sl ? (
                         <p className="text-xs text-muted-foreground">
-                          Available in lot: <span className="font-mono font-medium">{parseFloat(sl.remainingQuantity || '0').toFixed(2)}</span>
+                          Available in lot: <span className="font-mono font-medium">{rem.toFixed(2)} {products.find(p => p.id === recordInputForm.productId)?.unit || ''}</span>
                         </p>
                       ) : null;
                     })()}
