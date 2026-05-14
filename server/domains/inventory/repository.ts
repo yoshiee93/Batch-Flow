@@ -88,6 +88,7 @@ export const inventoryRepository = {
     if (!opts?.includeHistorical) {
       conditions.push(eq(lots.status, 'active'));
       conditions.push(gt(sql`cast(${lots.remainingQuantity} as numeric)`, sql`0`));
+      conditions.push(eq(lots.lotType, 'finished_good'));
     }
     return db.select().from(lots).where(and(...conditions)).orderBy(desc(lots.createdAt));
   },

@@ -214,7 +214,11 @@ export const productionService = {
     if (sourceLotId) {
       const lot = await repo.getLotById(sourceLotId);
       if (lot) {
-        const newRemainingQty = Math.max(0, parseFloat(lot.remainingQuantity || "0") - quantityNum).toFixed(2);
+        const lotRemaining = parseFloat(lot.remainingQuantity || "0");
+        if (quantityNum > lotRemaining) {
+          throw new Error(`Quantity exceeds available lot stock. Only ${lotRemaining.toFixed(2)} available in lot ${lot.lotNumber}.`);
+        }
+        const newRemainingQty = (lotRemaining - quantityNum).toFixed(2);
         const newStatus = parseFloat(newRemainingQty) <= 0
           ? 'consumed'
           : (lot.status as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired');

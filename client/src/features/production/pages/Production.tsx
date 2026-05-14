@@ -285,13 +285,27 @@ export default function Production() {
           return;
         }
       }
-      setScannedLot(lot);
-      setRecordInputForm(prev => ({
-        ...prev,
-        materialId: lot.materialId || prev.materialId,
-        lotId: lot.id,
-        quantity: '',
-      }));
+      if (recordInputForm.inputType === 'product') {
+        if (lot.lotType !== 'finished_good') {
+          setBarcodeError('This lot is not a finished product lot. Only finished product lots can be used as product inputs.');
+          return;
+        }
+        if (!lot.productId) {
+          setBarcodeError('This lot is not linked to a product. Please use a finished product lot barcode.');
+          return;
+        }
+        setScannedLot(lot);
+        setSelectedSourceLotId(lot.id);
+        setRecordInputForm(prev => ({ ...prev, productId: lot.productId!, quantity: '' }));
+      } else {
+        setScannedLot(lot);
+        setRecordInputForm(prev => ({
+          ...prev,
+          materialId: lot.materialId || prev.materialId,
+          lotId: lot.id,
+          quantity: '',
+        }));
+      }
     } catch {
       setBarcodeError('Lot not found. Try a different barcode value, lot number (e.g. RM-260413-0001), or supplier batch ID.');
     } finally {
@@ -348,6 +362,16 @@ export default function Production() {
     if (inputType === 'product' && !selectedSourceLotId) {
       toast({ title: "No lot selected", description: "Please select the source lot for this product input.", variant: "destructive" });
       return;
+    }
+    if (inputType === 'product' && selectedSourceLotId) {
+      const sourceLot = availableProductLots.find(l => l.id === selectedSourceLotId) || (scannedLot?.id === selectedSourceLotId ? scannedLot : null);
+      const availableQty = parseFloat((sourceLot as { remainingQuantity?: string } | null)?.remainingQuantity || '0');
+      const consumeQty = parseFloat(quantity);
+      if (consumeQty > availableQty) {
+        const msg = `Quantity exceeds available lot stock. Only ${availableQty.toFixed(2)} available in lot ${(sourceLot as { lotNumber?: string } | null)?.lotNumber || ''}.`;
+        toast({ title: "Insufficient lot quantity", description: msg, variant: "destructive" });
+        return;
+      }
     }
     if (inputType === 'product' && productId) {
       const inputProduct = products.find(p => p.id === productId);
@@ -918,7 +942,62 @@ export default function Production() {
                 )}
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="barcode-scan-product">Scan Finished Product Barcode (optional)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="barcode-scan-product"
+                      placeholder="Scan or type barcode / lot number..."
+                      value={barcodeInput}
+                      onChange={(e) => {
+                        setBarcodeInput(e.target.value);
+                        setBarcodeError('');
+                        if (scannedLot) { setScannedLot(null); setSelectedSourceLotId(''); setRecordInputForm(f => ({ ...f, productId: '' })); }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); handleBarcodeLookup(barcodeInput); }
+                      }}
+                      data-testid="input-barcode-scan-product"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isLookingUpBarcode || !barcodeInput.trim()}
+                      onClick={() => handleBarcodeLookup(barcodeInput)}
+                      data-testid="button-lookup-barcode-product"
+                    >
+                      {isLookingUpBarcode ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Look up'}
+                    </Button>
+                  </div>
+                  {barcodeError && (
+                    <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md" data-testid="text-barcode-error-product">
+                      <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <span>{barcodeError}</span>
+                    </div>
+                  )}
+                  {scannedLot && scannedLot.productId && (
+                    <div className="bg-muted rounded-lg p-3 space-y-1.5" data-testid="card-scanned-product-lot">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-semibold">{scannedLot.productName || products.find(p => p.id === scannedLot.productId)?.name || 'Unknown product'}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{scannedLot.lotNumber}</div>
+                        </div>
+                        <Badge className="bg-green-100 text-green-800">lot auto-selected</Badge>
+                      </div>
+                      <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1 pt-1 border-t">
+                        <div className="text-muted-foreground">Available</div>
+                        <div className="font-mono font-medium">{parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.productUnit || ''}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="relative flex items-center gap-2">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-muted-foreground">or select manually</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                <div className="space-y-2">
                 <Label htmlFor="input-product">Product *</Label>
                 {(() => {
                   const inputCategories = categories.filter(c => !c.excludeFromYield && c.showInProductionInputs && products.some(p => p.categoryId === c.id && parseFloat(p.currentStock || '0') > 0));
@@ -1050,6 +1129,7 @@ export default function Production() {
                     })()}
                   </div>
                 )}
+              </div>
               </div>
             )}
 
