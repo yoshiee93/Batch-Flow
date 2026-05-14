@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import {
   users, customers, categories, products, materials, lots, recipes, recipeItems,
   batches, batchMaterials, batchOutputs, orders, orderItems, qualityChecks,
-  stockMovements, auditLogs,
+  stockMovements, auditLogs, processCodeDefinitions,
 } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../lib/authMiddleware";
@@ -28,6 +28,7 @@ adminRouter.get("/admin/export", adminOnly, asyncHandler(async (_req, res) => {
     usersData, customersData, categoriesData, productsData, materialsData, lotsData,
     recipesData, recipeItemsData, batchesData, batchMaterialsData, batchOutputsData,
     ordersData, orderItemsData, qualityChecksData, stockMovementsData, auditLogsData,
+    processCodeDefsData,
   ] = await Promise.all([
     db.select().from(users),
     db.select().from(customers),
@@ -45,6 +46,7 @@ adminRouter.get("/admin/export", adminOnly, asyncHandler(async (_req, res) => {
     db.select().from(qualityChecks),
     db.select().from(stockMovements),
     db.select().from(auditLogs),
+    db.select().from(processCodeDefinitions),
   ]);
 
   const snapshot = {
@@ -67,6 +69,7 @@ adminRouter.get("/admin/export", adminOnly, asyncHandler(async (_req, res) => {
       qualityChecks: qualityChecksData,
       stockMovements: stockMovementsData,
       auditLogs: auditLogsData,
+      processCodeDefinitions: processCodeDefsData,
     },
   };
 
@@ -101,7 +104,8 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
     await tx.execute(sql`
       TRUNCATE customers, categories, products, materials, lots,
         recipes, recipe_items, batches, batch_materials, batch_outputs,
-        orders, order_items, quality_checks, stock_movements, audit_logs
+        orders, order_items, quality_checks, stock_movements, audit_logs,
+        process_code_definitions
       CASCADE
     `);
 
@@ -189,11 +193,29 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
       `);
     }
 
+    // Build the full set of user IDs now present in the DB (backup users + kept admin)
+    const importedUserIds = new Set<string>(backupUserIds);
+    if (currentAdminId) importedUserIds.add(currentAdminId);
+
     if (t.customers?.length) await tx.insert(customers).values(t.customers.map(parseDates));
     if (t.categories?.length) await tx.insert(categories).values(t.categories.map(parseDates));
     if (t.products?.length) await tx.insert(products).values(t.products.map(parseDates));
     if (t.materials?.length) await tx.insert(materials).values(t.materials.map(parseDates));
-    if (t.lots?.length) await tx.insert(lots).values(t.lots.map(parseDates));
+
+    if (t.lots?.length) {
+      // Null out receivedById if the referenced user isn't in the restored users table
+      const lotsRows = (t.lots as Record<string, unknown>[]).map((row) => {
+        const parsed = parseDates(row);
+        const refId = (parsed.receivedById ?? parsed.received_by_id) as string | null | undefined;
+        if (refId && !importedUserIds.has(refId)) {
+          return { ...parsed, receivedById: null };
+        }
+        return parsed;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any[];
+      await tx.insert(lots).values(lotsRows);
+    }
+
     if (t.recipes?.length) await tx.insert(recipes).values(t.recipes.map(parseDates));
     if (t.recipeItems?.length) await tx.insert(recipeItems).values(t.recipeItems.map(parseDates));
     if (t.batches?.length) await tx.insert(batches).values(t.batches.map(parseDates));
@@ -204,6 +226,11 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
     if (t.qualityChecks?.length) await tx.insert(qualityChecks).values(t.qualityChecks.map(parseDates));
     if (t.stockMovements?.length) await tx.insert(stockMovements).values(t.stockMovements.map(parseDates));
     if (t.auditLogs?.length) await tx.insert(auditLogs).values(t.auditLogs.map(parseDates));
+
+    // processCodeDefinitions — optional field, present in v1 exports from this version onward
+    if (Array.isArray(t.processCodeDefinitions) && t.processCodeDefinitions.length) {
+      await tx.insert(processCodeDefinitions).values(t.processCodeDefinitions.map(parseDates));
+    }
   });
 
   res.json({ success: true, message: "Database restored successfully from backup." });
