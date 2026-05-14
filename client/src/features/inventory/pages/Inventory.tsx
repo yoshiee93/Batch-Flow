@@ -1040,7 +1040,7 @@ export default function Inventory() {
         <SheetContent className="w-full sm:max-w-md overflow-y-auto" data-testid="sheet-stock-breakdown">
           {selectedProductForBreakdown && (() => {
             const productLots = (lots as Lot[])
-              .filter(l => l.productId === selectedProductForBreakdown.id && l.status === 'active')
+              .filter(l => l.productId === selectedProductForBreakdown.id && l.status === 'active' && parseFloat(l.remainingQuantity || '0') > 0)
               .sort((a, b) => new Date(b.receivedDate).getTime() - new Date(a.receivedDate).getTime());
             const lotsTotal = productLots.reduce((sum, l) => sum + parseFloat(l.remainingQuantity || '0'), 0);
             const unit = selectedProductForBreakdown.unit || '';
