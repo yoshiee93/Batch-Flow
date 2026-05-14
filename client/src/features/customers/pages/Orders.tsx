@@ -1050,6 +1050,7 @@ function EditOrderContent({
 }) {
   const { canManageOrders } = useRole();
   const { data: orderItems = [], isLoading: itemsLoading } = useOrderItems(order.id);
+  const { data: liveStockCheck } = useOrderStockCheck(order.id);
   const createOrderItem = useCreateOrderItem();
   const deleteOrderItem = useDeleteOrderItem();
   const { toast } = useToast();
@@ -1174,7 +1175,15 @@ function EditOrderContent({
                           <TableCell>{product?.name || 'Unknown Product'}</TableCell>
                           <TableCell className="text-right font-mono">{parseFloat(item.quantity).toFixed(2)}{product?.unit ? ` ${product.unit}` : ''}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {product ? `${parseFloat(product.currentStock).toFixed(2)}${product.unit ? ` ${product.unit}` : ''}` : '-'}
+                            {(() => {
+                              const checkItem = liveStockCheck?.items.find(c => c.productId === item.productId);
+                              const avail = checkItem != null
+                                ? checkItem.available
+                                : product ? parseFloat(product.currentStock) : null;
+                              return avail != null
+                                ? `${avail.toFixed(2)}${product?.unit ? ` ${product.unit}` : ''}`
+                                : '-';
+                            })()}
                           </TableCell>
                           <TableCell>
                             {canManageOrders && (
