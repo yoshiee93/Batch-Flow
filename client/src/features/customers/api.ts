@@ -24,18 +24,31 @@ export interface OrderTestingBlocker {
   testingStatus: string;
 }
 
+export type OrderStatus =
+  | "pending"
+  | "in_production"
+  | "ready"
+  | "packed"
+  | "partially_packed"
+  | "shipped"
+  | "completed"
+  | "cancelled";
+
 export interface Order {
   id: string;
   orderNumber: string;
   customerId: string | null;
   customerName: string;
-  status: "pending" | "in_production" | "ready" | "shipped" | "cancelled";
+  status: OrderStatus;
   priority: "low" | "normal" | "high" | "urgent";
   dueDate: string;
   notes: string | null;
   poNumber: string | null;
   customBatchNumber: string | null;
   freight: string | null;
+  shippedAt: string | null;
+  shippingCarrier: string | null;
+  trackingReference: string | null;
   createdAt: string;
 }
 
@@ -51,17 +64,81 @@ export interface OrderItemWithProduct extends OrderItem {
   productName: string;
 }
 
+export type AllocationStatus =
+  | "awaiting_stock"
+  | "partially_allocated"
+  | "ready_to_ship"
+  | "packed"
+  | "partially_packed"
+  | "shipped"
+  | "cancelled";
+
 export interface OrderWithAllocation extends Order {
-  allocationStatus: 'ready_to_ship' | 'partially_allocated' | 'awaiting_stock';
+  allocationStatus: AllocationStatus;
   items: OrderItemWithProduct[];
   customerRequiresTesting?: boolean;
   testingBlockers?: OrderTestingBlocker[];
+}
+
+export interface LotAvailability {
+  lotId: string;
+  lotNumber: string;
+  remainingQuantity: number;
+  expiryDate: string | null;
+  producedDate: string | null;
+  receivedDate: string;
+  status: string;
+}
+
+export interface StockCheckItem {
+  orderItemId: string;
+  productId: string;
+  productName: string;
+  unit: string;
+  required: number;
+  available: number;
+  shortfall: number;
+  availableLots: LotAvailability[];
+}
+
+export interface OrderStockCheck {
+  allAvailable: boolean;
+  hasAnyAvailable: boolean;
+  items: StockCheckItem[];
+}
+
+export interface OrderAllocation {
+  id: string;
+  orderId: string;
+  orderItemId: string;
+  productId: string;
+  lotId: string;
+  quantityAllocated: string;
+  packedBy: string | null;
+  packedAt: string;
+  createdAt: string;
 }
 
 export function useOrderTestingBlockers(orderId: string | null) {
   return useQuery<OrderTestingBlocker[]>({
     queryKey: ["orderTestingBlockers", orderId],
     queryFn: () => fetchApi(`/orders/${orderId}/testing-blockers`),
+    enabled: !!orderId,
+  });
+}
+
+export function useOrderStockCheck(orderId: string | null) {
+  return useQuery<OrderStockCheck>({
+    queryKey: ["orderStockCheck", orderId],
+    queryFn: () => fetchApi(`/orders/${orderId}/stock-check`),
+    enabled: !!orderId,
+  });
+}
+
+export function useOrderAllocations(orderId: string | null) {
+  return useQuery<OrderAllocation[]>({
+    queryKey: ["orderAllocations", orderId],
+    queryFn: () => fetchApi(`/orders/${orderId}/allocations`),
     enabled: !!orderId,
   });
 }
@@ -165,6 +242,60 @@ export function useCompleteOrder() {
       queryClient.invalidateQueries({ queryKey: ["ordersWithAllocation"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["materials"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    },
+  });
+}
+
+export function usePackOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      orderId,
+      allocations,
+    }: {
+      orderId: string;
+      allocations: { orderItemId: string; lotId: string; quantityAllocated: number }[];
+    }) =>
+      fetchApi<Order>(`/orders/${orderId}/pack`, {
+        method: "POST",
+        body: JSON.stringify({ allocations }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ordersWithAllocation"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["orderAllocations"] });
+      queryClient.invalidateQueries({ queryKey: ["orderStockCheck"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    },
+  });
+}
+
+export function useShipOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      orderId,
+      shippingCarrier,
+      trackingReference,
+      shippedAt,
+    }: {
+      orderId: string;
+      shippingCarrier?: string;
+      trackingReference?: string;
+      shippedAt?: string;
+    }) =>
+      fetchApi<{ order: Order; movements: Record<string, unknown>[] }>(`/orders/${orderId}/ship`, {
+        method: "POST",
+        body: JSON.stringify({ shippingCarrier, trackingReference, shippedAt }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ordersWithAllocation"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
   });

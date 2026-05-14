@@ -1,11 +1,14 @@
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, asc } from "drizzle-orm";
 import { db } from "../../db";
 import {
-  customers, orders, orderItems, products,
+  customers, orders, orderItems, products, lots, orderItemAllocations,
   type Customer, type InsertCustomer,
   type Order, type InsertOrder,
   type OrderItem, type InsertOrderItem,
+  type OrderItemAllocation, type InsertOrderItemAllocation,
 } from "@shared/schema";
+
+export type OrderStatus = "pending" | "in_production" | "ready" | "packed" | "partially_packed" | "shipped" | "completed" | "cancelled";
 
 export const customersRepository = {
   async getCustomers(): Promise<Customer[]> {
@@ -51,6 +54,7 @@ export const customersRepository = {
   },
 
   async deleteOrderRaw(id: string): Promise<void> {
+    await db.delete(orderItemAllocations).where(eq(orderItemAllocations.orderId, id));
     await db.delete(orderItems).where(eq(orderItems.orderId, id));
     await db.delete(orders).where(eq(orders.id, id));
   },
@@ -65,6 +69,7 @@ export const customersRepository = {
   },
 
   async deleteOrderItemRaw(id: string): Promise<void> {
+    await db.delete(orderItemAllocations).where(eq(orderItemAllocations.orderItemId, id));
     await db.delete(orderItems).where(eq(orderItems.id, id));
   },
 
@@ -91,7 +96,7 @@ export const customersRepository = {
 
   async getActiveOrders(): Promise<Order[]> {
     return db.select().from(orders)
-      .where(sql`${orders.status} IN ('pending', 'in_production')`);
+      .where(sql`${orders.status} IN ('pending', 'in_production', 'ready')`);
   },
 
   async getProductById(productId: string) {
@@ -103,8 +108,8 @@ export const customersRepository = {
     await db.update(products).set({ currentStock: newStock }).where(eq(products.id, productId));
   },
 
-  async updateOrderStatus(id: string, status: "pending" | "in_production" | "ready" | "shipped" | "cancelled"): Promise<Order> {
-    const [updated] = await db.update(orders).set({ status }).where(eq(orders.id, id)).returning();
+  async updateOrderStatus(id: string, status: OrderStatus): Promise<Order> {
+    const [updated] = await db.update(orders).set({ status } as any).where(eq(orders.id, id)).returning();
     return updated;
   },
 
@@ -118,5 +123,19 @@ export const customersRepository = {
 
   async getOrderItemsForOrder(orderId: string): Promise<OrderItem[]> {
     return db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+  },
+
+  async getOrderAllocations(orderId: string): Promise<OrderItemAllocation[]> {
+    return db.select().from(orderItemAllocations).where(eq(orderItemAllocations.orderId, orderId));
+  },
+
+  async getAvailableLotsForProduct(productId: string) {
+    return db.select().from(lots)
+      .where(
+        sql`${lots.productId} = ${productId}
+          AND ${lots.status} = 'active'
+          AND ${lots.remainingQuantity}::numeric > 0`
+      )
+      .orderBy(asc(lots.expiryDate), asc(lots.producedDate), asc(lots.receivedDate));
   },
 };

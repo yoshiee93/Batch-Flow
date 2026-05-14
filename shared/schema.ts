@@ -122,7 +122,7 @@ export interface LabelTemplateSettings {
 }
 
 export const batchStatusEnum = pgEnum("batch_status", ["planned", "in_progress", "quality_check", "completed", "released", "quarantined"]);
-export const orderStatusEnum = pgEnum("order_status", ["pending", "in_production", "ready", "shipped", "cancelled"]);
+export const orderStatusEnum = pgEnum("order_status", ["pending", "in_production", "ready", "packed", "partially_packed", "shipped", "completed", "cancelled"]);
 export const orderPriorityEnum = pgEnum("order_priority", ["low", "normal", "high", "urgent"]);
 export const movementTypeEnum = pgEnum("movement_type", ["receipt", "production_input", "production_output", "adjustment", "shipment"]);
 export const qualityResultEnum = pgEnum("quality_result", ["pass", "fail", "pending"]);
@@ -334,6 +334,9 @@ export const orders = pgTable("orders", {
   poNumber: varchar("po_number", { length: 100 }),
   customBatchNumber: varchar("custom_batch_number", { length: 50 }),
   freight: text("freight"),
+  shippedAt: timestamp("shipped_at"),
+  shippingCarrier: text("shipping_carrier"),
+  trackingReference: varchar("tracking_reference", { length: 100 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -442,15 +445,37 @@ export const batchMaterialsRelations = relations(batchMaterials, ({ one }) => ({
   addedByUser: one(users, { fields: [batchMaterials.addedBy], references: [users.id] }),
 }));
 
+export const orderItemAllocations = pgTable("order_item_allocations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => orders.id),
+  orderItemId: varchar("order_item_id").notNull().references(() => orderItems.id),
+  productId: varchar("product_id").notNull().references(() => products.id),
+  lotId: varchar("lot_id").notNull().references(() => lots.id),
+  quantityAllocated: decimal("quantity_allocated", { precision: 12, scale: 3 }).notNull(),
+  packedBy: varchar("packed_by").references(() => users.id),
+  packedAt: timestamp("packed_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   customer: one(customers, { fields: [orders.customerId], references: [customers.id] }),
   items: many(orderItems),
+  allocations: many(orderItemAllocations),
   stockMovements: many(stockMovements),
 }));
 
-export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+export const orderItemsRelations = relations(orderItems, ({ one, many }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
   product: one(products, { fields: [orderItems.productId], references: [products.id] }),
+  allocations: many(orderItemAllocations),
+}));
+
+export const orderItemAllocationsRelations = relations(orderItemAllocations, ({ one }) => ({
+  order: one(orders, { fields: [orderItemAllocations.orderId], references: [orders.id] }),
+  orderItem: one(orderItems, { fields: [orderItemAllocations.orderItemId], references: [orderItems.id] }),
+  product: one(products, { fields: [orderItemAllocations.productId], references: [products.id] }),
+  lot: one(lots, { fields: [orderItemAllocations.lotId], references: [lots.id] }),
+  packedByUser: one(users, { fields: [orderItemAllocations.packedBy], references: [users.id] }),
 }));
 
 export const qualityChecksRelations = relations(qualityChecks, ({ one }) => ({
@@ -501,6 +526,7 @@ export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, cre
   dueDate: z.union([z.string(), z.date()]).transform((val) => typeof val === 'string' ? new Date(val) : val),
 });
 export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: true });
+export const insertOrderItemAllocationSchema = createInsertSchema(orderItemAllocations).omit({ id: true, createdAt: true, packedAt: true });
 export const insertQualityCheckSchema = createInsertSchema(qualityChecks).omit({ id: true, checkedAt: true });
 export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({ id: true, createdAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
@@ -555,6 +581,8 @@ export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
+export type InsertOrderItemAllocation = z.infer<typeof insertOrderItemAllocationSchema>;
+export type OrderItemAllocation = typeof orderItemAllocations.$inferSelect;
 export type InsertQualityCheck = z.infer<typeof insertQualityCheckSchema>;
 export type QualityCheck = typeof qualityChecks.$inferSelect;
 export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;

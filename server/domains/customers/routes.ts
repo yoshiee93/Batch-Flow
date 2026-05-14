@@ -46,6 +46,69 @@ customersRouter.get("/orders/:id/items", asyncHandler(async (req, res) => {
   res.json(await svc.getOrderItems(req.params.id));
 }));
 
+customersRouter.get("/orders/:id/stock-check", asyncHandler(async (req, res) => {
+  const orderId = req.params.id;
+  const order = await svc.getOrder(orderId);
+  if (!order) return res.status(404).json({ error: "Order not found" });
+  res.json(await svc.getOrderStockCheck(orderId));
+}));
+
+customersRouter.get("/orders/:id/allocations", asyncHandler(async (req, res) => {
+  const orderId = req.params.id;
+  const order = await svc.getOrder(orderId);
+  if (!order) return res.status(404).json({ error: "Order not found" });
+  const { customersRepository } = await import("./repository");
+  res.json(await customersRepository.getOrderAllocations(orderId));
+}));
+
+customersRouter.post("/orders/:id/pack", adminOnly, asyncHandler(async (req, res) => {
+  const orderId = req.params.id;
+  const order = await svc.getOrder(orderId);
+  if (!order) return res.status(404).json({ error: "Order not found" });
+
+  const bodySchema = z.object({
+    allocations: z.array(z.object({
+      orderItemId: z.string().min(1),
+      lotId: z.string().min(1),
+      quantityAllocated: z.number().positive(),
+    })).min(1, "At least one allocation is required"),
+  });
+
+  const { allocations } = bodySchema.parse(req.body);
+  const userId = (req as any).user?.id;
+
+  try {
+    const updatedOrder = await svc.packOrder(orderId, allocations, userId);
+    res.json(updatedOrder);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to pack order";
+    res.status(400).json({ error: msg });
+  }
+}));
+
+customersRouter.post("/orders/:id/ship", adminOnly, asyncHandler(async (req, res) => {
+  const orderId = req.params.id;
+  const order = await svc.getOrder(orderId);
+  if (!order) return res.status(404).json({ error: "Order not found" });
+
+  const bodySchema = z.object({
+    shippingCarrier: z.string().optional(),
+    trackingReference: z.string().optional(),
+    shippedAt: z.string().optional().transform(v => v ? new Date(v) : undefined),
+  });
+
+  const data = bodySchema.parse(req.body);
+  const userId = (req as any).user?.id;
+
+  try {
+    const result = await svc.shipOrder(orderId, data, userId);
+    res.json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to ship order";
+    res.status(400).json({ error: msg });
+  }
+}));
+
 customersRouter.get("/orders/:id", asyncHandler(async (req, res) => {
   const order = await svc.getOrder(req.params.id);
   if (!order) return res.status(404).json({ error: "Order not found" });
@@ -94,7 +157,7 @@ customersRouter.post("/orders/:id/complete", adminOnly, asyncHandler(async (req,
   const orderId = req.params.id;
   const order = await svc.getOrder(orderId);
   if (!order) return res.status(404).json({ error: "Order not found" });
-  if (order.status === "shipped") return res.status(400).json({ error: "Order already completed" });
+  if (order.status === "shipped" || order.status === "completed") return res.status(400).json({ error: "Order already completed" });
   if (order.status === "cancelled") return res.status(400).json({ error: "Cannot complete cancelled order" });
   const items = await svc.getOrderItems(orderId);
   if (!items || items.length === 0) {
@@ -106,7 +169,8 @@ customersRouter.post("/orders/:id/complete", adminOnly, asyncHandler(async (req,
     if (err instanceof TestingRequiredError) {
       return res.status(409).json({ error: err.message, code: err.code, blockingLots: err.blockingLots });
     }
-    throw err;
+    const msg = err instanceof Error ? err.message : "Failed to complete order";
+    return res.status(400).json({ error: msg });
   }
 }));
 

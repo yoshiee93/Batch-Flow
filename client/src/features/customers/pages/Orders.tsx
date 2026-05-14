@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown, Archive, FlaskConical, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown, Archive, FlaskConical, ArrowUp, ArrowDown, BoxSelect, Ship, Layers } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -28,7 +28,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { applyServerFieldErrors } from '@/lib/applyServerFieldErrors';
 import { ApiValidationError } from '@/lib/fetchApi';
-import { useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem, useDeleteOrderItem, useDeleteOrder, useCustomers, useOrdersWithAllocation, useCompleteOrder, type Order, type OrderItem, type Product, type Customer, type OrderWithAllocation } from '@/lib/api';
+import {
+  useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem,
+  useDeleteOrderItem, useDeleteOrder, useCustomers, useOrdersWithAllocation, useCompleteOrder,
+  useOrderStockCheck, usePackOrder, useShipOrder,
+  type Order, type OrderItem, type Product, type Customer, type OrderWithAllocation,
+  type StockCheckItem, type OrderStockCheck,
+} from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
 import { useRole } from '@/contexts/AuthContext';
@@ -49,8 +55,13 @@ export default function Orders() {
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isPackDialogOpen, setIsPackDialogOpen] = useState(false);
+  const [isShipDialogOpen, setIsShipDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [viewingOrder, setViewingOrder] = useState<OrderWithAllocation | null>(null);
+  const [packingOrder, setPackingOrder] = useState<OrderWithAllocation | null>(null);
+  const [shippingOrder, setShippingOrder] = useState<OrderWithAllocation | null>(null);
+
   const createOrderSchema = z.object({
     orderNumber: z.string().min(1, 'Order number is required'),
     customerId: z.string().min(1, 'Please select a customer'),
@@ -75,13 +86,12 @@ export default function Orders() {
       const value = partial[key];
       if (value !== undefined) {
         createOrderForm.setValue(key, value as CreateOrderValues[typeof key], {
-          shouldValidate: true,
-          shouldDirty: true,
-          shouldTouch: true,
+          shouldValidate: true, shouldDirty: true, shouldTouch: true,
         });
       }
     });
   };
+
   const editOrderSchema = z.object({
     customerId: z.string().min(1, 'Please select a customer'),
     customerName: z.string().min(1, 'Customer is required'),
@@ -106,16 +116,13 @@ export default function Orders() {
       const value = partial[key];
       if (value !== undefined) {
         editOrderForm.setValue(key, value as EditOrderValues[typeof key], {
-          shouldValidate: true,
-          shouldDirty: true,
-          shouldTouch: true,
+          shouldValidate: true, shouldDirty: true, shouldTouch: true,
         });
       }
     });
   };
-  
-  const { canManageOrders } = useRole();
 
+  const { canManageOrders } = useRole();
   const { data: ordersWithAllocation = [], isLoading, isError } = useOrdersWithAllocation();
   const { data: products = [] } = useProducts();
   const { data: customers = [] } = useCustomers();
@@ -123,33 +130,42 @@ export default function Orders() {
   const createOrder = useCreateOrder();
   const deleteOrder = useDeleteOrder();
   const completeOrder = useCompleteOrder();
+  const packOrder = usePackOrder();
+  const shipOrder = useShipOrder();
   const { toast } = useToast();
   const { settings } = useSettings();
 
   const handleCompleteOrder = async (orderId: string) => {
     try {
       const result = await completeOrder.mutateAsync(orderId);
-      toast({ 
-        title: "Order completed", 
-        description: `Order shipped successfully. ${result.movements.length} stock movement(s) logged.` 
-      });
+      toast({ title: "Order completed", description: `Order shipped successfully. ${result.movements.length} stock movement(s) logged.` });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to complete order";
       toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
 
-  const filteredOrders = ordersWithAllocation.filter(o => 
+  const handleOpenPack = (order: OrderWithAllocation) => {
+    setPackingOrder(order);
+    setIsPackDialogOpen(true);
+  };
+
+  const handleOpenShip = (order: OrderWithAllocation) => {
+    setShippingOrder(order);
+    setIsShipDialogOpen(true);
+  };
+
+  const filteredOrders = ordersWithAllocation.filter(o =>
     o.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     o.customerName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const currentOrders = filteredOrders.filter(o => 
-    o.status !== 'shipped' && o.status !== 'cancelled'
+  const currentOrders = filteredOrders.filter(o =>
+    o.status !== 'shipped' && o.status !== 'completed' && o.status !== 'cancelled'
   );
 
-  const archivedOrders = filteredOrders.filter(o => 
-    o.status === 'shipped' || o.status === 'cancelled'
+  const archivedOrders = filteredOrders.filter(o =>
+    o.status === 'shipped' || o.status === 'completed' || o.status === 'cancelled'
   );
 
   type SortDir = 'asc' | 'desc';
@@ -158,8 +174,8 @@ export default function Orders() {
   const [archivedSort, setArchivedSort] = useState<{ key: SortKey | null; dir: SortDir }>({ key: null, dir: 'asc' });
 
   const priorityRank: Record<string, number> = { low: 0, normal: 1, high: 2, urgent: 3 };
-  const statusRank: Record<string, number> = { pending: 0, in_production: 1, ready: 2, shipped: 3, cancelled: 4 };
-  const allocationRank: Record<string, number> = { awaiting_stock: 0, partially_allocated: 1, ready_to_ship: 2, shipped: 3, cancelled: 4 };
+  const statusRank: Record<string, number> = { pending: 0, in_production: 1, ready: 2, partially_packed: 3, packed: 4, shipped: 5, completed: 6, cancelled: 7 };
+  const allocationRank: Record<string, number> = { awaiting_stock: 0, partially_allocated: 1, partially_packed: 2, ready_to_ship: 3, packed: 4, shipped: 5, cancelled: 6 };
 
   const compareOrders = (a: OrderWithAllocation, b: OrderWithAllocation, key: SortKey): number => {
     switch (key) {
@@ -238,7 +254,7 @@ export default function Orders() {
       }
     } catch (error) {
       if (error instanceof ApiValidationError) {
-        const unmatched = applyServerFieldErrors(error, createOrderForm.setError, ['orderNumber','customerName','customerId','priority','dueDate','poNumber','customBatchNumber','freight']);
+        const unmatched = applyServerFieldErrors(error, createOrderForm.setError, ['orderNumber', 'customerName', 'customerId', 'priority', 'dueDate', 'poNumber', 'customBatchNumber', 'freight']);
         if (!unmatched.handled) toast({ title: "Error", description: error.message || "Failed to create order", variant: "destructive" });
       } else {
         toast({ title: "Error", description: (error as Error)?.message || "Failed to create order", variant: "destructive" });
@@ -285,21 +301,19 @@ export default function Orders() {
       setIsEditDialogOpen(false);
     } catch (error) {
       if (error instanceof ApiValidationError) {
-        const unmatched = applyServerFieldErrors(error, editOrderForm.setError, ['customerName','customerId','priority','dueDate','notes','poNumber','customBatchNumber','freight']);
+        const unmatched = applyServerFieldErrors(error, editOrderForm.setError, ['customerName', 'customerId', 'priority', 'dueDate', 'notes', 'poNumber', 'customBatchNumber', 'freight']);
         if (!unmatched.handled) toast({ title: 'Error', description: error.message || 'Failed to update order', variant: 'destructive' });
       } else {
         toast({ title: 'Error', description: (error as Error)?.message || 'Failed to update order', variant: 'destructive' });
       }
     }
   });
+
   const handleCustomerSelect = (customerId: string, isCreate: boolean) => {
     const customer = customers.find(c => c.id === customerId);
     if (customer) {
-      if (isCreate) {
-        setNewOrder({ customerId, customerName: customer.name });
-      } else {
-        setEditOrder({ customerId, customerName: customer.name });
-      }
+      if (isCreate) setNewOrder({ customerId, customerName: customer.name });
+      else setEditOrder({ customerId, customerName: customer.name });
     }
   };
 
@@ -347,49 +361,33 @@ export default function Orders() {
             </DialogTrigger>
           )}
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Order</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Create New Order</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="orderNumber">Order Number *</Label>
-                <Input
-                  id="orderNumber"
-                  placeholder="e.g. ORD-2025-005"
-                  value={newOrder.orderNumber}
-                  onChange={(e) => setNewOrder({ ...newOrder, orderNumber: e.target.value })}
-                  data-testid="input-order-number"
-                />
+                <Input id="orderNumber" placeholder="e.g. ORD-2025-005" value={newOrder.orderNumber}
+                  onChange={(e) => setNewOrder({ ...newOrder, orderNumber: e.target.value })} data-testid="input-order-number" />
                 {createOrderForm.formState.errors.orderNumber && (
                   <p className="text-sm text-destructive" data-testid="error-order-number">{createOrderForm.formState.errors.orderNumber.message}</p>
                 )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customer">Customer *</Label>
-                <CustomerCombobox
-                  customers={customers}
-                  customerId={newOrder.customerId}
-                  customerName={newOrder.customerName}
-                  onSelect={(id) => handleCustomerSelect(id, true)}
-                  testId="select-customer"
-                />
+                <CustomerCombobox customers={customers} customerId={newOrder.customerId} customerName={newOrder.customerName}
+                  onSelect={(id) => handleCustomerSelect(id, true)} testId="select-customer" />
                 {(createOrderForm.formState.errors.customerId || createOrderForm.formState.errors.customerName) && (
                   <p className="text-sm text-destructive" data-testid="error-customer-name">
                     {createOrderForm.formState.errors.customerId?.message || createOrderForm.formState.errors.customerName?.message}
                   </p>
                 )}
                 {customers.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    No customers exist yet. <a href="/customers" className="underline">Add a customer</a> to get started.
-                  </p>
+                  <p className="text-xs text-muted-foreground">No customers exist yet. <a href="/customers" className="underline">Add a customer</a> to get started.</p>
                 )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="priority">Priority</Label>
                 <Select value={newOrder.priority} onValueChange={(v) => setNewOrder({ ...newOrder, priority: v as any })}>
-                  <SelectTrigger data-testid="select-priority">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger data-testid="select-priority"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="normal">Normal</SelectItem>
@@ -400,46 +398,27 @@ export default function Orders() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dueDate">Due Date *</Label>
-                <Input
-                  id="dueDate"
-                  type="date"
-                  value={newOrder.dueDate}
-                  onChange={(e) => setNewOrder({ ...newOrder, dueDate: e.target.value })}
-                  data-testid="input-due-date"
-                />
+                <Input id="dueDate" type="date" value={newOrder.dueDate}
+                  onChange={(e) => setNewOrder({ ...newOrder, dueDate: e.target.value })} data-testid="input-due-date" />
                 {createOrderForm.formState.errors.dueDate && (
                   <p className="text-sm text-destructive" data-testid="error-due-date">{createOrderForm.formState.errors.dueDate.message}</p>
                 )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="poNumber">Invoice Number</Label>
-                <Input
-                  id="poNumber"
-                  placeholder="e.g. INV-12345"
-                  value={newOrder.poNumber || ''}
-                  onChange={(e) => setNewOrder({ ...newOrder, poNumber: e.target.value })}
-                  data-testid="input-po-number"
-                />
+                <Input id="poNumber" placeholder="e.g. INV-12345" value={newOrder.poNumber || ''}
+                  onChange={(e) => setNewOrder({ ...newOrder, poNumber: e.target.value })} data-testid="input-po-number" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customBatchNumber">Custom Batch Number</Label>
-                <Input
-                  id="customBatchNumber"
-                  placeholder="Optional override of internal batch code"
-                  value={newOrder.customBatchNumber || ''}
-                  onChange={(e) => setNewOrder({ ...newOrder, customBatchNumber: e.target.value })}
-                  data-testid="input-custom-batch-number"
-                />
+                <Input id="customBatchNumber" placeholder="Optional override of internal batch code"
+                  value={newOrder.customBatchNumber || ''} onChange={(e) => setNewOrder({ ...newOrder, customBatchNumber: e.target.value })}
+                  data-testid="input-custom-batch-number" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="freight">Freight</Label>
-                <Input
-                  id="freight"
-                  placeholder="e.g. DHL — AWB 123 — $185"
-                  value={newOrder.freight || ''}
-                  onChange={(e) => setNewOrder({ ...newOrder, freight: e.target.value })}
-                  data-testid="input-freight"
-                />
+                <Input id="freight" placeholder="e.g. DHL — AWB 123 — $185" value={newOrder.freight || ''}
+                  onChange={(e) => setNewOrder({ ...newOrder, freight: e.target.value })} data-testid="input-freight" />
               </div>
             </div>
             <DialogFooter>
@@ -455,13 +434,8 @@ export default function Orders() {
 
       <div className="flex items-center space-x-2 bg-card p-2 rounded-md border w-full sm:max-w-md">
         <Search className="w-4 h-4 text-muted-foreground ml-2 flex-shrink-0" />
-        <Input 
-          placeholder="Search orders..." 
-          className="border-none shadow-none focus-visible:ring-0"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          data-testid="input-search-orders"
-        />
+        <Input placeholder="Search orders..." className="border-none shadow-none focus-visible:ring-0"
+          value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} data-testid="input-search-orders" />
         <Button variant="ghost" size="icon" className="flex-shrink-0" data-testid="button-filter-orders">
           <Filter size={16} />
         </Button>
@@ -469,9 +443,7 @@ export default function Orders() {
 
       <Tabs defaultValue="current" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="current" data-testid="tab-current-orders">
-            Current ({currentOrders.length})
-          </TabsTrigger>
+          <TabsTrigger value="current" data-testid="tab-current-orders">Current ({currentOrders.length})</TabsTrigger>
           <TabsTrigger value="archive" data-testid="tab-archive-orders">
             <Archive size={14} className="mr-1" /> Archive ({archivedOrders.length})
           </TabsTrigger>
@@ -486,7 +458,7 @@ export default function Orders() {
                     <SortableHead className="w-[100px] sm:w-[140px]" sort={currentSort} sortKey="orderNumber" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-orderNumber">Order #</SortableHead>
                     <SortableHead className="min-w-[120px]" sort={currentSort} sortKey="customerName" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-customerName">Customer</SortableHead>
                     <SortableHead className="min-w-[200px]" sort={currentSort} sortKey="itemsCount" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-items">Items</SortableHead>
-                    <SortableHead className="text-center min-w-[100px]" align="center" sort={currentSort} sortKey="allocationStatus" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-stock">Stock</SortableHead>
+                    <SortableHead className="text-center min-w-[120px]" align="center" sort={currentSort} sortKey="allocationStatus" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-stock">Stock / Pack</SortableHead>
                     <SortableHead className="text-center min-w-[80px]" align="center" sort={currentSort} sortKey="priority" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-priority">Priority</SortableHead>
                     <SortableHead className="text-center min-w-[80px]" align="center" sort={currentSort} sortKey="status" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-status">Status</SortableHead>
                     <SortableHead className="text-right min-w-[100px]" align="right" sort={currentSort} sortKey="dueDate" onToggle={(k) => toggleSort(currentSort, setCurrentSort, k)} testId="sort-current-dueDate">Due Date</SortableHead>
@@ -495,14 +467,16 @@ export default function Orders() {
                 </TableHeader>
                 <TableBody>
                   {sortedCurrentOrders.map((order) => (
-                    <OrderRow 
-                      key={order.id} 
-                      order={order} 
+                    <OrderRow
+                      key={order.id}
+                      order={order}
                       onStatusChange={handleStatusChange}
                       onEditClick={handleEditClick}
                       onDelete={handleDeleteOrder}
                       onComplete={handleCompleteOrder}
                       onViewClick={handleViewClick}
+                      onPackClick={handleOpenPack}
+                      onShipClick={handleOpenShip}
                       products={products}
                       isDeletePending={deleteOrder.isPending}
                       isCompletePending={completeOrder.isPending}
@@ -538,9 +512,9 @@ export default function Orders() {
                 </TableHeader>
                 <TableBody>
                   {sortedArchivedOrders.map((order) => (
-                    <ArchivedOrderRow 
-                      key={order.id} 
-                      order={order} 
+                    <ArchivedOrderRow
+                      key={order.id}
+                      order={order}
                       onViewClick={handleViewClick}
                       onDelete={handleDeleteOrder}
                       products={products}
@@ -561,6 +535,7 @@ export default function Orders() {
         </TabsContent>
       </Tabs>
 
+      {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -584,6 +559,7 @@ export default function Orders() {
         </DialogContent>
       </Dialog>
 
+      {/* View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="w-full sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -630,6 +606,24 @@ export default function Orders() {
                     <p className="font-medium">{viewingOrder.freight}</p>
                   </div>
                 )}
+                {viewingOrder.shippedAt && (
+                  <div data-testid="view-shipped-at">
+                    <p className="text-sm text-muted-foreground">Shipped</p>
+                    <p className="font-medium">{format(new Date(viewingOrder.shippedAt), 'MMM d, yyyy')}</p>
+                  </div>
+                )}
+                {viewingOrder.shippingCarrier && (
+                  <div data-testid="view-carrier">
+                    <p className="text-sm text-muted-foreground">Carrier</p>
+                    <p className="font-medium">{viewingOrder.shippingCarrier}</p>
+                  </div>
+                )}
+                {viewingOrder.trackingReference && (
+                  <div data-testid="view-tracking">
+                    <p className="text-sm text-muted-foreground">Tracking</p>
+                    <p className="font-medium font-mono">{viewingOrder.trackingReference}</p>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -645,7 +639,7 @@ export default function Orders() {
                       const reserved = parseFloat(item.reservedQuantity);
                       const unit = product?.unit || '';
                       const stockStatus = reserved >= needed ? 'ready' : reserved > 0 ? 'partial' : 'waiting';
-                      
+
                       return (
                         <Collapsible key={item.id} defaultOpen={settings.cardsExpandedByDefault} className="group">
                           <div className="border rounded-lg overflow-hidden">
@@ -657,15 +651,9 @@ export default function Orders() {
                                   {product?.sku && <p className="text-xs text-muted-foreground">{product.sku}</p>}
                                 </div>
                               </div>
-                              {stockStatus === 'ready' && (
-                                <Badge className="bg-green-100 text-green-700"><CheckCircle2 size={12} className="mr-1" /> Ready</Badge>
-                              )}
-                              {stockStatus === 'partial' && (
-                                <Badge className="bg-amber-100 text-amber-700"><Clock size={12} className="mr-1" /> Partial</Badge>
-                              )}
-                              {stockStatus === 'waiting' && (
-                                <Badge className="bg-slate-100 text-slate-600"><AlertCircle size={12} className="mr-1" /> Waiting</Badge>
-                              )}
+                              {stockStatus === 'ready' && <Badge className="bg-green-100 text-green-700"><CheckCircle2 size={12} className="mr-1" /> Ready</Badge>}
+                              {stockStatus === 'partial' && <Badge className="bg-amber-100 text-amber-700"><Clock size={12} className="mr-1" /> Partial</Badge>}
+                              {stockStatus === 'waiting' && <Badge className="bg-slate-100 text-slate-600"><AlertCircle size={12} className="mr-1" /> Waiting</Badge>}
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                               <div className="grid grid-cols-3 gap-2 text-sm p-3 pt-0 border-t">
@@ -701,7 +689,7 @@ export default function Orders() {
           )}
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>Close</Button>
-            {canManageOrders && (
+            {canManageOrders && viewingOrder && (
               <>
                 <Button variant="outline" onClick={() => {
                   setIsViewDialogOpen(false);
@@ -709,49 +697,336 @@ export default function Orders() {
                 }}>
                   <Pencil className="mr-2 h-4 w-4" /> Edit Order
                 </Button>
-                {viewingOrder && viewingOrder.status !== 'shipped' && viewingOrder.status !== 'cancelled' && (
-                  <ConfirmDialog
-                    trigger={
-                      <Button
-                        className="bg-green-600 hover:bg-green-700"
-                        disabled={viewingOrder.items.length === 0}
-                        title={viewingOrder.items.length === 0 ? 'Order must have at least one line item before it can be completed' : undefined}
-                      >
-                        <Truck size={14} className="mr-2" /> Complete Order
-                      </Button>
-                    }
-                    title="Complete Order"
-                    description="This will mark the order as shipped and deduct the reserved stock from inventory. This action cannot be undone."
-                    confirmLabel="Complete Order"
-                    variant="overwrite"
-                    onConfirm={() => {
-                      handleCompleteOrder(viewingOrder.id);
-                      setIsViewDialogOpen(false);
-                    }}
-                    pending={completeOrder.isPending}
-                    testId="confirm-complete-order-view"
-                  />
+                {viewingOrder.status === 'packed' && (
+                  <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => {
+                    setIsViewDialogOpen(false);
+                    handleOpenShip(viewingOrder);
+                  }} data-testid="button-view-ship-order">
+                    <Ship size={14} className="mr-2" /> Ship Order
+                  </Button>
+                )}
+                {(viewingOrder.status === 'partially_packed' || viewingOrder.status === 'pending' || viewingOrder.status === 'in_production' || viewingOrder.status === 'ready') && viewingOrder.items.length > 0 && (
+                  <Button className="bg-green-600 hover:bg-green-700" onClick={() => {
+                    setIsViewDialogOpen(false);
+                    handleOpenPack(viewingOrder);
+                  }} data-testid="button-view-pack-order">
+                    <BoxSelect size={14} className="mr-2" />
+                    {viewingOrder.status === 'partially_packed' ? 'Continue Packing' : 'Pack Order'}
+                  </Button>
                 )}
               </>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Pack Order Dialog */}
+      {packingOrder && (
+        <PackOrderDialog
+          open={isPackDialogOpen}
+          order={packingOrder}
+          onClose={() => { setIsPackDialogOpen(false); setPackingOrder(null); }}
+        />
+      )}
+
+      {/* Ship Order Dialog */}
+      {shippingOrder && (
+        <ShipOrderDialog
+          open={isShipDialogOpen}
+          order={shippingOrder}
+          onClose={() => { setIsShipDialogOpen(false); setShippingOrder(null); }}
+        />
+      )}
     </div>
   );
 }
 
-function EditOrderContent({
+// ─── Pack Order Dialog ───────────────────────────────────────────────────────
+
+type AllocState = Record<string, Record<string, string>>; // { [orderItemId]: { [lotId]: qty } }
+
+function PackOrderDialog({
+  open,
   order,
-  editOrder,
-  setEditOrder,
-  customers,
-  products,
-  onCustomerSelect,
-  onSave,
-  isPending,
-  isValid,
   onClose,
+}: {
+  open: boolean;
+  order: OrderWithAllocation;
+  onClose: () => void;
+}) {
+  const { data: stockCheck, isLoading } = useOrderStockCheck(open ? order.id : null);
+  const packOrder = usePackOrder();
+  const { toast } = useToast();
+  const [allocations, setAllocations] = useState<AllocState>({});
+
+  useEffect(() => {
+    if (stockCheck) {
+      const initial: AllocState = {};
+      for (const item of stockCheck.items) {
+        initial[item.orderItemId] = {};
+        for (const lot of item.availableLots) {
+          initial[item.orderItemId][lot.lotId] = '';
+        }
+      }
+      setAllocations(initial);
+    }
+  }, [stockCheck]);
+
+  const getTotalAllocated = (item: StockCheckItem) => {
+    const itemAllocs = allocations[item.orderItemId] ?? {};
+    return Object.values(itemAllocs).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+  };
+
+  const handleFIFOItem = (item: StockCheckItem) => {
+    let remaining = item.required;
+    const newAllocs: Record<string, string> = {};
+    const sortedLots = [...item.availableLots].sort((a, b) => {
+      if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime();
+      if (a.expiryDate) return -1;
+      if (b.expiryDate) return 1;
+      if (a.producedDate && b.producedDate) return new Date(a.producedDate).getTime() - new Date(b.producedDate).getTime();
+      return new Date(a.receivedDate).getTime() - new Date(b.receivedDate).getTime();
+    });
+    for (const lot of sortedLots) {
+      if (remaining <= 0) { newAllocs[lot.lotId] = '0'; continue; }
+      const take = Math.min(lot.remainingQuantity, remaining);
+      newAllocs[lot.lotId] = take.toFixed(3);
+      remaining -= take;
+    }
+    setAllocations(prev => ({ ...prev, [item.orderItemId]: newAllocs }));
+  };
+
+  const handleFIFOAll = () => {
+    if (!stockCheck) return;
+    for (const item of stockCheck.items) handleFIFOItem(item);
+  };
+
+  const handleSubmit = async () => {
+    const allocList: { orderItemId: string; lotId: string; quantityAllocated: number }[] = [];
+    for (const [orderItemId, lots] of Object.entries(allocations)) {
+      for (const [lotId, qty] of Object.entries(lots)) {
+        const quantity = parseFloat(qty);
+        if (!isNaN(quantity) && quantity > 0) allocList.push({ orderItemId, lotId, quantityAllocated: quantity });
+      }
+    }
+    if (allocList.length === 0) {
+      toast({ title: "No allocations", description: "Enter at least one quantity to allocate.", variant: "destructive" });
+      return;
+    }
+    try {
+      const result = await packOrder.mutateAsync({ orderId: order.id, allocations: allocList });
+      const statusLabel = result.status === 'packed' ? 'fully packed' : 'partially packed';
+      toast({ title: "Order packed", description: `Order ${order.orderNumber} is now ${statusLabel}.` });
+      onClose();
+    } catch (error) {
+      toast({ title: "Pack failed", description: (error as Error).message || "Failed to pack order", variant: "destructive" });
+    }
+  };
+
+  const allItemsMeetRequirement = stockCheck?.items.every(item => getTotalAllocated(item) >= item.required - 0.001) ?? false;
+  const hasAnyAllocation = Object.values(allocations).some(lots => Object.values(lots).some(v => parseFloat(v) > 0));
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <BoxSelect className="h-5 w-5" />
+            Pack Order {order.orderNumber}
+          </DialogTitle>
+          <DialogDescription>Allocate lots to each product in this order.</DialogDescription>
+        </DialogHeader>
+
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {stockCheck && !isLoading && (
+          <div className="space-y-4 py-2">
+            {/* Overall availability banner */}
+            <div className={cn(
+              "rounded-md p-3 text-sm flex items-center gap-2",
+              stockCheck.allAvailable ? "bg-green-50 text-green-800 border border-green-200" : "bg-amber-50 text-amber-800 border border-amber-200"
+            )}>
+              {stockCheck.allAvailable
+                ? <><CheckCircle2 size={16} /> All products are in stock — full packing available.</>
+                : <><AlertCircle size={16} /> Some products have insufficient stock — partial packing only.</>
+              }
+            </div>
+
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={handleFIFOAll} data-testid="button-suggest-fifo-all">
+                <Layers size={14} className="mr-2" /> Suggest FIFO (All Items)
+              </Button>
+            </div>
+
+            {stockCheck.items.map((item) => {
+              const totalAllocated = getTotalAllocated(item);
+              const isFullyAllocated = totalAllocated >= item.required - 0.001;
+              const itemAllocs = allocations[item.orderItemId] ?? {};
+
+              return (
+                <div key={item.orderItemId} className="border rounded-lg overflow-hidden" data-testid={`pack-item-${item.orderItemId}`}>
+                  <div className="p-3 bg-muted/30 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{item.productName}</p>
+                      <p className="text-sm text-muted-foreground font-mono">
+                        Required: {item.required.toFixed(2)} {item.unit}
+                        {item.shortfall > 0 && <span className="text-destructive ml-2">· Short by {item.shortfall.toFixed(2)} {item.unit}</span>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={cn("text-sm font-mono font-medium", isFullyAllocated ? "text-green-700" : "text-amber-700")}>
+                        {totalAllocated.toFixed(2)} / {item.required.toFixed(2)} {item.unit}
+                      </span>
+                      <Button variant="ghost" size="sm" onClick={() => handleFIFOItem(item)} data-testid={`button-fifo-${item.orderItemId}`}>
+                        FIFO
+                      </Button>
+                    </div>
+                  </div>
+
+                  {item.availableLots.length === 0 ? (
+                    <div className="p-3 text-sm text-muted-foreground italic">No available lots for this product.</div>
+                  ) : (
+                    <div className="divide-y">
+                      {item.availableLots.map((lot) => (
+                        <div key={lot.lotId} className="flex items-center gap-3 px-3 py-2 text-sm" data-testid={`pack-lot-${lot.lotId}`}>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-mono font-medium">{lot.lotNumber}</span>
+                            <span className="text-muted-foreground ml-2">({lot.remainingQuantity.toFixed(2)} {item.unit} available)</span>
+                            {lot.expiryDate && (
+                              <span className="text-amber-600 ml-2 text-xs">Exp {format(new Date(lot.expiryDate), 'dd MMM yyyy')}</span>
+                            )}
+                          </div>
+                          <div className="w-28 flex-shrink-0">
+                            <Input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              max={lot.remainingQuantity}
+                              value={itemAllocs[lot.lotId] ?? ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const num = parseFloat(val);
+                                const clamped = !isNaN(num) ? Math.min(num, lot.remainingQuantity) : val;
+                                setAllocations(prev => ({
+                                  ...prev,
+                                  [item.orderItemId]: { ...prev[item.orderItemId], [lot.lotId]: String(clamped) },
+                                }));
+                              }}
+                              placeholder="0.000"
+                              className="text-right font-mono h-8 text-sm"
+                              data-testid={`input-alloc-${item.orderItemId}-${lot.lotId}`}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!hasAnyAllocation || packOrder.isPending}
+            className={allItemsMeetRequirement ? "bg-green-600 hover:bg-green-700" : "bg-amber-600 hover:bg-amber-700"}
+            data-testid="button-submit-pack"
+          >
+            {packOrder.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {allItemsMeetRequirement ? 'Pack Order' : 'Partial Pack'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Ship Order Dialog ───────────────────────────────────────────────────────
+
+function ShipOrderDialog({
+  open,
+  order,
+  onClose,
+}: {
+  open: boolean;
+  order: OrderWithAllocation;
+  onClose: () => void;
+}) {
+  const shipOrder = useShipOrder();
+  const { toast } = useToast();
+  const today = new Date().toISOString().split('T')[0];
+  const [carrier, setCarrier] = useState('');
+  const [tracking, setTracking] = useState('');
+  const [shippedDate, setShippedDate] = useState(today);
+
+  const handleSubmit = async () => {
+    try {
+      const result = await shipOrder.mutateAsync({
+        orderId: order.id,
+        shippingCarrier: carrier || undefined,
+        trackingReference: tracking || undefined,
+        shippedAt: shippedDate ? new Date(shippedDate).toISOString() : undefined,
+      });
+      toast({ title: "Order shipped", description: `Order ${order.orderNumber} has been shipped. ${result.movements.length} movement(s) logged.` });
+      onClose();
+    } catch (error) {
+      toast({ title: "Ship failed", description: (error as Error).message || "Failed to ship order", variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="w-full sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Ship className="h-5 w-5" />
+            Ship Order {order.orderNumber}
+          </DialogTitle>
+          <DialogDescription>Confirm shipping details to mark this order as shipped.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="shippedDate">Shipped Date</Label>
+            <Input id="shippedDate" type="date" value={shippedDate}
+              onChange={(e) => setShippedDate(e.target.value)} data-testid="input-shipped-date" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="carrier">Freight / Carrier <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Input id="carrier" placeholder="e.g. DHL, FedEx, StarTrack"
+              value={carrier} onChange={(e) => setCarrier(e.target.value)} data-testid="input-shipping-carrier" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="tracking">Tracking / Reference <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Input id="tracking" placeholder="e.g. AWB 1234567890"
+              value={tracking} onChange={(e) => setTracking(e.target.value)} data-testid="input-tracking-reference" />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Shipping will log stock movements for all packed lots and mark the order as Shipped.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={shipOrder.isPending} className="bg-blue-600 hover:bg-blue-700" data-testid="button-submit-ship">
+            {shipOrder.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Ship size={14} className="mr-2" /> Confirm Ship
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Edit Order Content ───────────────────────────────────────────────────────
+
+function EditOrderContent({
+  order, editOrder, setEditOrder, customers, products, onCustomerSelect, onSave, isPending, isValid, onClose,
 }: {
   order: Order;
   editOrder: { customerName: string; customerId?: string; priority: string; dueDate: string; notes?: string; poNumber?: string; customBatchNumber?: string; freight?: string };
@@ -769,7 +1044,7 @@ function EditOrderContent({
   const createOrderItem = useCreateOrderItem();
   const deleteOrderItem = useDeleteOrderItem();
   const { toast } = useToast();
-  
+
   const addItemSchema = z.object({
     productId: z.string().min(1, 'Product is required'),
     quantity: z.string()
@@ -789,11 +1064,7 @@ function EditOrderContent({
     (Object.keys(partial) as Array<keyof AddItemValues>).forEach((key) => {
       const value = partial[key];
       if (value !== undefined) {
-        addItemForm.setValue(key, value as AddItemValues[typeof key], {
-          shouldValidate: true,
-          shouldDirty: true,
-          shouldTouch: true,
-        });
+        addItemForm.setValue(key, value as AddItemValues[typeof key], { shouldValidate: true, shouldDirty: true, shouldTouch: true });
       }
     });
   };
@@ -801,11 +1072,7 @@ function EditOrderContent({
 
   const handleAddItem = addItemForm.handleSubmit(async (values) => {
     try {
-      await createOrderItem.mutateAsync({
-        orderId: order.id,
-        productId: values.productId,
-        quantity: values.quantity,
-      });
+      await createOrderItem.mutateAsync({ orderId: order.id, productId: values.productId, quantity: values.quantity });
       toast({ title: "Item added", description: "Order item added successfully" });
       addItemForm.reset({ productId: '', quantity: '' });
     } catch (error) {
@@ -813,8 +1080,7 @@ function EditOrderContent({
         const unmatched = applyServerFieldErrors(error, addItemForm.setError, ['productId', 'quantity']);
         if (!unmatched.handled) toast({ title: 'Error', description: error.message || 'Failed to add order item', variant: 'destructive' });
       } else {
-        const msg = error instanceof Error ? error.message : "Failed to add order item";
-        toast({ title: "Error", description: msg, variant: "destructive" });
+        toast({ title: "Error", description: (error instanceof Error ? error.message : "Failed to add order item"), variant: "destructive" });
       }
     }
   });
@@ -833,20 +1099,13 @@ function EditOrderContent({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Customer *</Label>
-          <CustomerCombobox
-            customers={customers}
-            customerId={editOrder.customerId}
-            customerName={editOrder.customerName}
-            onSelect={onCustomerSelect}
-            testId="select-edit-customer"
-          />
+          <CustomerCombobox customers={customers} customerId={editOrder.customerId} customerName={editOrder.customerName}
+            onSelect={onCustomerSelect} testId="select-edit-customer" />
         </div>
         <div className="space-y-2">
           <Label>Priority</Label>
           <Select value={editOrder.priority} onValueChange={(v) => setEditOrder({ ...editOrder, priority: v })}>
-            <SelectTrigger data-testid="select-edit-priority">
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger data-testid="select-edit-priority"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="low">Low</SelectItem>
               <SelectItem value="normal">Normal</SelectItem>
@@ -857,61 +1116,30 @@ function EditOrderContent({
         </div>
         <div className="space-y-2">
           <Label>Due Date *</Label>
-          <Input
-            type="date"
-            value={editOrder.dueDate}
-            onChange={(e) => setEditOrder({ ...editOrder, dueDate: e.target.value })}
-            data-testid="input-edit-due-date"
-          />
+          <Input type="date" value={editOrder.dueDate} onChange={(e) => setEditOrder({ ...editOrder, dueDate: e.target.value })} data-testid="input-edit-due-date" />
         </div>
         <div className="space-y-2">
           <Label>Notes</Label>
-          <Input
-            value={editOrder.notes}
-            onChange={(e) => setEditOrder({ ...editOrder, notes: e.target.value })}
-            placeholder="Additional notes..."
-            data-testid="input-edit-notes"
-          />
+          <Input value={editOrder.notes} onChange={(e) => setEditOrder({ ...editOrder, notes: e.target.value })} placeholder="Additional notes..." data-testid="input-edit-notes" />
         </div>
         <div className="space-y-2">
           <Label>Invoice Number</Label>
-          <Input
-            value={editOrder.poNumber || ''}
-            onChange={(e) => setEditOrder({ ...editOrder, poNumber: e.target.value })}
-            placeholder="e.g. INV-12345"
-            data-testid="input-edit-po-number"
-          />
+          <Input value={editOrder.poNumber || ''} onChange={(e) => setEditOrder({ ...editOrder, poNumber: e.target.value })} placeholder="e.g. INV-12345" data-testid="input-edit-po-number" />
         </div>
         <div className="space-y-2">
           <Label>Custom Batch Number</Label>
-          <Input
-            value={editOrder.customBatchNumber || ''}
-            onChange={(e) => setEditOrder({ ...editOrder, customBatchNumber: e.target.value })}
-            placeholder="Optional override of internal batch code"
-            data-testid="input-edit-custom-batch-number"
-          />
+          <Input value={editOrder.customBatchNumber || ''} onChange={(e) => setEditOrder({ ...editOrder, customBatchNumber: e.target.value })} placeholder="Optional override" data-testid="input-edit-custom-batch-number" />
         </div>
         <div className="space-y-2 col-span-2">
           <Label>Freight</Label>
-          <Input
-            value={editOrder.freight || ''}
-            onChange={(e) => setEditOrder({ ...editOrder, freight: e.target.value })}
-            placeholder="e.g. DHL — AWB 123 — $185"
-            data-testid="input-edit-freight"
-          />
+          <Input value={editOrder.freight || ''} onChange={(e) => setEditOrder({ ...editOrder, freight: e.target.value })} placeholder="e.g. DHL — AWB 123 — $185" data-testid="input-edit-freight" />
         </div>
       </div>
 
       <div className="border-t pt-4">
-        <h3 className="font-semibold mb-3 flex items-center gap-2">
-          <Package className="h-4 w-4" />
-          Order Items
-        </h3>
-        
+        <h3 className="font-semibold mb-3 flex items-center gap-2"><Package className="h-4 w-4" /> Order Items</h3>
         {itemsLoading ? (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
+          <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
           <>
             <div className="rounded-md border mb-4 max-h-[280px] overflow-y-auto">
@@ -927,9 +1155,7 @@ function EditOrderContent({
                 <TableBody>
                   {orderItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
-                        No items in this order. Add products below.
-                      </TableCell>
+                      <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">No items in this order. Add products below.</TableCell>
                     </TableRow>
                   ) : (
                     orderItems.map((item) => {
@@ -943,13 +1169,7 @@ function EditOrderContent({
                           </TableCell>
                           <TableCell>
                             {canManageOrders && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveItem(item.id)}
-                                disabled={deleteOrderItem.isPending}
-                                data-testid={`button-remove-item-${item.id}`}
-                              >
+                              <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} disabled={deleteOrderItem.isPending} data-testid={`button-remove-item-${item.id}`}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             )}
@@ -962,100 +1182,80 @@ function EditOrderContent({
               </Table>
             </div>
 
-            {canManageOrders && <div className="flex gap-2 items-end">
-              <div className="flex-1 space-y-2">
-                <Label>Add Product</Label>
-                <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={productSearchOpen}
-                      className="w-full justify-between font-normal"
-                      data-testid="select-add-product"
-                    >
-                      {newItem.productId
-                        ? products.find(p => p.id === newItem.productId)?.name || "Select product..."
-                        : "Search products..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Type to search products..." />
-                      <CommandList>
-                        <CommandEmpty>No product found.</CommandEmpty>
-                        <CommandGroup>
-                          {products
-                            .filter(product => !orderItems.some(item => item.productId === product.id))
-                            .map(product => (
-                            <CommandItem
-                              key={product.id}
-                              value={`${product.sku} ${product.name}`}
-                              onSelect={() => {
-                                setNewItem({ ...newItem, productId: product.id });
-                                setProductSearchOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  newItem.productId === product.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {product.sku ? `${product.sku} - ` : ''}{product.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+            {canManageOrders && (
+              <div className="flex gap-2 items-end">
+                <div className="flex-1 space-y-2">
+                  <Label>Add Product</Label>
+                  <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" aria-expanded={productSearchOpen}
+                        className="w-full justify-between font-normal" data-testid="select-add-product">
+                        {newItem.productId ? products.find(p => p.id === newItem.productId)?.name || "Select product..." : "Search products..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Type to search products..." />
+                        <CommandList>
+                          <CommandEmpty>No product found.</CommandEmpty>
+                          <CommandGroup>
+                            {products.filter(product => !orderItems.some(item => item.productId === product.id)).map(product => (
+                              <CommandItem key={product.id} value={`${product.sku} ${product.name}`}
+                                onSelect={() => { setNewItem({ ...newItem, productId: product.id }); setProductSearchOpen(false); }}>
+                                <Check className={cn("mr-2 h-4 w-4", newItem.productId === product.id ? "opacity-100" : "opacity-0")} />
+                                {product.sku ? `${product.sku} - ` : ''}{product.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="w-32 space-y-2">
+                  <Label>Quantity{(() => { const p = products.find(pp => pp.id === newItem.productId); return p?.unit ? ` (${p.unit})` : ''; })()}</Label>
+                  <Input type="number" step="0.01" value={newItem.quantity}
+                    onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })} placeholder="0.00" data-testid="input-add-quantity" />
+                  {addItemForm.formState.errors.quantity && (
+                    <p className="text-sm text-destructive" data-testid="error-add-quantity">{addItemForm.formState.errors.quantity.message}</p>
+                  )}
+                </div>
+                <Button onClick={handleAddItem} disabled={!addItemForm.formState.isValid || createOrderItem.isPending} data-testid="button-add-item">
+                  {createOrderItem.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                </Button>
               </div>
-              <div className="w-32 space-y-2">
-                <Label>Quantity{(() => { const p = products.find(pp => pp.id === newItem.productId); return p?.unit ? ` (${p.unit})` : ''; })()}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={newItem.quantity}
-                  onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
-                  placeholder="0.00"
-                  data-testid="input-add-quantity"
-                />
-                {addItemForm.formState.errors.quantity && (
-                  <p className="text-sm text-destructive" data-testid="error-add-quantity">{addItemForm.formState.errors.quantity.message}</p>
-                )}
-              </div>
-              <Button
-                onClick={handleAddItem}
-                disabled={!addItemForm.formState.isValid || createOrderItem.isPending}
-                data-testid="button-add-item"
-              >
-                {createOrderItem.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              </Button>
-            </div>}
+            )}
           </>
         )}
       </div>
 
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Cancel</Button>
-        {canManageOrders && <Button onClick={onSave} disabled={!isValid || isPending} data-testid="button-save-order">
-          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save Changes
-        </Button>}
+        {canManageOrders && (
+          <Button onClick={onSave} disabled={!isValid || isPending} data-testid="button-save-order">
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Changes
+          </Button>
+        )}
       </DialogFooter>
     </div>
   );
 }
 
-function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, onViewClick, products, isDeletePending, isCompletePending }: { 
-  order: OrderWithAllocation; 
+// ─── Order Table Row ──────────────────────────────────────────────────────────
+
+function OrderRow({
+  order, onStatusChange, onEditClick, onDelete, onComplete, onViewClick, onPackClick, onShipClick, products, isDeletePending, isCompletePending,
+}: {
+  order: OrderWithAllocation;
   onStatusChange: (id: string, status: string) => void;
   onEditClick: (order: Order) => void;
   onDelete: (order: Order) => void;
   onComplete: (id: string) => void;
   onViewClick: (order: OrderWithAllocation) => void;
+  onPackClick: (order: OrderWithAllocation) => void;
+  onShipClick: (order: OrderWithAllocation) => void;
   products: Product[];
   isDeletePending: boolean;
   isCompletePending: boolean;
@@ -1064,44 +1264,32 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const { canManageOrders } = useRole();
 
+  const isArchivableStatus = order.status === 'shipped' || order.status === 'completed' || order.status === 'cancelled';
+  const isPackable = !isArchivableStatus && order.status !== 'packed';
+  const isShippable = order.status === 'packed';
+
   const allocationBadge = () => {
-    if (order.items.length === 0) {
-      return <Badge className="bg-slate-100 text-slate-600">-</Badge>;
-    }
+    if (order.items.length === 0) return <Badge className="bg-slate-100 text-slate-600">-</Badge>;
     switch (order.allocationStatus) {
+      case 'packed':
+        return <Badge className="bg-green-100 text-green-700 border-green-200"><CheckCircle2 size={12} className="mr-1" /> Packed</Badge>;
+      case 'partially_packed':
+        return <Badge className="bg-blue-100 text-blue-700 border-blue-200"><BoxSelect size={12} className="mr-1" /> Part. Packed</Badge>;
       case 'ready_to_ship':
-        return (
-          <Badge className="bg-green-100 text-green-700 border-green-200">
-            <CheckCircle2 size={12} className="mr-1" /> Ready
-          </Badge>
-        );
+        return <Badge className="bg-green-100 text-green-700 border-green-200"><CheckCircle2 size={12} className="mr-1" /> Stock Available</Badge>;
       case 'partially_allocated':
-        return (
-          <Badge className="bg-amber-100 text-amber-700 border-amber-200">
-            <Clock size={12} className="mr-1" /> Partial
-          </Badge>
-        );
+        return <Badge className="bg-amber-100 text-amber-700 border-amber-200"><Clock size={12} className="mr-1" /> Partial Stock</Badge>;
       default:
-        return (
-          <Badge className="bg-slate-100 text-slate-600 border-slate-200">
-            <AlertCircle size={12} className="mr-1" /> Waiting
-          </Badge>
-        );
+        return <Badge className="bg-slate-100 text-slate-600 border-slate-200"><AlertCircle size={12} className="mr-1" /> Stock Shortage</Badge>;
     }
   };
 
   return (
-    <TableRow 
-      data-testid={`row-order-${order.id}`} 
-      className="cursor-pointer hover:bg-muted/50"
-      onClick={() => onViewClick(order)}
-    >
+    <TableRow data-testid={`row-order-${order.id}`} className="cursor-pointer hover:bg-muted/50" onClick={() => onViewClick(order)}>
       <TableCell className="font-mono font-bold">
         <div className="flex flex-col">
           <span>{order.orderNumber}</span>
-          {order.poNumber && (
-            <span className="text-xs text-muted-foreground font-normal" data-testid={`text-po-number-${order.id}`}>Inv: {order.poNumber}</span>
-          )}
+          {order.poNumber && <span className="text-xs text-muted-foreground font-normal" data-testid={`text-po-number-${order.id}`}>Inv: {order.poNumber}</span>}
         </div>
       </TableCell>
       <TableCell>
@@ -1129,18 +1317,10 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
           {order.items.length === 0 && <span className="text-muted-foreground text-sm italic">No items</span>}
         </div>
       </TableCell>
-      <TableCell className="text-center">
-        {allocationBadge()}
-      </TableCell>
-      <TableCell className="text-center">
-        <PriorityBadge priority={order.priority} />
-      </TableCell>
-      <TableCell className="text-center">
-        <OrderStatusBadge status={order.status} />
-      </TableCell>
-      <TableCell className="text-right font-mono text-sm">
-        {format(new Date(order.dueDate), 'MMM d, yyyy')}
-      </TableCell>
+      <TableCell className="text-center">{allocationBadge()}</TableCell>
+      <TableCell className="text-center"><PriorityBadge priority={order.priority} /></TableCell>
+      <TableCell className="text-center"><OrderStatusBadge status={order.status} /></TableCell>
+      <TableCell className="text-right font-mono text-sm">{format(new Date(order.dueDate), 'MMM d, yyyy')}</TableCell>
       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -1156,43 +1336,51 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
                   <Pencil size={14} className="mr-2" /> Edit Order
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onStatusChange(order.id, 'in_production')}>
-                  <Clock size={14} className="mr-2" /> Start Production
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onStatusChange(order.id, 'ready')}>
-                  <CheckCircle2 size={14} className="mr-2" /> Mark Ready
-                </DropdownMenuItem>
-                {order.status !== 'shipped' && order.status !== 'cancelled' && (() => {
+
+                {isShippable && (
+                  <DropdownMenuItem onClick={() => onShipClick(order)} className="text-blue-600" data-testid={`button-ship-order-${order.id}`}>
+                    <Ship size={14} className="mr-2" /> Ship Order
+                  </DropdownMenuItem>
+                )}
+
+                {isPackable && order.items.length > 0 && (
+                  <DropdownMenuItem onClick={() => onPackClick(order)} className="text-green-600" data-testid={`button-pack-order-${order.id}`}>
+                    <BoxSelect size={14} className="mr-2" />
+                    {order.status === 'partially_packed' ? 'Continue Packing' : order.allocationStatus === 'ready_to_ship' ? 'Pack Order' : 'Partial Pack'}
+                  </DropdownMenuItem>
+                )}
+
+                {!isPackable && !isShippable && order.items.length > 0 && order.status !== 'cancelled' && (() => {
                   const blockerCount = order.testingBlockers?.length ?? 0;
                   const blocked = blockerCount > 0;
                   const blockerLotNumbers = (order.testingBlockers ?? []).map(b => b.lotNumber).join(', ');
-                  const tooltip = order.items.length === 0
-                    ? 'Order must have at least one line item before it can be completed'
-                    : blocked
-                      ? `Testing required before shipping. Blocking lots: ${blockerLotNumbers}`
-                      : undefined;
+                  const tooltip = blocked ? `Testing required. Blocking lots: ${blockerLotNumbers}` : undefined;
                   return (
-                    <DropdownMenuItem
-                      onClick={() => setIsCompleteDialogOpen(true)}
-                      disabled={order.items.length === 0 || blocked}
-                      className="text-green-600"
-                      data-testid={`button-complete-order-${order.id}`}
-                      title={tooltip}
-                    >
-                      <Truck size={14} className="mr-2" /> Complete Order
+                    <DropdownMenuItem onClick={() => setIsCompleteDialogOpen(true)} disabled={blocked} className="text-green-600"
+                      data-testid={`button-complete-order-${order.id}`} title={tooltip}>
+                      <Truck size={14} className="mr-2" /> Complete Order (Legacy)
                       {blocked && <FlaskConical size={12} className="ml-2" />}
                     </DropdownMenuItem>
                   );
                 })()}
+
+                {!isShippable && !isPackable && order.status !== 'cancelled' && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onStatusChange(order.id, 'in_production')}>
+                      <Clock size={14} className="mr-2" /> Start Production
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onStatusChange(order.id, 'ready')}>
+                      <CheckCircle2 size={14} className="mr-2" /> Mark Ready
+                    </DropdownMenuItem>
+                  </>
+                )}
+
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive" onClick={() => onStatusChange(order.id, 'cancelled')}>
                   Cancel Order
                 </DropdownMenuItem>
-                <DropdownMenuItem 
-                  className="text-destructive" 
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                  data-testid={`button-delete-order-${order.id}`}
-                >
+                <DropdownMenuItem className="text-destructive" onClick={() => setIsDeleteDialogOpen(true)} data-testid={`button-delete-order-${order.id}`}>
                   <Trash2 size={14} className="mr-2" /> Delete Order
                 </DropdownMenuItem>
               </>
@@ -1213,8 +1401,8 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
         <ConfirmDialog
           open={isCompleteDialogOpen}
           onOpenChange={setIsCompleteDialogOpen}
-          title="Complete Order"
-          description={`Complete order ${order.orderNumber} for ${order.customerName}? This will mark the order as shipped, deduct stock from inventory for all items, and log stock movements for traceability.`}
+          title="Complete Order (Legacy)"
+          description={`Complete order ${order.orderNumber} for ${order.customerName}? This will mark the order as shipped, deduct stock from inventory, and log stock movements.`}
           confirmLabel="Complete Order"
           variant="overwrite"
           onConfirm={() => { onComplete(order.id); setIsCompleteDialogOpen(false); }}
@@ -1226,8 +1414,10 @@ function OrderRow({ order, onStatusChange, onEditClick, onDelete, onComplete, on
   );
 }
 
-function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDeletePending }: { 
-  order: OrderWithAllocation; 
+// ─── Archived Order Row ───────────────────────────────────────────────────────
+
+function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDeletePending }: {
+  order: OrderWithAllocation;
   onViewClick: (order: OrderWithAllocation) => void;
   onDelete: (order: Order) => void;
   products: Product[];
@@ -1237,32 +1427,17 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDe
   const { canManageOrders } = useRole();
 
   const statusBadge = () => {
-    if (order.status === 'shipped') {
-      return (
-        <Badge className="bg-green-100 text-green-700 border-green-200">
-          <Truck size={12} className="mr-1" /> Shipped
-        </Badge>
-      );
-    }
-    return (
-      <Badge className="bg-red-100 text-red-700 border-red-200">
-        Cancelled
-      </Badge>
-    );
+    if (order.status === 'shipped') return <Badge className="bg-green-100 text-green-700 border-green-200"><Truck size={12} className="mr-1" /> Shipped</Badge>;
+    if (order.status === 'completed') return <Badge className="bg-slate-100 text-slate-700 border-slate-200"><CheckCircle2 size={12} className="mr-1" /> Completed</Badge>;
+    return <Badge className="bg-red-100 text-red-700 border-red-200">Cancelled</Badge>;
   };
 
   return (
-    <TableRow 
-      data-testid={`row-archived-order-${order.id}`} 
-      className="cursor-pointer hover:bg-muted/50"
-      onClick={() => onViewClick(order)}
-    >
+    <TableRow data-testid={`row-archived-order-${order.id}`} className="cursor-pointer hover:bg-muted/50" onClick={() => onViewClick(order)}>
       <TableCell className="font-mono font-bold">
         <div className="flex flex-col">
           <span>{order.orderNumber}</span>
-          {order.poNumber && (
-            <span className="text-xs text-muted-foreground font-normal">Inv: {order.poNumber}</span>
-          )}
+          {order.poNumber && <span className="text-xs text-muted-foreground font-normal">Inv: {order.poNumber}</span>}
         </div>
       </TableCell>
       <TableCell>{order.customerName}</TableCell>
@@ -1280,15 +1455,9 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDe
           {order.items.length === 0 && <span className="text-muted-foreground text-sm italic">No items</span>}
         </div>
       </TableCell>
-      <TableCell className="text-center">
-        {statusBadge()}
-      </TableCell>
-      <TableCell className="text-center">
-        <PriorityBadge priority={order.priority} />
-      </TableCell>
-      <TableCell className="text-right font-mono text-sm">
-        {format(new Date(order.createdAt), 'MMM d, yyyy')}
-      </TableCell>
+      <TableCell className="text-center">{statusBadge()}</TableCell>
+      <TableCell className="text-center"><PriorityBadge priority={order.priority} /></TableCell>
+      <TableCell className="text-right font-mono text-sm">{format(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -1298,17 +1467,11 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDe
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onViewClick(order)}>
-              <Package size={14} className="mr-2" /> View Details
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onViewClick(order)}><Package size={14} className="mr-2" /> View Details</DropdownMenuItem>
             {canManageOrders && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  className="text-destructive" 
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                  data-testid={`button-delete-archived-order-${order.id}`}
-                >
+                <DropdownMenuItem className="text-destructive" onClick={() => setIsDeleteDialogOpen(true)} data-testid={`button-delete-archived-order-${order.id}`}>
                   <Trash2 size={14} className="mr-2" /> Delete Order
                 </DropdownMenuItem>
               </>
@@ -1331,23 +1494,29 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDe
   );
 }
 
+// ─── Shared Components ────────────────────────────────────────────────────────
+
 function OrderStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     pending: "bg-amber-100 text-amber-700 border-amber-200",
     in_production: "bg-blue-100 text-blue-700 border-blue-200",
-    ready: "bg-green-100 text-green-700 border-green-200",
+    ready: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    partially_packed: "bg-blue-100 text-blue-800 border-blue-300",
+    packed: "bg-green-100 text-green-700 border-green-200",
     shipped: "bg-slate-100 text-slate-700 border-slate-200",
+    completed: "bg-slate-100 text-slate-700 border-slate-200",
     cancelled: "bg-red-100 text-red-700 border-red-200",
   };
-
   const labels: Record<string, string> = {
     pending: "Pending",
     in_production: "In Production",
     ready: "Ready",
+    partially_packed: "Part. Packed",
+    packed: "Packed",
     shipped: "Shipped",
+    completed: "Completed",
     cancelled: "Cancelled",
   };
-
   return (
     <Badge variant="outline" className={cn("font-mono uppercase text-[10px]", styles[status])}>
       {labels[status] || status}
@@ -1355,13 +1524,7 @@ function OrderStatusBadge({ status }: { status: string }) {
   );
 }
 
-function CustomerCombobox({
-  customers,
-  customerId,
-  customerName,
-  onSelect,
-  testId,
-}: {
+function CustomerCombobox({ customers, customerId, customerName, onSelect, testId }: {
   customers: Customer[];
   customerId?: string;
   customerName?: string;
@@ -1370,24 +1533,12 @@ function CustomerCombobox({
 }) {
   const [open, setOpen] = useState(false);
   const selected = customers.find(c => c.id === customerId);
-  const label = selected
-    ? `${selected.code} - ${selected.name}`
-    : customerName
-      ? customerName
-      : customers.length === 0
-        ? 'No customers available — add one first'
-        : 'Search customers...';
+  const label = selected ? `${selected.code} - ${selected.name}` : customerName ? customerName : customers.length === 0 ? 'No customers available — add one first' : 'Search customers...';
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          disabled={customers.length === 0}
-          className="w-full justify-between font-normal"
-          data-testid={testId}
-        >
+        <Button variant="outline" role="combobox" aria-expanded={open} disabled={customers.length === 0}
+          className="w-full justify-between font-normal" data-testid={testId}>
           <span className={cn("truncate", !selected && !customerName && "text-muted-foreground")}>{label}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -1399,15 +1550,9 @@ function CustomerCombobox({
             <CommandEmpty>No customer found.</CommandEmpty>
             <CommandGroup>
               {customers.map(customer => (
-                <CommandItem
-                  key={customer.id}
-                  value={`${customer.code} ${customer.name}`}
-                  onSelect={() => {
-                    onSelect(customer.id);
-                    setOpen(false);
-                  }}
-                  data-testid={`${testId}-option-${customer.id}`}
-                >
+                <CommandItem key={customer.id} value={`${customer.code} ${customer.name}`}
+                  onSelect={() => { onSelect(customer.id); setOpen(false); }}
+                  data-testid={`${testId}-option-${customer.id}`}>
                   <Check className={cn("mr-2 h-4 w-4", customerId === customer.id ? "opacity-100" : "opacity-0")} />
                   <span className="font-mono text-xs text-muted-foreground mr-2">{customer.code}</span>
                   {customer.name}
@@ -1422,13 +1567,7 @@ function CustomerCombobox({
 }
 
 function SortableHead<K extends string>({
-  children,
-  className,
-  align = 'left',
-  sort,
-  sortKey,
-  onToggle,
-  testId,
+  children, className, align = 'left', sort, sortKey, onToggle, testId,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -1442,17 +1581,13 @@ function SortableHead<K extends string>({
   const Icon = active ? (sort.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown;
   return (
     <TableHead className={className}>
-      <button
-        type="button"
-        onClick={() => onToggle(sortKey)}
-        className={cn(
-          "inline-flex items-center gap-1 hover:text-foreground transition-colors select-none",
+      <button type="button" onClick={() => onToggle(sortKey)}
+        className={cn("inline-flex items-center gap-1 hover:text-foreground transition-colors select-none",
           active ? "text-foreground font-semibold" : "text-muted-foreground",
           align === 'right' && "ml-auto justify-end w-full",
           align === 'center' && "mx-auto justify-center w-full",
         )}
-        data-testid={testId}
-      >
+        data-testid={testId}>
         {children}
         <Icon className={cn("h-3 w-3", !active && "opacity-50")} />
       </button>
@@ -1467,14 +1602,7 @@ function PriorityBadge({ priority }: { priority: string }) {
     high: "bg-orange-50 text-orange-700 border-orange-200",
     urgent: "bg-red-50 text-red-700 border-red-200",
   };
-
-  const labels: Record<string, string> = {
-    low: "Low",
-    normal: "Normal",
-    high: "High",
-    urgent: "Urgent",
-  };
-
+  const labels: Record<string, string> = { low: "Low", normal: "Normal", high: "High", urgent: "Urgent" };
   return (
     <Badge variant="outline" className={cn("font-mono uppercase text-[10px]", styles[priority])}>
       {labels[priority] || priority}
