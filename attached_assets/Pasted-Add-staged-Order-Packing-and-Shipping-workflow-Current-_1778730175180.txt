@@ -1,0 +1,136 @@
+Add staged Order Packing and Shipping workflow.
+
+Current issue:
+Orders currently show whether product is in stock, but they do not let users choose which actual batches/lots are used to fulfil the order. The system also moves too directly toward completion. We need an order workflow with clear stages: created → stock checked → packed → shipped/completed.
+
+Goal:
+Creating the order should remain simple. After opening an order, the system should show whether the order can be packed, what is missing if it cannot, and provide the correct next action buttons.
+
+Requirements:
+
+1. Order creation remains simple
+- User creates an order by selecting customer, due date, products, and quantities.
+- Do not require batch/lot selection during order creation.
+- Do not automatically pick lots/batches during order creation.
+
+2. Stock availability check on order detail
+- When viewing an order, calculate whether all order items are currently in stock.
+- For each item show:
+  - required quantity
+  - available quantity
+  - missing quantity, if any
+- If everything is available, show status/label: Stock Available.
+- If not everything is available, show: Stock Shortage.
+- Clearly show which products are short.
+
+3. Replace Complete Order button with stage-based actions
+- Do not show “Complete Order” immediately on newly created orders.
+- If order has stock available, show:
+  - Pack Order
+- If order has shortages, show:
+  - Partial Pack Order
+  - View Missing Stock
+- Once fully packed, show:
+  - Ship Order
+- Once shipped, allow:
+  - Mark Completed, if separate from shipping
+  - or mark as Completed automatically if that is the existing workflow
+
+4. Pack Order workflow
+- Add Pack Order button/modal/page.
+- For each order item, show required quantity.
+- Show available lots/batches for that product only.
+- Only show lots where:
+  - status = active
+  - remainingQuantity > 0
+- Display:
+  - lot/batch number
+  - remaining quantity
+  - expiry date if available
+  - status
+- Allow the user to allocate quantities from one or more lots.
+- Support partial packing.
+- Add “Suggest FIFO” button to auto-select oldest/earliest expiry lots first.
+- Do not allow allocating more than available remainingQuantity.
+
+5. Missing stock handling
+- If there is not enough stock to fulfil the full order:
+  - show missing quantities per product
+  - still allow partial packing
+  - keep order status as Partially Packed or Stock Shortage
+- Do not allow Ready for Delivery unless all required quantities have been allocated.
+
+6. Order item allocation persistence
+Create order_item_allocations table if it does not already exist:
+- id
+- orderId
+- orderItemId
+- productId
+- lotId
+- quantityAllocated
+- packedBy
+- packedAt
+- createdAt
+
+This table must preserve traceability:
+order → order item → product → lot/batch.
+
+7. Stock behaviour
+- When packing/allocating, reserve or deduct allocated quantity from selected lots.
+- Do not allocate from consumed, quarantined, expired, or zero-stock lots.
+- If a lot reaches 0, mark it consumed.
+- Ensure stock cannot go negative.
+
+8. Shipping workflow
+- Add Ship Order button once order is fully packed.
+- Shipping should move the order to Shipped or Completed depending on existing status model.
+- Capture shipping/freight info if available:
+  - freight provider
+  - tracking/reference number if simple
+  - shipped date/time
+- Do not allow shipping if order is not fully packed.
+
+9. Order statuses
+Use or map to statuses like:
+- Pending
+- Stock Available
+- Stock Shortage
+- Partially Packed
+- Ready for Delivery
+- Shipped
+- Completed
+- Cancelled
+
+Keep existing statuses if needed, but make the UI labels clear.
+
+10. UI updates
+- On order list/detail show:
+  - stock availability
+  - packing status
+  - missing quantities
+  - allocated lots/batches
+  - next action button based on current stage
+- Replace vague “In Stock” wording with clearer labels:
+  - Stock Available
+  - Needs Packing
+  - Partially Packed
+  - Ready for Delivery
+  - Shipped
+
+11. Reporting preparation
+- Store enough structured data so future reports can show:
+  - orders packed
+  - orders partially packed
+  - shipped orders
+  - product/batch usage by customer
+  - shortages/missing stock
+
+12. Keep scope controlled
+- Do not redesign the whole orders module.
+- Do not break order create/edit.
+- Keep the workflow simple and production-floor friendly.
+
+After implementation:
+- Run npm run check
+- Run npm run build
+- Fix all errors before finishing.
