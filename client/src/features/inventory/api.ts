@@ -110,10 +110,23 @@ export interface StockMovement {
   createdAt: string;
 }
 
-export function useLots() {
+export function useLots(opts?: { currentOnly?: boolean; productId?: string; materialId?: string }) {
+  const params = new URLSearchParams();
+  if (opts?.currentOnly) params.set('currentOnly', 'true');
+  if (opts?.productId) params.set('productId', opts.productId);
+  if (opts?.materialId) params.set('materialId', opts.materialId);
+  const qs = params.toString();
   return useQuery<Lot[]>({
-    queryKey: ["lots"],
-    queryFn: () => fetchApi("/lots"),
+    queryKey: ["lots", opts],
+    queryFn: () => fetchApi(`/lots${qs ? `?${qs}` : ''}`),
+  });
+}
+
+export function useAvailableProductLots(productId: string | undefined) {
+  return useQuery<Lot[]>({
+    queryKey: ["lots", "product", productId],
+    queryFn: () => fetchApi<Lot[]>(`/products/${productId}/lots`),
+    enabled: !!productId,
   });
 }
 

@@ -30,7 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  useBatches, useBatch, useProducts, useRecipes, useMaterials, useLots, useCategories,
+  useBatches, useBatch, useProducts, useRecipes, useMaterials, useLots, useCategories, useAvailableProductLots,
   useUpdateBatch, useCreateBatch, useDeleteBatch,
   useBatchMaterials, useRecordBatchInput, useRemoveBatchMaterial, useUpdateBatchMaterial,
   useBatchOutputs, useBatchOutputLots, useAddBatchOutput, useRemoveBatchOutput, useUpdateBatchOutput, useFinalizeBatch, useMarkBarcodePrinted, useMarkBatchBarcodePrinted, useRegenerateOutputLots,
@@ -118,6 +118,7 @@ export default function Production() {
   const [createProductSearchOpen, setCreateProductSearchOpen] = useState(false);
   const [createBatchCategoryFilter, setCreateBatchCategoryFilter] = useState<string>('all');
   const [inputProductCategoryFilter, setInputProductCategoryFilter] = useState<string>('all');
+  const [selectedSourceLotId, setSelectedSourceLotId] = useState<string>('');
   
   const { canManageBatches } = useRole();
 
@@ -131,6 +132,9 @@ export default function Production() {
   const createBatch = useCreateBatch();
   const deleteBatch = useDeleteBatch();
   const recordBatchInput = useRecordBatchInput();
+  const { data: availableProductLots = [] } = useAvailableProductLots(
+    recordInputForm.inputType === 'product' ? recordInputForm.productId || undefined : undefined
+  );
   const { toast } = useToast();
 
   // Group products by category for dropdown display (only categories visible in production batch form)
@@ -246,6 +250,7 @@ export default function Production() {
     setScannedLot(null);
     setBarcodeError('');
     setInputProductCategoryFilter('all');
+    setSelectedSourceLotId('');
     setIsRecordInputOpen(true);
   };
 
@@ -340,6 +345,10 @@ export default function Production() {
       toast({ title: "Missing product", description: "Please select a product", variant: "destructive" });
       return;
     }
+    if (inputType === 'product' && !selectedSourceLotId) {
+      toast({ title: "No lot selected", description: "Please select the source lot for this product input.", variant: "destructive" });
+      return;
+    }
     if (inputType === 'product' && productId) {
       const inputProduct = products.find(p => p.id === productId);
       if (inputProduct?.categoryId) {
@@ -371,10 +380,12 @@ export default function Production() {
           batchId: selectedBatch.id,
           productId,
           quantity,
+          sourceLotId: selectedSourceLotId || undefined,
         });
         toast({ title: "Input recorded", description: "Product has been added to batch and deducted from inventory" });
       }
       setRecordInputForm({ inputType: 'material', materialId: '', productId: '', quantity: '', lotId: '' });
+      setSelectedSourceLotId('');
       setBarcodeInput('');
       setScannedLot(null);
       setBarcodeError('');
@@ -821,6 +832,7 @@ export default function Production() {
                     setBarcodeInput('');
                     setScannedLot(null);
                     setBarcodeError('');
+                    setSelectedSourceLotId('');
                   }}
                   data-testid="button-input-type-material"
                 >
@@ -835,6 +847,7 @@ export default function Production() {
                     setBarcodeInput('');
                     setScannedLot(null);
                     setBarcodeError('');
+                    setSelectedSourceLotId('');
                   }}
                   data-testid="button-input-type-product"
                 >
@@ -962,6 +975,7 @@ export default function Production() {
                                   value={`${product.sku} ${product.name}`}
                                   onSelect={() => {
                                     setRecordInputForm({ ...recordInputForm, productId: product.id });
+                                    setSelectedSourceLotId('');
                                     setInputProductSearchOpen(false);
                                   }}
                                 >
@@ -983,6 +997,7 @@ export default function Production() {
                                   value={`Uncategorized ${product.sku} ${product.name}`}
                                   onSelect={() => {
                                     setRecordInputForm({ ...recordInputForm, productId: product.id });
+                                    setSelectedSourceLotId('');
                                     setInputProductSearchOpen(false);
                                   }}
                                 >
@@ -1001,6 +1016,38 @@ export default function Production() {
                   <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
                     Available: <span className="font-mono font-medium">{products.find(p => p.id === recordInputForm.productId)?.currentStock || '0'} {products.find(p => p.id === recordInputForm.productId)?.unit || ''}</span>
                     <p className="text-xs mt-1">This product will be tracked for full chain traceability.</p>
+                  </div>
+                )}
+                {recordInputForm.productId && (
+                  <div className="space-y-1.5 pt-1">
+                    <Label htmlFor="select-source-lot">Source Lot *</Label>
+                    <Select
+                      value={selectedSourceLotId}
+                      onValueChange={setSelectedSourceLotId}
+                    >
+                      <SelectTrigger id="select-source-lot" data-testid="select-source-lot">
+                        <SelectValue placeholder={availableProductLots.length === 0 ? 'No active lots available' : 'Select a lot…'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableProductLots.length === 0 ? (
+                          <SelectItem value="__none" disabled>No active lots with stock</SelectItem>
+                        ) : (
+                          availableProductLots.map(lot => (
+                            <SelectItem key={lot.id} value={lot.id} data-testid={`option-source-lot-${lot.id}`}>
+                              {lot.lotNumber} — {parseFloat(lot.remainingQuantity || '0').toFixed(2)} {products.find(p => p.id === recordInputForm.productId)?.unit || ''}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {selectedSourceLotId && (() => {
+                      const sl = availableProductLots.find(l => l.id === selectedSourceLotId);
+                      return sl ? (
+                        <p className="text-xs text-muted-foreground">
+                          Available in lot: <span className="font-mono font-medium">{parseFloat(sl.remainingQuantity || '0').toFixed(2)}</span>
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
                 )}
               </div>
@@ -1025,7 +1072,7 @@ export default function Production() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsRecordInputOpen(false); setBarcodeInput(''); setScannedLot(null); setBarcodeError(''); setInputProductCategoryFilter('all'); }}>Close</Button>
+            <Button variant="outline" onClick={() => { setIsRecordInputOpen(false); setBarcodeInput(''); setScannedLot(null); setBarcodeError(''); setInputProductCategoryFilter('all'); setSelectedSourceLotId(''); }}>Close</Button>
             <Button onClick={handleRecordInput} disabled={recordBatchInput.isPending} data-testid="button-add-input">
               {recordBatchInput.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add to Batch

@@ -110,8 +110,11 @@ inventoryRouter.get("/lots/:id", asyncHandler(async (req, res) => {
   res.json(lot);
 }));
 
-inventoryRouter.get("/lots", asyncHandler(async (_req, res) => {
-  res.json(await svc.getLots());
+inventoryRouter.get("/lots", asyncHandler(async (req, res) => {
+  const currentOnly = req.query.currentOnly === 'true';
+  const productId = req.query.productId as string | undefined;
+  const materialId = req.query.materialId as string | undefined;
+  res.json(await svc.getLots({ currentOnly, productId, materialId }));
 }));
 
 inventoryRouter.post("/lots", inventoryOrAdmin, asyncHandler(async (req, res) => {
@@ -135,11 +138,13 @@ inventoryRouter.delete("/lots/:id", inventoryOrAdmin, asyncHandler(async (req, r
 }));
 
 inventoryRouter.get("/materials/:id/lots", asyncHandler(async (req, res) => {
-  res.json(await svc.getLotsByMaterial(req.params.id));
+  const includeHistorical = req.query.includeHistorical === 'true';
+  res.json(await svc.getLotsByMaterial(req.params.id, { includeHistorical }));
 }));
 
 inventoryRouter.get("/products/:id/lots", asyncHandler(async (req, res) => {
-  res.json(await svc.getLotsByProduct(req.params.id));
+  const includeHistorical = req.query.includeHistorical === 'true';
+  res.json(await svc.getLotsByProduct(req.params.id, { includeHistorical }));
 }));
 
 inventoryRouter.post("/receive-stock", inventoryOrAdmin, asyncHandler(async (req, res) => {

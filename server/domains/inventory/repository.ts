@@ -1,4 +1,4 @@
-import { eq, and, desc, or, isNotNull } from "drizzle-orm";
+import { eq, and, desc, or, isNotNull, gt, sql } from "drizzle-orm";
 import { db } from "../../db";
 import {
   lots, stockMovements, auditLogs, materials, products, batchMaterials, batches,
@@ -55,7 +55,17 @@ export type BatchOutputLotEntry = {
 };
 
 export const inventoryRepository = {
-  async getLots(): Promise<Lot[]> {
+  async getLots(opts?: { currentOnly?: boolean; productId?: string; materialId?: string }): Promise<Lot[]> {
+    const conditions = [];
+    if (opts?.currentOnly) {
+      conditions.push(eq(lots.status, 'active'));
+      conditions.push(gt(sql`cast(${lots.remainingQuantity} as numeric)`, sql`0`));
+    }
+    if (opts?.productId) conditions.push(eq(lots.productId, opts.productId));
+    if (opts?.materialId) conditions.push(eq(lots.materialId, opts.materialId));
+    if (conditions.length > 0) {
+      return db.select().from(lots).where(and(...conditions)).orderBy(desc(lots.createdAt));
+    }
     return db.select().from(lots).orderBy(desc(lots.createdAt));
   },
 
@@ -64,12 +74,22 @@ export const inventoryRepository = {
     return row;
   },
 
-  async getLotsByMaterial(materialId: string): Promise<Lot[]> {
-    return db.select().from(lots).where(eq(lots.materialId, materialId)).orderBy(desc(lots.createdAt));
+  async getLotsByMaterial(materialId: string, opts?: { includeHistorical?: boolean }): Promise<Lot[]> {
+    const conditions = [eq(lots.materialId, materialId)];
+    if (!opts?.includeHistorical) {
+      conditions.push(eq(lots.status, 'active'));
+      conditions.push(gt(sql`cast(${lots.remainingQuantity} as numeric)`, sql`0`));
+    }
+    return db.select().from(lots).where(and(...conditions)).orderBy(desc(lots.createdAt));
   },
 
-  async getLotsByProduct(productId: string): Promise<Lot[]> {
-    return db.select().from(lots).where(eq(lots.productId, productId)).orderBy(desc(lots.createdAt));
+  async getLotsByProduct(productId: string, opts?: { includeHistorical?: boolean }): Promise<Lot[]> {
+    const conditions = [eq(lots.productId, productId)];
+    if (!opts?.includeHistorical) {
+      conditions.push(eq(lots.status, 'active'));
+      conditions.push(gt(sql`cast(${lots.remainingQuantity} as numeric)`, sql`0`));
+    }
+    return db.select().from(lots).where(and(...conditions)).orderBy(desc(lots.createdAt));
   },
 
   async getLotByBarcode(query: string): Promise<Lot | undefined> {

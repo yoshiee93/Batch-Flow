@@ -109,6 +109,7 @@ export default function Inventory() {
   const [activeTab, setActiveTab] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [lotSearchTerm, setLotSearchTerm] = useState('');
+  const [showHistoricalLots, setShowHistoricalLots] = useState(false);
   const [cardFilter, setCardFilter] = useState<CardFilter>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('filter') === 'lowstock' ? 'lowstock' : 'all';
@@ -239,7 +240,7 @@ export default function Inventory() {
   const { data: materials = [], isLoading: materialsLoading, isError: materialsError } = useMaterials();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProducts();
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
-  const { data: lots = [], isLoading: lotsLoading } = useLots();
+  const { data: lots = [], isLoading: lotsLoading } = useLots({ currentOnly: !showHistoricalLots });
   const { data: batches = [] } = useBatches();
   const { data: receivableItems = [] } = useReceivableItems();
 
@@ -983,15 +984,25 @@ export default function Inventory() {
         </TabsContent>
 
         <TabsContent value="lots" className="space-y-4">
-          <div className="flex items-center space-x-2 bg-card p-2 rounded-md border max-w-md">
-            <Search className="w-4 h-4 text-muted-foreground ml-2" />
-            <Input
-              placeholder="Search lots by number, barcode, or source..."
-              className="border-none shadow-none focus-visible:ring-0"
-              value={lotSearchTerm}
-              onChange={(e) => setLotSearchTerm(e.target.value)}
-              data-testid="input-search-lots"
-            />
+          <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+            <div className="flex items-center space-x-2 bg-card p-2 rounded-md border flex-1 max-w-md">
+              <Search className="w-4 h-4 text-muted-foreground ml-2" />
+              <Input
+                placeholder="Search lots by number, barcode, or source..."
+                className="border-none shadow-none focus-visible:ring-0"
+                value={lotSearchTerm}
+                onChange={(e) => setLotSearchTerm(e.target.value)}
+                data-testid="input-search-lots"
+              />
+            </div>
+            <Button
+              variant={showHistoricalLots ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowHistoricalLots(v => !v)}
+              data-testid="button-toggle-historical-lots"
+            >
+              {showHistoricalLots ? 'Showing All Lots' : 'Show All Lots'}
+            </Button>
           </div>
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">

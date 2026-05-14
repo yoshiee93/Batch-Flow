@@ -32,10 +32,10 @@ export type ReceiveStockInput = {
 };
 
 export const inventoryService = {
-  getLots: repo.getLots.bind(repo),
+  getLots: (opts?: { currentOnly?: boolean; productId?: string; materialId?: string }) => repo.getLots(opts),
   getLot: repo.getLot.bind(repo),
-  getLotsByMaterial: repo.getLotsByMaterial.bind(repo),
-  getLotsByProduct: repo.getLotsByProduct.bind(repo),
+  getLotsByMaterial: (materialId: string, opts?: { includeHistorical?: boolean }) => repo.getLotsByMaterial(materialId, opts),
+  getLotsByProduct: (productId: string, opts?: { includeHistorical?: boolean }) => repo.getLotsByProduct(productId, opts),
   getLotByBarcode: repo.getLotByBarcode.bind(repo),
   getLotUsage: repo.getLotUsage.bind(repo),
   getBatchInputLots: repo.getBatchInputLots.bind(repo),
