@@ -1310,7 +1310,7 @@ function OrderRow({
       </TableCell>
       <TableCell>
         <div className="space-y-1">
-          {order.items.map((item) => {
+          {order.items.slice(0, 3).map((item) => {
             const product = products.find(p => p.id === item.productId);
             const allocated = parseFloat(item.reservedQuantity);
             const needed = parseFloat(item.quantity);
@@ -1320,6 +1320,9 @@ function OrderRow({
               </div>
             );
           })}
+          {order.items.length > 3 && (
+            <div className="text-xs text-muted-foreground">+{order.items.length - 3} more</div>
+          )}
           {order.items.length === 0 && <span className="text-muted-foreground text-sm italic">No items</span>}
         </div>
       </TableCell>
@@ -1449,7 +1452,7 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDe
       <TableCell>{order.customerName}</TableCell>
       <TableCell>
         <div className="space-y-1">
-          {order.items.map((item) => {
+          {order.items.slice(0, 3).map((item) => {
             const product = products.find(p => p.id === item.productId);
             const quantity = parseFloat(item.quantity);
             return (
@@ -1458,6 +1461,9 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDe
               </div>
             );
           })}
+          {order.items.length > 3 && (
+            <div className="text-xs text-muted-foreground">+{order.items.length - 3} more</div>
+          )}
           {order.items.length === 0 && <span className="text-muted-foreground text-sm italic">No items</span>}
         </div>
       </TableCell>
@@ -1599,7 +1605,9 @@ function ViewStockCheckPanel({
           const shortfall = checkItem?.shortfall ?? 0;
           const unit = checkItem?.unit ?? product?.unit ?? '';
 
-          const stockStatus = shortfall === 0 ? 'ready' : available > 0 ? 'partial' : 'waiting';
+          const stockStatus = checkItem
+            ? (shortfall === 0 ? 'ready' : available > 0 ? 'partial' : 'waiting')
+            : null;
 
           return (
             <div key={item.id} className="border rounded-lg overflow-hidden">
