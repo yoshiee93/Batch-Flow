@@ -215,6 +215,7 @@ export function useCreateOrder() {
     mutationFn: (data: Partial<Order>) => fetchApi<Order>("/orders", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithAllocation"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
   });
@@ -227,6 +228,7 @@ export function useUpdateOrder() {
       fetchApi<Order>(`/orders/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithAllocation"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
   });
@@ -307,6 +309,7 @@ export function useDeleteOrder() {
     mutationFn: (id: string) => fetchApi(`/orders/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithAllocation"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
   });
@@ -320,6 +323,7 @@ export function useCreateOrderItem() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orderItems"] });
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithAllocation"] });
     },
   });
 }
@@ -331,6 +335,7 @@ export function useDeleteOrderItem() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orderItems"] });
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithAllocation"] });
     },
   });
 }

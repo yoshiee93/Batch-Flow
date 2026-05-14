@@ -789,6 +789,18 @@ function PackOrderDialog({
     }
   };
 
+  const [lotSearch, setLotSearch] = useState('');
+  const lotSearchRef = useRef<HTMLInputElement>(null);
+
+  // Reset search when dialog opens/closes
+  useEffect(() => {
+    if (open) {
+      setLotSearch('');
+      // Auto-focus after the dialog finishes opening
+      setTimeout(() => lotSearchRef.current?.focus(), 100);
+    }
+  }, [open]);
+
   const allItemsMeetRequirement = stockCheck?.items.every(item => getTotalAllocated(item) >= item.required - 0.001) ?? false;
   const hasAnyAllocation = Object.values(allocations).some(lots => Object.values(lots).some(v => parseFloat(v) > 0));
 
@@ -811,6 +823,29 @@ function PackOrderDialog({
 
         {stockCheck && !isLoading && (
           <div className="space-y-4 py-2">
+            {/* Lot search / barcode scanner slot */}
+            <div className="flex items-center gap-2 border rounded-md px-3 py-1.5 bg-background">
+              <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <input
+                ref={lotSearchRef}
+                type="text"
+                placeholder="Search or scan lot number…"
+                value={lotSearch}
+                onChange={(e) => setLotSearch(e.target.value)}
+                className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+                data-testid="input-pack-lot-search"
+              />
+              {lotSearch && (
+                <button
+                  onClick={() => { setLotSearch(''); lotSearchRef.current?.focus(); }}
+                  className="text-muted-foreground hover:text-foreground text-xs"
+                  data-testid="button-clear-lot-search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
             {/* Overall availability banner */}
             <div className={cn(
               "rounded-md p-3 text-sm flex items-center gap-2",
@@ -832,6 +867,14 @@ function PackOrderDialog({
               const totalAllocated = getTotalAllocated(item);
               const isFullyAllocated = totalAllocated >= item.required - 0.001;
               const itemAllocs = allocations[item.orderItemId] ?? {};
+
+              const visibleLots = lotSearch.trim()
+                ? item.availableLots.filter(lot =>
+                    lot.lotNumber.toLowerCase().includes(lotSearch.trim().toLowerCase())
+                  )
+                : item.availableLots;
+
+              if (lotSearch.trim() && visibleLots.length === 0) return null;
 
               return (
                 <div key={item.orderItemId} className="border rounded-lg overflow-hidden" data-testid={`pack-item-${item.orderItemId}`}>
@@ -857,7 +900,7 @@ function PackOrderDialog({
                     <div className="p-3 text-sm text-muted-foreground italic">No available lots for this product.</div>
                   ) : (
                     <div className="divide-y">
-                      {item.availableLots.map((lot) => (
+                      {visibleLots.map((lot) => (
                         <div key={lot.lotId} className="flex items-center gap-3 px-3 py-2 text-sm" data-testid={`pack-lot-${lot.lotId}`}>
                           <div className="flex-1 min-w-0">
                             <span className="font-mono font-medium">{lot.lotNumber}</span>
