@@ -1678,7 +1678,6 @@ function BatchOutputsEditor({
   const recordPrint = useRecordPrint();
   const { data: batchData } = useBatch(batchId);
   const { isAdmin } = useRole();
-  const [showAdvancedAddOutput, setShowAdvancedAddOutput] = useState(false);
   
   useEffect(() => {
     finalizeForm.reset({
@@ -1694,6 +1693,10 @@ function BatchOutputsEditor({
     setMarkCompleted(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchId, initialWaste, initialMilling, initialWet, initialCleaningTime, initialNumberOfStaff, initialFinishTime, initialProductAssessment]);
+
+  useEffect(() => {
+    setNewOutputForm(f => ({ ...f, productId: batchData?.productId ?? '' }));
+  }, [batchId, batchData?.productId]);
   
   const { data: outputs = [], isLoading } = useBatchOutputs(batchId);
   const { data: outputLots = [], isLoading: outputLotsLoading } = useBatchOutputLots(batchId, { enabled: isCompleted });
@@ -1913,25 +1916,12 @@ function BatchOutputsEditor({
   
   return (
     <div className="space-y-4 py-2">
-      {/* Add Product Output — admin-only advanced affordance (collapsed by default) */}
+      {/* Add Product Output — admin-only */}
       {isAdmin && (
       <div className="space-y-3 pb-4 border-b" data-testid="section-add-output">
         <div className="flex items-center justify-between gap-2">
           <h4 className="font-medium text-sm">Add Product Output</h4>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="text-xs h-7"
-            onClick={() => setShowAdvancedAddOutput(v => !v)}
-            data-testid="button-toggle-advanced-add-output"
-          >
-            {showAdvancedAddOutput ? 'Hide advanced' : 'Show advanced'}
-          </Button>
         </div>
-        {showAdvancedAddOutput && (
-        <>
-        <p className="text-xs text-muted-foreground">Advanced — adding outputs outside the normal Finalize flow.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="output-product">Product</Label>
@@ -2007,8 +1997,6 @@ function BatchOutputsEditor({
             </div>
           </div>
         </div>
-        </>
-        )}
       </div>
       )}
 
