@@ -7,15 +7,19 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   Search, ArrowRight, ArrowLeft, Box, Factory, Loader2, AlertCircle,
-  Barcode, Printer, Package, ChevronRight
+  Barcode, Printer, Package, ChevronRight, Truck, FlaskConical,
 } from 'lucide-react';
 import {
-  useLots, useBatches, useBatch, useMaterials, useProducts,
+  useLots, useBatches, useBatch, useMaterials, useProducts, useOrders,
   useTraceabilityForward, useTraceabilityBackward,
   fetchLotByBarcode, fetchBatchByBarcode,
   useBatchOutputLots, useMarkBatchBarcodePrinted, useMarkBarcodePrinted,
 } from '@/lib/api';
-import type { ForwardTraceResponse, BackwardTraceResponse } from '@/features/traceability/api';
+import {
+  useOrderTraceability,
+  type ForwardTraceResponse, type BackwardTraceResponse,
+  type OrderProvenanceResult,
+} from '@/features/traceability/api';
 import type { OutputLot } from '@/features/inventory/api';
 import { useRecordPrint } from '@/features/labels/api';
 import { printAndRecord } from '@/lib/printAndRecord';
@@ -23,16 +27,17 @@ import { useToast } from '@/hooks/use-toast';
 
 type Candidate =
   | { type: 'lot'; id: string; label: string; sublabel?: string }
-  | { type: 'batch'; id: string; label: string; sublabel?: string };
+  | { type: 'batch'; id: string; label: string; sublabel?: string }
+  | { type: 'order'; id: string; label: string; sublabel?: string };
 
 export default function Traceability() {
   const search = useSearch();
   const params = new URLSearchParams(search);
-  const initialQuery = params.get('batch') || params.get('lot') || '';
+  const initialQuery = params.get('batch') || params.get('lot') || params.get('order') || '';
 
   const [query, setQuery] = useState(initialQuery);
   const [activeQuery, setActiveQuery] = useState('');
-  const [searchId, setSearchId] = useState<{ type: 'lot' | 'batch'; id: string } | null>(null);
+  const [searchId, setSearchId] = useState<{ type: 'lot' | 'batch' | 'order'; id: string } | null>(null);
   const [barcodeError, setBarcodeError] = useState('');
   const [isBarcodeLookup, setIsBarcodeLookup] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -42,6 +47,7 @@ export default function Traceability() {
   const { data: batches = [] } = useBatches();
   const { data: materials = [] } = useMaterials();
   const { data: products = [] } = useProducts();
+  const { data: orders = [] } = useOrders();
 
   const { data: forwardTrace, isLoading: forwardLoading, isError: forwardError } = useTraceabilityForward(
     searchId?.type === 'lot' ? searchId.id : ''
@@ -51,7 +57,10 @@ export default function Traceability() {
     searchId?.type === 'batch' ? searchId.id : ''
   );
 
-  // Auto-focus input on mount for scanner workflows
+  const { data: orderTrace, isLoading: orderLoading, isError: orderError } = useOrderTraceability(
+    searchId?.type === 'order' ? searchId.id : ''
+  );
+
   useEffect(() => {
     if (!initialQuery) {
       inputRef.current?.focus();
@@ -73,6 +82,9 @@ export default function Traceability() {
       (l.supplierLot?.toLowerCase().includes(lower))
     );
     const matchingBatches = batches.filter(b => b.batchNumber.toLowerCase().includes(lower));
+    const matchingOrders = orders.filter(o =>
+      o.orderNumber.toLowerCase().includes(lower)
+    );
 
     const allCandidates: Candidate[] = [
       ...matchingLots.map(l => ({
@@ -86,6 +98,12 @@ export default function Traceability() {
         id: b.id,
         label: b.batchNumber,
         sublabel: `Batch · ${b.status.replace('_', ' ')}`,
+      })),
+      ...matchingOrders.map(o => ({
+        type: 'order' as const,
+        id: o.id,
+        label: o.orderNumber,
+        sublabel: `Order · ${o.customerName} · ${o.status.replace(/_/g, ' ')}`,
       })),
     ];
 
@@ -125,19 +143,19 @@ export default function Traceability() {
     if (initialQuery && lots.length > 0) {
       resolveQuery(initialQuery);
     }
-  }, [initialQuery, lots.length, batches.length]);
+  }, [initialQuery, lots.length, batches.length, orders.length]);
 
   const handleTrace = () => resolveQuery(query);
 
-  const isLoading = forwardLoading || backwardLoading || isBarcodeLookup;
-  const hasError = forwardError || backwardError;
+  const isLoading = forwardLoading || backwardLoading || orderLoading || isBarcodeLookup;
+  const hasError = forwardError || backwardError || orderError;
 
   return (
     <div className="space-y-6">
       <div className="max-w-2xl mx-auto text-center space-y-4">
         <div>
           <h1 className="text-3xl font-bold font-mono" data-testid="text-traceability-title">Track & Trace</h1>
-          <p className="text-muted-foreground mt-1">Search by lot number, barcode, supplier lot, or batch number to trace stock movement.</p>
+          <p className="text-muted-foreground mt-1">Search by lot number, barcode, supplier lot, batch number, or order number to trace stock movement.</p>
         </div>
 
         <div className="flex gap-2 max-w-lg mx-auto">
@@ -145,7 +163,7 @@ export default function Traceability() {
             <Barcode className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               ref={inputRef}
-              placeholder="Scan or type: lot number, barcode, supplier lot, or batch…"
+              placeholder="Scan or type: lot, barcode, batch, or order number…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="font-mono pl-9"
@@ -161,7 +179,7 @@ export default function Traceability() {
         </div>
 
         <div className="text-xs text-muted-foreground space-y-1">
-          <p>Supports: lot numbers · barcode values · supplier lot IDs · batch numbers</p>
+          <p>Supports: lot numbers · barcode values · supplier lot IDs · batch numbers · order numbers</p>
           {(lots[0] || batches[0]) && (
             <div className="flex justify-center gap-3 flex-wrap">
               {lots[0] && (
@@ -220,14 +238,16 @@ export default function Traceability() {
                     onClick={() => selectCandidate(c)}
                   >
                     <div className="flex items-center gap-3">
-                      {c.type === 'lot' ? <Box className="h-4 w-4 text-muted-foreground shrink-0" /> : <Factory className="h-4 w-4 text-muted-foreground shrink-0" />}
+                      {c.type === 'lot' && <Box className="h-4 w-4 text-muted-foreground shrink-0" />}
+                      {c.type === 'batch' && <Factory className="h-4 w-4 text-muted-foreground shrink-0" />}
+                      {c.type === 'order' && <Truck className="h-4 w-4 text-muted-foreground shrink-0" />}
                       <div>
                         <div className="font-mono font-medium text-sm">{c.label}</div>
                         {c.sublabel && <div className="text-xs text-muted-foreground">{c.sublabel}</div>}
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-xs shrink-0">
-                      {c.type === 'lot' ? 'Lot' : 'Batch'}
+                    <Badge variant="outline" className="text-xs shrink-0 capitalize">
+                      {c.type}
                     </Badge>
                   </button>
                 ))}
@@ -245,12 +265,16 @@ export default function Traceability() {
         <BackwardTraceView trace={backwardTrace} batchId={searchId.id} />
       )}
 
+      {orderTrace && searchId?.type === 'order' && !hasError && candidates.length === 0 && (
+        <OrderProvenanceView trace={orderTrace} />
+      )}
+
       {!isLoading && !hasError && searchId === null && barcodeError && candidates.length === 0 && (
         <div className="text-center py-12 space-y-3">
           <AlertCircle className="h-10 w-10 text-muted-foreground mx-auto" />
           <p className="font-medium">No results found for <span className="font-mono">"{barcodeError}"</span></p>
           <p className="text-sm text-muted-foreground">
-            Try a lot number (RM-YYMMDD-0001), a barcode value (BC1234), a supplier lot reference, or a batch number.
+            Try a lot number, barcode value, supplier lot reference, batch number, or order number.
           </p>
           <Button variant="outline" size="sm" onClick={() => { setBarcodeError(''); setQuery(''); inputRef.current?.focus(); }}>
             Clear and search again
@@ -284,7 +308,7 @@ function ForwardTraceView({ trace, materials, products }: {
   materials: Array<{ id: string; name: string; unit?: string }>;
   products: Array<{ id: string; name: string; unit?: string }>;
 }) {
-  const { lot, usedInBatches, outputLots } = trace;
+  const { lot, usedInBatches, outputLots, shippedInOrders } = trace;
   const lotType = lot.lotType ?? '';
   const sourceDesc = lot.supplierName || lot.sourceName || (lot.sourceBatchId ? 'Internally produced' : 'External receipt');
   const material = lot.materialId ? materials.find(m => m.id === lot.materialId) : null;
@@ -574,6 +598,40 @@ function ForwardTraceView({ trace, materials, products }: {
           </CardContent>
         </Card>
       )}
+
+      {/* Shipped in orders */}
+      {shippedInOrders.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm uppercase text-muted-foreground flex items-center gap-2">
+              <Truck className="h-4 w-4" /> Shipped in Orders
+              <Badge variant="secondary" className="ml-1">{shippedInOrders.length}</Badge>
+            </CardTitle>
+            <CardDescription>Customer orders that received stock from this lot or its outputs.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {shippedInOrders.map((ord, i) => (
+                <div key={i} className="flex items-center justify-between p-3 border rounded-lg bg-card gap-2" data-testid={`trace-order-${ord.orderId}`}>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono font-bold text-sm text-primary">{ord.orderNumber}</span>
+                    <span className="text-xs text-muted-foreground">{ord.customerName}</span>
+                    {ord.packedAt && <span className="text-xs text-muted-foreground">Packed {fmtDate(ord.packedAt)}</span>}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-mono text-sm">{parseFloat(ord.quantityAllocated).toFixed(2)}</span>
+                    <Link href={`/orders?order=${ord.orderId}`}>
+                      <Button size="sm" variant="outline" className="text-xs h-7 px-2">
+                        View Order
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -814,6 +872,156 @@ function BackwardTraceView({ trace, batchId }: { trace: BackwardTraceResponse; b
           </Button>
         </Link>
       </div>
+    </div>
+  );
+}
+
+function OrderProvenanceView({ trace }: { trace: OrderProvenanceResult }) {
+  const statusLabels: Record<string, string> = {
+    pending: 'Pending', in_production: 'In Production', ready: 'Ready',
+    partially_packed: 'Partially Packed', packed: 'Packed',
+    shipped: 'Shipped', completed: 'Completed', cancelled: 'Cancelled',
+  };
+
+  const hasAllocations = trace.lines.some(l => l.allocations.length > 0);
+
+  return (
+    <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
+
+      {/* Order header */}
+      <Card className="border-l-4 border-l-primary">
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5" />
+                Order: {trace.orderNumber}
+              </CardTitle>
+              <div className="flex gap-2 flex-wrap mt-2">
+                <Badge variant="outline" className="text-xs">{trace.customerName}</Badge>
+                <Badge variant="secondary" className="text-xs">{statusLabels[trace.status] ?? trace.status}</Badge>
+                {trace.shippedAt && (
+                  <span className="text-xs text-muted-foreground self-center">Shipped {fmtDate(trace.shippedAt)}</span>
+                )}
+              </div>
+            </div>
+            <Link href="/orders">
+              <Button variant="outline" size="sm">View Orders</Button>
+            </Link>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {!hasAllocations ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <Package className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">
+              No packing allocations recorded for this order yet.
+              Pack the order to see full lot provenance here.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {trace.lines.map((line) => (
+            <Card key={line.orderItemId} data-testid={`provenance-line-${line.orderItemId}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                    {line.productName}
+                  </CardTitle>
+                  <span className="font-mono text-sm text-muted-foreground">
+                    {parseFloat(line.quantity).toFixed(2)} {line.unit} ordered
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {line.allocations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">No lots allocated to this line item.</p>
+                ) : (
+                  line.allocations.map((alloc) => (
+                    <div key={alloc.allocationId} className="border rounded-lg overflow-hidden">
+                      {/* Lot row */}
+                      <div className="flex items-start justify-between p-3 bg-muted/30 gap-2">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <Box className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <Link href={`/traceability?lot=${alloc.lotId}`}>
+                              <span className="font-mono font-bold text-sm hover:underline text-primary cursor-pointer">
+                                {alloc.lotNumber}
+                              </span>
+                            </Link>
+                            {alloc.barcodeValue && (
+                              <Badge variant="outline" className="font-mono text-xs">{alloc.barcodeValue}</Badge>
+                            )}
+                          </div>
+                          {alloc.packedAt && (
+                            <span className="text-xs text-muted-foreground pl-5">Packed {fmtDate(alloc.packedAt)}</span>
+                          )}
+                        </div>
+                        <span className="font-mono text-sm shrink-0 font-medium">
+                          {parseFloat(alloc.quantityAllocated).toFixed(2)} {line.unit}
+                        </span>
+                      </div>
+
+                      {/* Source batch */}
+                      {alloc.sourceBatch && (
+                        <div className="border-t">
+                          <div className="flex items-center gap-2 px-3 py-2 bg-background">
+                            <ArrowLeft className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="text-xs text-muted-foreground uppercase font-medium">Produced by batch</span>
+                            <Link href={`/traceability?batch=${alloc.sourceBatch.id}`}>
+                              <span className="font-mono text-sm font-bold hover:underline text-primary cursor-pointer">
+                                {alloc.sourceBatch.batchCode || alloc.sourceBatch.batchNumber}
+                              </span>
+                            </Link>
+                          </div>
+
+                          {alloc.sourceBatch.ingredients.length > 0 && (
+                            <div className="border-t px-3 py-2 space-y-1.5">
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <FlaskConical className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground uppercase font-medium">Ingredients</span>
+                              </div>
+                              {alloc.sourceBatch.ingredients.map((ing, ii) => (
+                                <div key={ii} className="flex items-center justify-between gap-2 text-sm">
+                                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                    <span className="text-sm">{ing.materialName}</span>
+                                    <Link href={`/traceability?lot=${encodeURIComponent(ing.lotNumber)}`}>
+                                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded hover:bg-accent cursor-pointer">
+                                        {ing.lotNumber}
+                                      </span>
+                                    </Link>
+                                    {ing.supplierLot && (
+                                      <span className="text-xs text-muted-foreground">Supplier: {ing.supplierLot}</span>
+                                    )}
+                                  </div>
+                                  <span className="font-mono text-xs text-muted-foreground shrink-0">
+                                    {parseFloat(ing.quantityUsed).toFixed(2)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {!alloc.sourceBatch && (
+                        <div className="border-t px-3 py-2 flex items-center gap-2">
+                          <ArrowLeft className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-xs text-muted-foreground">Externally sourced lot — no production batch</span>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

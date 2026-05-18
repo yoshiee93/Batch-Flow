@@ -37,10 +37,19 @@ export interface ForwardTraceBatchUsage {
   quantityUsed: string;
 }
 
+export interface ShippedInOrder {
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  packedAt: string | null;
+  quantityAllocated: string;
+}
+
 export interface ForwardTraceResponse {
   lot: Lot;
   usedInBatches: ForwardTraceBatchUsage[];
   outputLots: Lot[];
+  shippedInOrders: ShippedInOrder[];
 }
 
 export interface BackwardTraceMaterialUsed {
@@ -80,6 +89,47 @@ export interface BackwardTraceResponse {
   materialsUsed: BackwardTraceMaterialUsed[];
 }
 
+export interface OrderProvenanceIngredient {
+  materialName: string;
+  lotNumber: string;
+  barcodeValue: string | null;
+  supplierLot: string | null;
+  quantityUsed: string;
+}
+
+export interface OrderProvenanceAllocation {
+  allocationId: string;
+  lotId: string;
+  lotNumber: string;
+  barcodeValue: string | null;
+  quantityAllocated: string;
+  packedAt: string | null;
+  sourceBatch: {
+    id: string;
+    batchNumber: string;
+    batchCode: string | null;
+    ingredients: OrderProvenanceIngredient[];
+  } | null;
+}
+
+export interface OrderProvenanceLine {
+  orderItemId: string;
+  productId: string;
+  productName: string;
+  quantity: string;
+  unit: string;
+  allocations: OrderProvenanceAllocation[];
+}
+
+export interface OrderProvenanceResult {
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  status: string;
+  shippedAt: string | null;
+  lines: OrderProvenanceLine[];
+}
+
 export function useTraceabilityForward(lotId: string) {
   return useQuery<ForwardTraceResponse>({
     queryKey: ["traceability", "forward", lotId],
@@ -93,6 +143,14 @@ export function useTraceabilityBackward(batchId: string) {
     queryKey: ["traceability", "backward", batchId],
     queryFn: () => fetchApi<BackwardTraceResponse>(`/traceability/backward/${batchId}`),
     enabled: !!batchId,
+  });
+}
+
+export function useOrderTraceability(orderId: string) {
+  return useQuery<OrderProvenanceResult>({
+    queryKey: ["traceability", "order", orderId],
+    queryFn: () => fetchApi<OrderProvenanceResult>(`/traceability/order/${orderId}`),
+    enabled: !!orderId,
   });
 }
 

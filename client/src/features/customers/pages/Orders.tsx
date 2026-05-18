@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown, Archive, FlaskConical, ArrowUp, ArrowDown, BoxSelect, Ship, Layers } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown, Archive, FlaskConical, ArrowUp, ArrowDown, BoxSelect, Ship, Layers, Box, ArrowLeft, GitBranch } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -31,9 +31,10 @@ import { ApiValidationError } from '@/lib/fetchApi';
 import {
   useOrders, useProducts, useOrderItems, useUpdateOrder, useCreateOrder, useCreateOrderItem,
   useDeleteOrderItem, useDeleteOrder, useCustomers, useOrdersWithAllocation, useCompleteOrder,
-  useOrderStockCheck, usePackOrder, useShipOrder, useOrderAllocations,
+  useOrderStockCheck, usePackOrder, useShipOrder, useOrderAllocations, useOrderTraceability,
   type Order, type OrderItem, type Product, type Customer, type OrderWithAllocation,
   type StockCheckItem, type OrderStockCheck, type OrderAllocation,
+  type OrderProvenanceResult,
 } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
@@ -561,7 +562,7 @@ export default function Orders() {
 
       {/* View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="w-full sm:max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
@@ -569,73 +570,94 @@ export default function Orders() {
             </DialogTitle>
             <DialogDescription>Order details and stock status</DialogDescription>
           </DialogHeader>
-          {viewingOrder && (
-            <div className="space-y-6 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Customer</p>
-                  <p className="font-medium">{viewingOrder.customerName}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Due Date</p>
-                  <p className="font-medium">{format(new Date(viewingOrder.dueDate), 'MMM d, yyyy')}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Priority</p>
-                  <PriorityBadge priority={viewingOrder.priority} />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <OrderStatusBadge status={viewingOrder.status} />
-                </div>
-                {viewingOrder.poNumber && (
-                  <div data-testid="view-po-number">
-                    <p className="text-sm text-muted-foreground">Invoice #</p>
-                    <p className="font-medium font-mono">{viewingOrder.poNumber}</p>
-                  </div>
-                )}
-                {viewingOrder.customBatchNumber && (
-                  <div data-testid="view-custom-batch-number">
-                    <p className="text-sm text-muted-foreground">Custom Batch #</p>
-                    <p className="font-medium font-mono">{viewingOrder.customBatchNumber}</p>
-                  </div>
-                )}
-                {viewingOrder.freight && (
-                  <div className="col-span-2" data-testid="view-freight">
-                    <p className="text-sm text-muted-foreground">Freight</p>
-                    <p className="font-medium">{viewingOrder.freight}</p>
-                  </div>
-                )}
-                {viewingOrder.shippedAt && (
-                  <div data-testid="view-shipped-at">
-                    <p className="text-sm text-muted-foreground">Shipped</p>
-                    <p className="font-medium">{format(new Date(viewingOrder.shippedAt), 'MMM d, yyyy')}</p>
-                  </div>
-                )}
-                {viewingOrder.shippingCarrier && (
-                  <div data-testid="view-carrier">
-                    <p className="text-sm text-muted-foreground">Carrier</p>
-                    <p className="font-medium">{viewingOrder.shippingCarrier}</p>
-                  </div>
-                )}
-                {viewingOrder.trackingReference && (
-                  <div data-testid="view-tracking">
-                    <p className="text-sm text-muted-foreground">Tracking</p>
-                    <p className="font-medium font-mono">{viewingOrder.trackingReference}</p>
-                  </div>
-                )}
-              </div>
+          {viewingOrder && (() => {
+            const showTraceability = ['packed', 'partially_packed', 'shipped', 'completed'].includes(viewingOrder.status);
+            return (
+              <Tabs defaultValue="details" className="py-2">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="details" data-testid="tab-order-details">Details</TabsTrigger>
+                  {showTraceability && (
+                    <TabsTrigger value="traceability" data-testid="tab-order-traceability">
+                      <GitBranch className="h-3.5 w-3.5 mr-1.5" />
+                      Traceability
+                    </TabsTrigger>
+                  )}
+                </TabsList>
 
-              <ViewStockCheckPanel orderId={viewingOrder.id} items={viewingOrder.items} products={products} status={viewingOrder.status} />
+                <TabsContent value="details" className="space-y-6 mt-0">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Customer</p>
+                      <p className="font-medium">{viewingOrder.customerName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Due Date</p>
+                      <p className="font-medium">{format(new Date(viewingOrder.dueDate), 'MMM d, yyyy')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Priority</p>
+                      <PriorityBadge priority={viewingOrder.priority} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <OrderStatusBadge status={viewingOrder.status} />
+                    </div>
+                    {viewingOrder.poNumber && (
+                      <div data-testid="view-po-number">
+                        <p className="text-sm text-muted-foreground">Invoice #</p>
+                        <p className="font-medium font-mono">{viewingOrder.poNumber}</p>
+                      </div>
+                    )}
+                    {viewingOrder.customBatchNumber && (
+                      <div data-testid="view-custom-batch-number">
+                        <p className="text-sm text-muted-foreground">Custom Batch #</p>
+                        <p className="font-medium font-mono">{viewingOrder.customBatchNumber}</p>
+                      </div>
+                    )}
+                    {viewingOrder.freight && (
+                      <div className="col-span-2" data-testid="view-freight">
+                        <p className="text-sm text-muted-foreground">Freight</p>
+                        <p className="font-medium">{viewingOrder.freight}</p>
+                      </div>
+                    )}
+                    {viewingOrder.shippedAt && (
+                      <div data-testid="view-shipped-at">
+                        <p className="text-sm text-muted-foreground">Shipped</p>
+                        <p className="font-medium">{format(new Date(viewingOrder.shippedAt), 'MMM d, yyyy')}</p>
+                      </div>
+                    )}
+                    {viewingOrder.shippingCarrier && (
+                      <div data-testid="view-carrier">
+                        <p className="text-sm text-muted-foreground">Carrier</p>
+                        <p className="font-medium">{viewingOrder.shippingCarrier}</p>
+                      </div>
+                    )}
+                    {viewingOrder.trackingReference && (
+                      <div data-testid="view-tracking">
+                        <p className="text-sm text-muted-foreground">Tracking</p>
+                        <p className="font-medium font-mono">{viewingOrder.trackingReference}</p>
+                      </div>
+                    )}
+                  </div>
 
-              {viewingOrder.notes && (
-                <div>
-                  <h4 className="font-semibold mb-2">Notes</h4>
-                  <p className="text-sm text-muted-foreground">{viewingOrder.notes}</p>
-                </div>
-              )}
-            </div>
-          )}
+                  <ViewStockCheckPanel orderId={viewingOrder.id} items={viewingOrder.items} products={products} status={viewingOrder.status} />
+
+                  {viewingOrder.notes && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Notes</h4>
+                      <p className="text-sm text-muted-foreground">{viewingOrder.notes}</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {showTraceability && (
+                  <TabsContent value="traceability" className="mt-0">
+                    <OrderProvenancePanel orderId={viewingOrder.id} />
+                  </TabsContent>
+                )}
+              </Tabs>
+            );
+          })()}
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>Close</Button>
             {canManageOrders && viewingOrder && (
@@ -1516,6 +1538,148 @@ function ArchivedOrderRow({ order, onViewClick, onDelete, products, isArchivedDe
 }
 
 // ─── Shared Components ────────────────────────────────────────────────────────
+
+// ─── Order Provenance Panel ───────────────────────────────────────────────────
+
+function fmtDateShort(d: string | null | undefined) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return String(d); }
+}
+
+function OrderProvenancePanel({ orderId }: { orderId: string }) {
+  const { data: trace, isLoading, isError } = useOrderTraceability(orderId);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm">Loading provenance data…</span>
+      </div>
+    );
+  }
+
+  if (isError || !trace) {
+    return (
+      <div className="flex flex-col items-center py-8 text-center gap-2">
+        <AlertCircle className="h-6 w-6 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Could not load traceability data.</p>
+      </div>
+    );
+  }
+
+  const hasAllocations = trace.lines.some(l => l.allocations.length > 0);
+
+  if (!hasAllocations) {
+    return (
+      <div className="flex flex-col items-center py-8 text-center gap-2">
+        <Package className="h-8 w-8 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          No packing allocations recorded yet. Pack this order to see full lot provenance.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4" data-testid="order-provenance-panel">
+      {trace.lines.map((line) => (
+        <div key={line.orderItemId} className="border rounded-lg overflow-hidden" data-testid={`provenance-line-${line.orderItemId}`}>
+          <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b">
+            <span className="font-medium text-sm">{line.productName}</span>
+            <span className="font-mono text-xs text-muted-foreground">
+              {parseFloat(line.quantity).toFixed(2)} {line.unit} ordered
+            </span>
+          </div>
+
+          {line.allocations.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-muted-foreground italic">No lots allocated.</div>
+          ) : (
+            <div className="divide-y">
+              {line.allocations.map((alloc) => (
+                <div key={alloc.allocationId}>
+                  {/* Lot row */}
+                  <div className="flex items-start justify-between px-3 py-2.5 gap-2 bg-background">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <Box className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <a
+                          href={`/traceability?lot=${encodeURIComponent(alloc.lotId)}`}
+                          className="font-mono font-bold text-sm text-primary hover:underline"
+                          data-testid={`provenance-lot-${alloc.lotId}`}
+                        >
+                          {alloc.lotNumber}
+                        </a>
+                        {alloc.barcodeValue && (
+                          <span className="font-mono text-xs text-muted-foreground">{alloc.barcodeValue}</span>
+                        )}
+                      </div>
+                      {alloc.packedAt && (
+                        <span className="text-xs text-muted-foreground pl-5">Packed {fmtDateShort(alloc.packedAt)}</span>
+                      )}
+                    </div>
+                    <span className="font-mono text-sm font-medium shrink-0">
+                      {parseFloat(alloc.quantityAllocated).toFixed(2)} {line.unit}
+                    </span>
+                  </div>
+
+                  {/* Source batch */}
+                  {alloc.sourceBatch ? (
+                    <div className="border-t bg-muted/20">
+                      <div className="flex items-center gap-2 px-3 py-1.5">
+                        <ArrowLeft className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground">From batch</span>
+                        <a
+                          href={`/traceability?batch=${encodeURIComponent(alloc.sourceBatch.id)}`}
+                          className="font-mono text-xs font-bold text-primary hover:underline"
+                          data-testid={`provenance-batch-${alloc.sourceBatch.id}`}
+                        >
+                          {alloc.sourceBatch.batchCode || alloc.sourceBatch.batchNumber}
+                        </a>
+                      </div>
+
+                      {alloc.sourceBatch.ingredients.length > 0 && (
+                        <div className="border-t px-3 py-2 space-y-1">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <FlaskConical className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground uppercase font-medium">Ingredients</span>
+                          </div>
+                          {alloc.sourceBatch.ingredients.map((ing, ii) => (
+                            <div key={ii} className="flex items-center justify-between gap-2 text-xs">
+                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                <span>{ing.materialName}</span>
+                                <a
+                                  href={`/traceability?lot=${encodeURIComponent(ing.lotNumber)}`}
+                                  className="font-mono bg-muted px-1.5 py-0.5 rounded hover:bg-accent cursor-pointer"
+                                >
+                                  {ing.lotNumber}
+                                </a>
+                                {ing.supplierLot && (
+                                  <span className="text-muted-foreground">({ing.supplierLot})</span>
+                                )}
+                              </div>
+                              <span className="font-mono text-muted-foreground shrink-0">
+                                {parseFloat(ing.quantityUsed).toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="border-t bg-muted/10 px-3 py-1.5 flex items-center gap-2">
+                      <ArrowLeft className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="text-xs text-muted-foreground">Externally sourced — no production batch</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ─── View Stock Check Panel ───────────────────────────────────────────────────
 
