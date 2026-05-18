@@ -16,12 +16,6 @@ traceabilityRouter.get("/traceability/backward/:batchId", asyncHandler(async (re
   res.json(trace);
 }));
 
-traceabilityRouter.get("/traceability/order/:orderId", asyncHandler(async (req, res) => {
-  const trace = await svc.getOrderProvenance(req.params.orderId);
-  if (!trace) return res.status(404).json({ error: "Order not found" });
-  res.json(trace);
-}));
-
 traceabilityRouter.get("/orders/:orderId/traceability", asyncHandler(async (req, res) => {
   const trace = await svc.getOrderProvenance(req.params.orderId);
   if (!trace) return res.status(404).json({ error: "Order not found" });

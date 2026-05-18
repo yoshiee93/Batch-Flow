@@ -130,20 +130,37 @@ export const traceabilityRepository = {
           .where(inArray(orderItemAllocations.lotId, lotIdsToCheck))
       : [];
 
-    const seenOrderIds = new Set<string>();
-    const shippedInOrders: ShippedInOrder[] = [];
+    // Aggregate quantity and pick latest packedAt per order
+    const orderAggMap = new Map<string, {
+      orderId: string; orderNumber: string; customerName: string;
+      totalQty: number; latestPackedAt: Date | null;
+    }>();
     for (const row of allAllocations) {
-      if (!seenOrderIds.has(row.order.id)) {
-        seenOrderIds.add(row.order.id);
-        shippedInOrders.push({
+      const entry = orderAggMap.get(row.order.id);
+      const qty = parseFloat(row.allocation.quantityAllocated) || 0;
+      const packedAt = row.allocation.packedAt ?? null;
+      if (!entry) {
+        orderAggMap.set(row.order.id, {
           orderId: row.order.id,
           orderNumber: row.order.orderNumber,
           customerName: row.order.customerName,
-          packedAt: row.allocation.packedAt ? row.allocation.packedAt.toISOString() : null,
-          quantityAllocated: row.allocation.quantityAllocated,
+          totalQty: qty,
+          latestPackedAt: packedAt,
         });
+      } else {
+        entry.totalQty += qty;
+        if (packedAt && (!entry.latestPackedAt || packedAt > entry.latestPackedAt)) {
+          entry.latestPackedAt = packedAt;
+        }
       }
     }
+    const shippedInOrders: ShippedInOrder[] = Array.from(orderAggMap.values()).map(e => ({
+      orderId: e.orderId,
+      orderNumber: e.orderNumber,
+      customerName: e.customerName,
+      packedAt: e.latestPackedAt ? e.latestPackedAt.toISOString() : null,
+      quantityAllocated: e.totalQty.toString(),
+    }));
 
     return {
       lot,
