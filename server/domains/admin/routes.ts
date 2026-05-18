@@ -145,20 +145,14 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
     if (t.stockMovements?.length) await tx.insert(stockMovements).values(t.stockMovements.map(parseDates));
     if (t.auditLogs?.length) await tx.insert(auditLogs).values(t.auditLogs.map(parseDates));
 
-    // processCodeDefinitions — optional field, present in v1 exports from this version onward
-    // Uses raw SQL with OVERRIDING SYSTEM VALUE because the column is GENERATED ALWAYS AS IDENTITY,
-    // which blocks explicit id values via Drizzle's standard .insert().
+    // processCodeDefinitions — optional field, present in v1 exports from this version onward.
+    // The id column is GENERATED ALWAYS AS IDENTITY so we deliberately omit it and let the
+    // sequence assign fresh ids. No other table holds a FK reference to processCodeDefinitions.id,
+    // so the exact numeric ids do not matter for referential integrity.
     if (Array.isArray(t.processCodeDefinitions) && t.processCodeDefinitions.length) {
-      for (const row of t.processCodeDefinitions) {
-        await tx.execute(
-          sql`INSERT INTO process_code_definitions (id, code, meaning)
-              OVERRIDING SYSTEM VALUE
-              VALUES (${row.id}, ${row.code}, ${row.meaning})`
-        );
-      }
-      await tx.execute(
-        sql`SELECT setval(pg_get_serial_sequence('process_code_definitions', 'id'), MAX(id)) FROM process_code_definitions`
-      );
+      const defs = (t.processCodeDefinitions as Array<{ code: string; meaning: string }>)
+        .map(r => ({ code: String(r.code), meaning: String(r.meaning) }));
+      await tx.insert(processCodeDefinitions).values(defs);
     }
   });
 
