@@ -146,8 +146,19 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
     if (t.auditLogs?.length) await tx.insert(auditLogs).values(t.auditLogs.map(parseDates));
 
     // processCodeDefinitions — optional field, present in v1 exports from this version onward
+    // Uses raw SQL with OVERRIDING SYSTEM VALUE because the column is GENERATED ALWAYS AS IDENTITY,
+    // which blocks explicit id values via Drizzle's standard .insert().
     if (Array.isArray(t.processCodeDefinitions) && t.processCodeDefinitions.length) {
-      await tx.insert(processCodeDefinitions).values(t.processCodeDefinitions.map(parseDates));
+      for (const row of t.processCodeDefinitions) {
+        await tx.execute(
+          sql`INSERT INTO process_code_definitions (id, code, meaning)
+              OVERRIDING SYSTEM VALUE
+              VALUES (${row.id}, ${row.code}, ${row.meaning})`
+        );
+      }
+      await tx.execute(
+        sql`SELECT setval(pg_get_serial_sequence('process_code_definitions', 'id'), MAX(id)) FROM process_code_definitions`
+      );
     }
   });
 
