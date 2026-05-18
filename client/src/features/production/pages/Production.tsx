@@ -286,22 +286,16 @@ export default function Production() {
           return;
         }
       }
-      if (recordInputForm.inputType === 'product') {
-        if (lot.lotType !== 'finished_good') {
-          setBarcodeError('This lot is not a finished product lot. Only finished product lots can be used as product inputs.');
-          return;
-        }
-        if (!lot.productId) {
-          setBarcodeError('This lot is not linked to a product. Please use a finished product lot barcode.');
-          return;
-        }
+      // Auto-detect input type from the lot
+      if (lot.productId) {
         setScannedLot(lot);
         setSelectedSourceLotId(lot.id);
-        setRecordInputForm(prev => ({ ...prev, productId: lot.productId!, quantity: '' }));
+        setRecordInputForm(prev => ({ ...prev, inputType: 'product', productId: lot.productId!, quantity: '' }));
       } else {
         setScannedLot(lot);
         setRecordInputForm(prev => ({
           ...prev,
+          inputType: 'material',
           materialId: lot.materialId || prev.materialId,
           lotId: lot.id,
           quantity: '',
@@ -845,161 +839,74 @@ export default function Production() {
             <DialogDescription>Add raw materials or finished products used in production. This will deduct from inventory.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Input Type</Label>
+            {/* Barcode scan — always optional, works for any lot type */}
+            <div className="space-y-1.5">
+              <Label htmlFor="barcode-scan">Scan Barcode (Optional)</Label>
               <div className="flex gap-2">
+                <Input
+                  id="barcode-scan"
+                  ref={barcodeScanRef}
+                  autoFocus
+                  placeholder="Scan or type barcode / lot number..."
+                  value={barcodeInput}
+                  onChange={(e) => {
+                    setBarcodeInput(e.target.value);
+                    setBarcodeError('');
+                    if (scannedLot) {
+                      setScannedLot(null);
+                      setSelectedSourceLotId('');
+                      setRecordInputForm(f => ({ ...f, lotId: '', materialId: '', productId: '', inputType: 'product' }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleBarcodeLookup(barcodeInput); }
+                  }}
+                  data-testid="input-barcode-scan"
+                />
                 <Button
                   type="button"
-                  variant={recordInputForm.inputType === 'material' ? 'default' : 'outline'}
-                  className="flex-1"
-                  onClick={() => {
-                    setRecordInputForm({ inputType: 'material', materialId: '', productId: '', quantity: '', lotId: '' });
-                    setBarcodeInput('');
-                    setScannedLot(null);
-                    setBarcodeError('');
-                    setSelectedSourceLotId('');
-                  }}
-                  data-testid="button-input-type-material"
+                  variant="outline"
+                  disabled={isLookingUpBarcode || !barcodeInput.trim()}
+                  onClick={() => handleBarcodeLookup(barcodeInput)}
+                  data-testid="button-lookup-barcode"
                 >
-                  Raw Material
-                </Button>
-                <Button
-                  type="button"
-                  variant={recordInputForm.inputType === 'product' ? 'default' : 'outline'}
-                  className="flex-1"
-                  onClick={() => {
-                    setRecordInputForm({ inputType: 'product', materialId: '', productId: '', quantity: '', lotId: '' });
-                    setBarcodeInput('');
-                    setScannedLot(null);
-                    setBarcodeError('');
-                    setSelectedSourceLotId('');
-                  }}
-                  data-testid="button-input-type-product"
-                >
-                  Finished Product
+                  {isLookingUpBarcode ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Look up'}
                 </Button>
               </div>
             </div>
 
-            {recordInputForm.inputType === 'material' ? (
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="barcode-scan">Scan / Type Barcode or Lot Number *</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="barcode-scan"
-                      ref={barcodeScanRef}
-                      autoFocus
-                      placeholder="Scan barcode or type lot number..."
-                      value={barcodeInput}
-                      onChange={(e) => {
-                        setBarcodeInput(e.target.value);
-                        setBarcodeError('');
-                        if (scannedLot) { setScannedLot(null); setRecordInputForm(f => ({ ...f, lotId: '', materialId: '' })); }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); handleBarcodeLookup(barcodeInput); }
-                      }}
-                      data-testid="input-barcode-scan"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={isLookingUpBarcode || !barcodeInput.trim()}
-                      onClick={() => handleBarcodeLookup(barcodeInput)}
-                      data-testid="button-lookup-barcode"
-                    >
-                      {isLookingUpBarcode ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Look up'}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Press Enter or click "Look up" after scanning. Supports barcode values and lot numbers (e.g. RM-260413-0001).</p>
-                </div>
-
-                {barcodeError && (
-                  <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md" data-testid="text-barcode-error">
-                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>{barcodeError}</span>
-                  </div>
-                )}
-
-                {scannedLot && (
-                  <div className="bg-muted rounded-lg p-3 space-y-1.5" data-testid="card-scanned-lot">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-semibold">{scannedLot.materialName || scannedLot.productName || 'Unknown'}</div>
-                        <div className="text-xs text-muted-foreground font-mono">{scannedLot.lotNumber}</div>
-                      </div>
-                      <Badge className={scannedLot.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
-                        {scannedLot.status}
-                      </Badge>
-                    </div>
-                    <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1 pt-1 border-t">
-                      <div className="text-muted-foreground">Available</div>
-                      <div className="font-mono font-medium">{parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.materialUnit || scannedLot.productUnit || ''}</div>
-                      {scannedLot.supplierName && <><div className="text-muted-foreground">Source</div><div>{scannedLot.supplierName}</div></>}
-                      {scannedLot.expiryDate && <><div className="text-muted-foreground">Expires</div><div>{new Date(scannedLot.expiryDate).toLocaleDateString()}</div></>}
-                    </div>
-                  </div>
-                )}
+            {barcodeError && (
+              <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md" data-testid="text-barcode-error">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>{barcodeError}</span>
               </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="barcode-scan-product">Scan Finished Product Barcode (optional)</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="barcode-scan-product"
-                      placeholder="Scan or type barcode / lot number..."
-                      value={barcodeInput}
-                      onChange={(e) => {
-                        setBarcodeInput(e.target.value);
-                        setBarcodeError('');
-                        if (scannedLot) { setScannedLot(null); setSelectedSourceLotId(''); setRecordInputForm(f => ({ ...f, productId: '' })); }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); handleBarcodeLookup(barcodeInput); }
-                      }}
-                      data-testid="input-barcode-scan-product"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={isLookingUpBarcode || !barcodeInput.trim()}
-                      onClick={() => handleBarcodeLookup(barcodeInput)}
-                      data-testid="button-lookup-barcode-product"
-                    >
-                      {isLookingUpBarcode ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Look up'}
-                    </Button>
+            )}
+
+            {/* Scanned lot info card */}
+            {scannedLot && (
+              <div className="bg-muted rounded-lg p-3 space-y-1.5" data-testid="card-scanned-lot">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-semibold">{scannedLot.materialName || scannedLot.productName || 'Unknown'}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{scannedLot.lotNumber}</div>
                   </div>
-                  {barcodeError && (
-                    <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md" data-testid="text-barcode-error-product">
-                      <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span>{barcodeError}</span>
-                    </div>
-                  )}
-                  {scannedLot && scannedLot.productId && (
-                    <div className="bg-muted rounded-lg p-3 space-y-1.5" data-testid="card-scanned-product-lot">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-semibold">{scannedLot.productName || products.find(p => p.id === scannedLot.productId)?.name || 'Unknown product'}</div>
-                          <div className="text-xs text-muted-foreground font-mono">{scannedLot.lotNumber}</div>
-                        </div>
-                        <Badge className="bg-green-100 text-green-800">lot auto-selected</Badge>
-                      </div>
-                      <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1 pt-1 border-t">
-                        <div className="text-muted-foreground">Available</div>
-                        <div className="font-mono font-medium">{parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.productUnit || ''}</div>
-                      </div>
-                    </div>
-                  )}
+                  <Badge className={scannedLot.productId ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}>
+                    {scannedLot.productId ? 'lot auto-selected' : scannedLot.status}
+                  </Badge>
                 </div>
-                <div className="relative flex items-center gap-2">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs text-muted-foreground">or select manually</span>
-                  <div className="flex-1 h-px bg-border" />
+                <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1 pt-1 border-t">
+                  <div className="text-muted-foreground">Available</div>
+                  <div className="font-mono font-medium">{parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.materialUnit || scannedLot.productUnit || ''}</div>
+                  {scannedLot.supplierName && <><div className="text-muted-foreground">Source</div><div>{scannedLot.supplierName}</div></>}
+                  {scannedLot.expiryDate && <><div className="text-muted-foreground">Expires</div><div>{new Date(scannedLot.expiryDate).toLocaleDateString()}</div></>}
                 </div>
-                <div className="space-y-2">
-                <Label htmlFor="input-product">Product *</Label>
+              </div>
+            )}
+
+            {/* Product search — shown when no raw-material lot has been scanned */}
+            {!scannedLot?.materialId && (
+              <div className="space-y-2">
+                <Label htmlFor="input-product">Product</Label>
                 {(() => {
                   const inputCategories = categories.filter(c => !c.excludeFromYield && c.showInProductionInputs && products.some(p => p.categoryId === c.id && parseFloat(p.currentStock || '0') > 0));
                   const hasUncatInput = products.some(p => !p.categoryId && parseFloat(p.currentStock || '0') > 0);
@@ -1054,8 +961,10 @@ export default function Production() {
                                   key={product.id}
                                   value={`${product.sku} ${product.name}`}
                                   onSelect={() => {
-                                    setRecordInputForm({ ...recordInputForm, productId: product.id });
+                                    setRecordInputForm({ ...recordInputForm, inputType: 'product', productId: product.id });
                                     setSelectedSourceLotId('');
+                                    setScannedLot(null);
+                                    setBarcodeInput('');
                                     setInputProductSearchOpen(false);
                                   }}
                                 >
@@ -1076,8 +985,10 @@ export default function Production() {
                                   key={product.id}
                                   value={`Uncategorized ${product.sku} ${product.name}`}
                                   onSelect={() => {
-                                    setRecordInputForm({ ...recordInputForm, productId: product.id });
+                                    setRecordInputForm({ ...recordInputForm, inputType: 'product', productId: product.id });
                                     setSelectedSourceLotId('');
+                                    setScannedLot(null);
+                                    setBarcodeInput('');
                                     setInputProductSearchOpen(false);
                                   }}
                                 >
@@ -1092,12 +1003,8 @@ export default function Production() {
                     </Command>
                   </PopoverContent>
                 </Popover>
-                {recordInputForm.productId && (
-                  <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
-                    Available: <span className="font-mono font-medium">{products.find(p => p.id === recordInputForm.productId)?.currentStock || '0'} {products.find(p => p.id === recordInputForm.productId)?.unit || ''}</span>
-                    <p className="text-xs mt-1">This product will be tracked for full chain traceability.</p>
-                  </div>
-                )}
+
+                {/* Source lot — shown once a product is chosen */}
                 {recordInputForm.productId && (
                   <div className="space-y-1.5 pt-1">
                     <Label>Source Lot *</Label>
@@ -1157,12 +1064,11 @@ export default function Production() {
                   </div>
                 )}
               </div>
-              </div>
             )}
 
             <div className="space-y-2">
               <Label htmlFor="input-quantity">
-                Quantity to consume *
+                Quantity *
                 {scannedLot && (
                   <span className="text-xs text-muted-foreground ml-2">(max: {parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.materialUnit || scannedLot.productUnit || ''})</span>
                 )}
