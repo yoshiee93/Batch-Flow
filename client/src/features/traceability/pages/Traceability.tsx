@@ -948,7 +948,7 @@ function OrderProvenanceView({ trace }: { trace: OrderProvenanceResult }) {
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <Box className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                            <Link href={`/traceability?lot=${alloc.lotId}`}>
+                            <Link href={`/traceability?lot=${encodeURIComponent(alloc.lotNumber)}`}>
                               <span className="font-mono font-bold text-sm hover:underline text-primary cursor-pointer">
                                 {alloc.lotNumber}
                               </span>
@@ -972,7 +972,7 @@ function OrderProvenanceView({ trace }: { trace: OrderProvenanceResult }) {
                           <div className="flex items-center gap-2 px-3 py-2 bg-background">
                             <ArrowLeft className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                             <span className="text-xs text-muted-foreground uppercase font-medium">Produced by batch</span>
-                            <Link href={`/traceability?batch=${alloc.sourceBatch.id}`}>
+                            <Link href={`/traceability?batch=${encodeURIComponent(alloc.sourceBatch.batchNumber)}`}>
                               <span className="font-mono text-sm font-bold hover:underline text-primary cursor-pointer">
                                 {alloc.sourceBatch.batchCode || alloc.sourceBatch.batchNumber}
                               </span>
