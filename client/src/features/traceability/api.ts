@@ -149,7 +149,7 @@ export function useTraceabilityBackward(batchId: string) {
 export function useOrderTraceability(orderId: string) {
   return useQuery<OrderProvenanceResult>({
     queryKey: ["traceability", "order", orderId],
-    queryFn: () => fetchApi<OrderProvenanceResult>(`/traceability/order/${orderId}`),
+    queryFn: () => fetchApi<OrderProvenanceResult>(`/orders/${orderId}/traceability`),
     enabled: !!orderId,
   });
 }

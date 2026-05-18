@@ -204,11 +204,11 @@ export const traceabilityRepository = {
       .where(eq(orderItemAllocations.orderId, orderId));
 
     // Get unique source batch IDs from allocated lots
-    const sourceBatchIds = [...new Set(
+    const sourceBatchIds = Array.from(new Set(
       allocations
         .map(r => r.lot.sourceBatchId)
         .filter((id): id is string => !!id)
-    )];
+    ));
 
     // Fetch batch details and their ingredients for all source batches
     const batchDetailsMap = new Map<string, {

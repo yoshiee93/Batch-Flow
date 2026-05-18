@@ -1603,7 +1603,7 @@ function OrderProvenancePanel({ orderId }: { orderId: string }) {
                       <div className="flex items-center gap-2">
                         <Box className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         <a
-                          href={`/traceability?lot=${encodeURIComponent(alloc.lotId)}`}
+                          href={`/traceability?lot=${encodeURIComponent(alloc.lotNumber)}`}
                           className="font-mono font-bold text-sm text-primary hover:underline"
                           data-testid={`provenance-lot-${alloc.lotId}`}
                         >
@@ -1629,7 +1629,7 @@ function OrderProvenancePanel({ orderId }: { orderId: string }) {
                         <ArrowLeft className="h-3 w-3 text-muted-foreground shrink-0" />
                         <span className="text-xs text-muted-foreground">From batch</span>
                         <a
-                          href={`/traceability?batch=${encodeURIComponent(alloc.sourceBatch.id)}`}
+                          href={`/traceability?batch=${encodeURIComponent(alloc.sourceBatch.batchNumber)}`}
                           className="font-mono text-xs font-bold text-primary hover:underline"
                           data-testid={`provenance-batch-${alloc.sourceBatch.id}`}
                         >
