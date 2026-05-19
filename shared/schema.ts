@@ -19,7 +19,8 @@ export type LabelFieldKey =
   | "supplierLot"
   | "source"
   | "barcodeValue"
-  | "customerName";
+  | "customerName"
+  | "categoryName";
 
 export type LabelTextAlign = "left" | "center" | "right";
 export type LabelRotation = 0 | 90 | 180 | 270;

@@ -13,7 +13,7 @@ import {
 import { useState } from 'react';
 import {
   useLotById, useLotUsage, useLotLineage, useMaterials, useProducts, useBatch,
-  useRecordLotTesting,
+  useRecordLotTesting, useCategories,
   type LotUsageEntry, type OutputLot, type VisualInspection
 } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -101,6 +101,7 @@ export default function LotDetail() {
   const { data: usersList = [] } = useUsers();
   const { data: materials = [] } = useMaterials();
   const { data: products = [] } = useProducts();
+  const { data: categories = [] } = useCategories();
   const { data: usage = [], isLoading: usageLoading } = useLotUsage(id!);
   const { data: lineage, isLoading: lineageLoading } = useLotLineage(id!);
   const { data: sourceBatch } = useBatch(lot?.sourceBatchId || '');
@@ -358,10 +359,23 @@ export default function LotDetail() {
               data-testid="button-print-label"
               onClick={async () => {
                 const isFinished = lot.lotType === 'finished_good' || lot.lotType === 'intermediate';
+                const lotProduct = lot.productId ? products.find(p => p.id === lot.productId) : undefined;
+                const lotMaterial = lot.materialId ? materials.find(m => m.id === lot.materialId) : undefined;
+                const lotCatId = lotProduct?.categoryId || lotMaterial?.categoryId;
+                const lotCategoryName = lotCatId ? (categories.find(c => c.id === lotCatId)?.name ?? null) : null;
                 if (isFinished) {
                   await printAndRecord({
                     kind: 'finished_output',
                     customerId: lot.customerId ?? null,
+                    ctx: {
+                      productName: itemName, lotNumber: lot.lotNumber,
+                      barcodeValue: lot.barcodeValue ?? lot.lotNumber,
+                      quantity: lot.quantity, unit,
+                      productionDate: lot.producedDate || lot.receivedDate,
+                      batchCode: sourceBatch?.batchCode || sourceBatch?.batchNumber || null,
+                      expiryDate: lot.expiryDate,
+                      categoryName: lotCategoryName,
+                    },
                     legacyData: {
                       template: 'finished_output',
                       lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue,
@@ -378,6 +392,15 @@ export default function LotDetail() {
                   await printAndRecord({
                     kind: 'raw_intake',
                     customerId: lot.customerId ?? null,
+                    ctx: {
+                      productName: itemName, lotNumber: lot.lotNumber,
+                      barcodeValue: lot.barcodeValue ?? lot.lotNumber,
+                      quantity: lot.quantity, unit,
+                      receivedDate: lot.receivedDate, expiryDate: lot.expiryDate,
+                      supplierLot: lot.supplierLot,
+                      source: lot.supplierName || lot.sourceName || null,
+                      categoryName: lotCategoryName,
+                    },
                     legacyData: {
                       template: 'raw_intake',
                       lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue,

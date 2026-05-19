@@ -336,15 +336,33 @@ export default function Inventory() {
     return '';
   }
 
+  function getLotCategoryName(lot: Lot): string | null {
+    const catId = lot.productId
+      ? products.find(p => p.id === lot.productId)?.categoryId
+      : lot.materialId
+        ? materials.find(m => m.id === lot.materialId)?.categoryId
+        : undefined;
+    return catId ? (categories.find(c => c.id === catId)?.name ?? null) : null;
+  }
+
   async function handlePrintLabel(lot: Lot) {
     const itemName = getLotItemName(lot);
     const unit = getLotUnit(lot);
+    const categoryName = getLotCategoryName(lot);
     const onAfter = () => { if (!lot.barcodePrintedAt) markBarcodePrinted.mutate(lot.id); };
     if (lot.lotType === 'finished_good' || lot.lotType === 'intermediate') {
       const srcBatch = lot.sourceBatchId ? batches.find(b => b.id === lot.sourceBatchId) : undefined;
       await printAndRecord({
         kind: 'finished_output',
         customerId: lot.customerId ?? null,
+        ctx: {
+          productName: itemName, lotNumber: lot.lotNumber,
+          barcodeValue: lot.barcodeValue ?? lot.lotNumber,
+          quantity: lot.originalQuantity || lot.quantity, unit,
+          productionDate: lot.producedDate || lot.receivedDate,
+          batchCode: srcBatch?.batchCode || srcBatch?.batchNumber || null,
+          expiryDate: lot.expiryDate, categoryName,
+        },
         legacyData: {
           template: 'finished_output',
           lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue, productName: itemName,
@@ -361,6 +379,15 @@ export default function Inventory() {
       await printAndRecord({
         kind: 'raw_intake',
         customerId: lot.customerId ?? null,
+        ctx: {
+          productName: itemName, lotNumber: lot.lotNumber,
+          barcodeValue: lot.barcodeValue ?? lot.lotNumber,
+          quantity: lot.originalQuantity || lot.quantity, unit,
+          receivedDate: lot.receivedDate, expiryDate: lot.expiryDate,
+          supplierLot: lot.supplierLot,
+          source: lot.supplierName || lot.sourceName || null,
+          categoryName,
+        },
         legacyData: {
           template: 'raw_intake',
           lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue, itemName,
@@ -541,9 +568,19 @@ export default function Inventory() {
   async function handlePrintReceivedLot(lot: LotWithDetails) {
     const itemName = lot.materialName || lot.productName || getLotItemName(lot as Lot);
     const unit = getLotUnit(lot as Lot);
+    const categoryName = getLotCategoryName(lot as Lot);
     await printAndRecord({
       kind: 'raw_intake',
       customerId: lot.customerId ?? null,
+      ctx: {
+        productName: itemName, lotNumber: lot.lotNumber,
+        barcodeValue: lot.barcodeValue ?? lot.lotNumber,
+        quantity: lot.originalQuantity || lot.quantity, unit,
+        receivedDate: lot.receivedDate, expiryDate: lot.expiryDate,
+        supplierLot: lot.supplierLot,
+        source: lot.supplierName || lot.sourceName || null,
+        categoryName,
+      },
       legacyData: {
         template: 'raw_intake',
         lotNumber: lot.lotNumber, barcodeValue: lot.barcodeValue, itemName,

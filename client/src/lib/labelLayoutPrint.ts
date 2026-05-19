@@ -16,6 +16,7 @@ export interface LabelDataContext {
   source?: string | null;
   barcodeValue?: string | null;
   customerName?: string | null;
+  categoryName?: string | null;
 }
 
 function esc(raw: string | null | undefined): string {
@@ -56,6 +57,7 @@ export function resolveField(key: LabelFieldKey, ctx: LabelDataContext): string 
     case "source": return ctx.source ?? "";
     case "barcodeValue": return ctx.barcodeValue ?? "";
     case "customerName": return ctx.customerName ?? "";
+    case "categoryName": return ctx.categoryName ?? "";
   }
 }
 
@@ -150,17 +152,19 @@ export function fieldLabel(key: LabelFieldKey): string {
     case "source": return "Source / Supplier";
     case "barcodeValue": return "Barcode Value";
     case "customerName": return "Customer Name";
+    case "categoryName": return "Category";
   }
 }
 
 export const ALL_FIELD_KEYS: LabelFieldKey[] = [
-  "productName", "lotNumber", "batchCode", "quantity", "unit", "quantityWithUnit",
+  "productName", "categoryName", "lotNumber", "batchCode", "quantity", "unit", "quantityWithUnit",
   "productionDate", "expiryDate", "receivedDate", "supplierLot", "source",
   "barcodeValue", "customerName",
 ];
 
 export const SAMPLE_CONTEXT: LabelDataContext = {
   productName: "Strawberry Whole",
+  categoryName: "Freeze Dried Fruits",
   lotNumber: "FG-260503-0001",
   batchCode: "RC4261156",
   quantity: "27.000",

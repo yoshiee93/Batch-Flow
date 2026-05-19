@@ -31,6 +31,7 @@ export default function PrintCustomLabel() {
   const [expiryDate, setExpiryDate] = useState("");
   const [supplierLot, setSupplierLot] = useState("");
   const [barcodeValue, setBarcodeValue] = useState("");
+  const [categoryName, setCategoryName] = useState("");
 
   const selected: LabelTemplate | undefined = useMemo(
     () => templates.find(t => t.id === templateId),
@@ -49,6 +50,7 @@ export default function PrintCustomLabel() {
       expiryDate: expiryDate || null,
       supplierLot: supplierLot || null,
       barcodeValue: barcodeValue || lotNumber || batchCode,
+      categoryName: categoryName || null,
     };
 
     const settings = selected ? parseLabelTemplateSettings(selected.settings) : null;
@@ -136,6 +138,7 @@ export default function PrintCustomLabel() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Field label="Product Name" value={productName} onChange={setProductName} testId="input-print-product" />
+          <Field label="Category" value={categoryName} onChange={setCategoryName} testId="input-print-category" />
           <Field label="Batch Code" value={batchCode} onChange={setBatchCode} testId="input-print-batch" />
           <Field label="Lot Number" value={lotNumber} onChange={setLotNumber} testId="input-print-lot" />
           <Field label="Barcode Value" value={barcodeValue} onChange={setBarcodeValue} placeholder="Defaults to lot or batch" testId="input-print-barcode" />

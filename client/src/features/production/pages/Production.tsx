@@ -1872,14 +1872,26 @@ function BatchOutputsEditor({
                     className="text-xs h-7 px-2"
                     data-testid={`button-print-final-lot-${ol.lotId}`}
                     onClick={async () => {
+                      const olProduct = allProducts.find(p => p.id === ol.productId);
+                      const olCategoryName = olProduct?.categoryId ? (allCategories.find(c => c.id === olProduct.categoryId)?.name ?? null) : null;
                       await printAndRecord({
                         kind: 'finished_output',
                         customerId: ol.customerId ?? batchCustomerId,
+                        ctx: {
+                          productName: ol.productName || 'Output',
+                          lotNumber: ol.lotNumber,
+                          barcodeValue: ol.barcodeValue ?? ol.lotNumber,
+                          quantity: ol.quantity, unit: olProduct?.unit || '',
+                          productionDate: finalizeResult.batch.endDate,
+                          batchCode: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
+                          expiryDate: ol.expiryDate,
+                          categoryName: olCategoryName,
+                        },
                         legacyData: {
                           template: 'finished_output',
                           lotNumber: ol.lotNumber, barcodeValue: ol.barcodeValue,
                           productName: ol.productName || 'Output',
-                          quantity: ol.quantity, unit: allProducts.find(p => p.id === ol.productId)?.unit || '',
+                          quantity: ol.quantity, unit: olProduct?.unit || '',
                           producedDate: finalizeResult.batch.endDate,
                           sourceBatch: finalizeResult.batch.batchCode || finalizeResult.batch.batchNumber,
                           expiryDate: ol.expiryDate,
@@ -2150,14 +2162,26 @@ function BatchOutputsEditor({
                         className="text-xs h-7 px-2"
                         data-testid={`button-reprint-lot-${ol.lotId}`}
                         onClick={async () => {
+                          const reprintProduct = allProducts.find(p => p.id === ol.productId);
+                          const reprintCategoryName = reprintProduct?.categoryId ? (allCategories.find(c => c.id === reprintProduct.categoryId)?.name ?? null) : null;
                           await printAndRecord({
                             kind: 'finished_output',
                             customerId: ol.customerId ?? batchCustomerId,
+                            ctx: {
+                              productName: ol.productName || 'Output',
+                              lotNumber: ol.lotNumber,
+                              barcodeValue: ol.barcodeValue ?? ol.lotNumber,
+                              quantity: ol.quantity, unit: reprintProduct?.unit || '',
+                              productionDate: batchData?.endDate,
+                              batchCode: batchData?.batchCode || batchData?.batchNumber,
+                              expiryDate: ol.expiryDate,
+                              categoryName: reprintCategoryName,
+                            },
                             legacyData: {
                               template: 'finished_output',
                               lotNumber: ol.lotNumber, barcodeValue: ol.barcodeValue,
                               productName: ol.productName || 'Output',
-                              quantity: ol.quantity, unit: allProducts.find(p => p.id === ol.productId)?.unit || '',
+                              quantity: ol.quantity, unit: reprintProduct?.unit || '',
                               producedDate: batchData?.endDate,
                               sourceBatch: batchData?.batchCode || batchData?.batchNumber,
                               expiryDate: ol.expiryDate,
