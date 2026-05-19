@@ -1,7 +1,7 @@
 import { db } from "../../db";
 import { customersRepository as repo } from "./repository";
 import { createAuditLog } from "../../lib/auditLog";
-import { inventoryRepository } from "../inventory/repository";
+import { inventoryRepository, recalcProductStock } from "../inventory/repository";
 import { orderItems, orders, orderItemAllocations, auditLogs, products, lots } from "@shared/schema";
 import { eq, sql, and, gt, or, isNull, asc } from "drizzle-orm";
 import type { Customer, InsertCustomer, Order, InsertOrder, OrderItem, InsertOrderItem, StockMovement } from "@shared/schema";
@@ -157,7 +157,9 @@ export const customersService = {
     allocations: { orderItemId: string; lotId: string; quantityAllocated: number }[],
     userId?: string,
   ): Promise<Order> {
-    return db.transaction(async (tx) => {
+    const affectedProductIds = new Set<string>();
+
+    const updatedOrder = await db.transaction(async (tx) => {
       const [order] = await tx.select().from(orders).where(eq(orders.id, orderId));
       if (!order) throw new Error("Order not found");
       if (order.status === "shipped" || order.status === "completed" || order.status === "cancelled") {
@@ -177,12 +179,8 @@ export const customersService = {
             .set({ remainingQuantity: restoredRemaining.toFixed(3), status: restoredRemaining > 0 ? "active" : lot.status })
             .where(eq(lots.id, prev.lotId));
         }
-        // Restore product stock
-        const [prod] = await tx.select().from(products).where(eq(products.id, prev.productId));
-        if (prod) {
-          const restoredStock = parseFloat(prod.currentStock) + prevQty;
-          await tx.update(products).set({ currentStock: restoredStock.toFixed(3) }).where(eq(products.id, prev.productId));
-        }
+        // Track previously allocated products for post-transaction recalc
+        affectedProductIds.add(prev.productId);
       }
 
       // Remove existing allocations
@@ -223,12 +221,7 @@ export const customersService = {
           .set({ remainingQuantity: newRemaining.toFixed(3), status: newRemaining <= 0 ? "consumed" : "active" })
           .where(eq(lots.id, alloc.lotId));
 
-        // Also deduct from product.currentStock to keep in sync
-        const [prod] = await tx.select().from(products).where(eq(products.id, item.productId));
-        if (prod) {
-          const newStock = Math.max(0, parseFloat(prod.currentStock) - alloc.quantityAllocated);
-          await tx.update(products).set({ currentStock: newStock.toFixed(3) }).where(eq(products.id, item.productId));
-        }
+        affectedProductIds.add(item.productId);
       }
 
       // Determine packed status
@@ -246,7 +239,7 @@ export const customersService = {
       else if (anyAllocated) newStatus = "partially_packed";
       else newStatus = "pending";
 
-      const [updatedOrder] = await tx.update(orders)
+      const [result] = await tx.update(orders)
         .set({ status: newStatus as Order["status"] })
         .where(eq(orders.id, orderId))
         .returning();
@@ -259,8 +252,15 @@ export const customersService = {
         userId: userId ?? null,
       });
 
-      return updatedOrder;
+      return result;
     });
+
+    // Recalc product stock from lots after all lot changes are committed
+    for (const productId of Array.from(affectedProductIds)) {
+      await recalcProductStock(productId);
+    }
+
+    return updatedOrder;
   },
 
   async shipOrder(
@@ -330,23 +330,41 @@ export const customersService = {
 
     const items = await repo.getOrderItems(orderId);
     const createdMovements: StockMovement[] = [];
+    const affectedProductIds = new Set<string>();
 
     for (const item of items) {
       const product = await repo.getProductById(item.productId);
       if (!product) continue;
 
-      const quantity = parseFloat(item.quantity);
-      const newStock = parseFloat(product.currentStock) - quantity;
-      await repo.updateProductStock(item.productId, newStock.toFixed(3));
+      let remaining = parseFloat(item.quantity);
+      const availableLots = await repo.getAvailableLotsForProduct(item.productId);
+
+      for (const lot of availableLots) {
+        if (remaining <= 0) break;
+        const lotRemaining = parseFloat(lot.remainingQuantity || "0");
+        const deduct = Math.min(remaining, lotRemaining);
+        const newLotRemaining = Math.max(0, lotRemaining - deduct).toFixed(3);
+        await inventoryRepository.updateLotRaw(lot.id, { remainingQuantity: newLotRemaining });
+        remaining -= deduct;
+      }
+
+      if (remaining > 0.001) {
+        throw new Error(`Insufficient lot stock to complete order item for product ${item.productId}. Shortage: ${remaining.toFixed(3)} ${product.unit || "KG"}.`);
+      }
 
       const movement = await inventoryRepository.createStockMovement({
         movementType: "shipment",
         productId: item.productId,
         orderId,
-        quantity: `-${quantity.toFixed(3)}`,
+        quantity: `-${parseFloat(item.quantity).toFixed(3)}`,
         reference: `Order ${order.orderNumber} completed - shipped to ${order.customerName}`,
       });
       createdMovements.push(movement);
+      affectedProductIds.add(item.productId);
+    }
+
+    for (const productId of Array.from(affectedProductIds)) {
+      await recalcProductStock(productId);
     }
 
     const updatedOrder = await repo.updateOrderStatus(orderId, "shipped");

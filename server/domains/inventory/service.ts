@@ -1,4 +1,4 @@
-import { inventoryRepository as repo, type BatchInputLotEntry, type BatchOutputLotEntry } from "./repository";
+import { inventoryRepository as repo, recalcStockFromLots, recalcMaterialStock, recalcProductStock, type BatchInputLotEntry, type BatchOutputLotEntry } from "./repository";
 import { createAuditLog } from "../../lib/auditLog";
 import { generateLotNumber, generateBarcodeValue } from "../../lib/lotUtils";
 import { getCurrentUserId } from "../../lib/requestContext";
@@ -58,20 +58,31 @@ export const inventoryService = {
   async createLot(data: InsertLot): Promise<Lot> {
     const created = await repo.createLotRaw(data);
     await createAuditLog({ entityType: "lot", entityId: created.id, action: "create", changes: JSON.stringify(data) });
+    if (created.materialId) await recalcMaterialStock(created.materialId);
+    if (created.productId) await recalcProductStock(created.productId);
     return created;
   },
 
   async updateLot(id: string, data: Partial<InsertLot>): Promise<Lot | undefined> {
+    const existing = await repo.getLot(id);
     const updated = await repo.updateLotRaw(id, data);
     if (updated) {
       await createAuditLog({ entityType: "lot", entityId: id, action: "update", changes: JSON.stringify(data) });
+      const lotAfter = updated;
+      if (lotAfter.materialId) await recalcMaterialStock(lotAfter.materialId);
+      if (lotAfter.productId) await recalcProductStock(lotAfter.productId);
+      if (existing?.materialId && existing.materialId !== lotAfter.materialId) await recalcMaterialStock(existing.materialId);
+      if (existing?.productId && existing.productId !== lotAfter.productId) await recalcProductStock(existing.productId);
     }
     return updated;
   },
 
   async deleteLot(id: string): Promise<void> {
+    const lot = await repo.getLot(id);
     await repo.deleteLotRaw(id);
     await createAuditLog({ entityType: "lot", entityId: id, action: "delete", changes: JSON.stringify({ deleted: true }) });
+    if (lot?.materialId) await recalcMaterialStock(lot.materialId);
+    if (lot?.productId) await recalcProductStock(lot.productId);
   },
 
   async recordLotTesting(
@@ -180,12 +191,7 @@ export const inventoryService = {
       testingStatus: "not_required",
     });
 
-    const newStock = (parseFloat(currentStock || "0") + quantityNum).toFixed(3);
-    if (itemType === "product") {
-      await repo.updateProductStock(itemId, newStock);
-    } else {
-      await repo.updateMaterialStock(itemId, newStock);
-    }
+    await recalcStockFromLots(itemId, itemType);
 
     const movement = await repo.createStockMovement({
       movementType: "receipt",

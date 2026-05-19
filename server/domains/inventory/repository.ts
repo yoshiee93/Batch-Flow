@@ -7,6 +7,56 @@ import {
   type AuditLog,
 } from "@shared/schema";
 
+export async function recalcMaterialStock(materialId: string): Promise<void> {
+  const result = await db
+    .select({ total: sql<string>`COALESCE(SUM(CAST(${lots.remainingQuantity} AS NUMERIC)), 0)` })
+    .from(lots)
+    .where(
+      and(
+        eq(lots.materialId, materialId),
+        eq(lots.status, "active"),
+        gt(sql`CAST(${lots.remainingQuantity} AS NUMERIC)`, sql`0`)
+      )
+    );
+  const newStock = parseFloat(result[0]?.total || "0").toFixed(3);
+  await db.update(materials).set({ currentStock: newStock }).where(eq(materials.id, materialId));
+}
+
+export async function recalcProductStock(productId: string): Promise<void> {
+  const result = await db
+    .select({ total: sql<string>`COALESCE(SUM(CAST(${lots.remainingQuantity} AS NUMERIC)), 0)` })
+    .from(lots)
+    .where(
+      and(
+        eq(lots.productId, productId),
+        eq(lots.lotType, "finished_good"),
+        eq(lots.status, "active"),
+        gt(sql`CAST(${lots.remainingQuantity} AS NUMERIC)`, sql`0`)
+      )
+    );
+  const newStock = parseFloat(result[0]?.total || "0").toFixed(3);
+  await db.update(products).set({ currentStock: newStock }).where(eq(products.id, productId));
+}
+
+export async function recalcStockFromLots(itemId: string, itemType: "material" | "product"): Promise<void> {
+  if (itemType === "material") {
+    await recalcMaterialStock(itemId);
+  } else {
+    await recalcProductStock(itemId);
+  }
+}
+
+export async function syncAllStockFromLots(): Promise<void> {
+  const allMaterials = await db.select({ id: materials.id }).from(materials);
+  for (const m of allMaterials) {
+    await recalcMaterialStock(m.id);
+  }
+  const allProducts = await db.select({ id: products.id }).from(products);
+  for (const p of allProducts) {
+    await recalcProductStock(p.id);
+  }
+}
+
 export type LotUsageEntry = {
   batchId: string;
   batchNumber: string;

@@ -8,6 +8,7 @@ import { createServer } from "http";
 import { seedIfEmpty } from "./seed";
 import { labelsRepository } from "./domains/labels/repository";
 import { requestContextMiddleware } from "./lib/requestContext";
+import { syncAllStockFromLots } from "./domains/inventory/repository";
 
 const app = express();
 const httpServer = createServer(app);
@@ -84,6 +85,7 @@ app.use((req, res, next) => {
 (async () => {
   await seedIfEmpty();
   await labelsRepository.ensureDefaultTemplates();
+  await syncAllStockFromLots();
   await registerRoutes(httpServer, app);
 
 

@@ -1,6 +1,6 @@
 import { db } from "../../db";
 import { productionRepository as repo } from "./repository";
-import { inventoryRepository, type BatchInputLotEntry, type BatchOutputLotEntry } from "../inventory/repository";
+import { inventoryRepository, recalcMaterialStock, recalcProductStock, type BatchInputLotEntry, type BatchOutputLotEntry } from "../inventory/repository";
 import { catalogRepository } from "../catalog/repository";
 import { createAuditLog } from "../../lib/auditLog";
 import { generateLotNumber, generateBarcodeValue, deriveLotNumber } from "../../lib/lotUtils";
@@ -84,27 +84,34 @@ export const productionService = {
   },
 
   async deleteBatch(id: string): Promise<void> {
-    // Direct db.transaction used here: multi-table cascade + stock reversal must be atomic.
+    // Collect affected IDs before the transaction so we can recalc stock after deletion
+    const preOutputs = await db.select({ productId: batchOutputs.productId }).from(batchOutputs).where(eq(batchOutputs.batchId, id));
+    const preInputs = await db.select({ materialId: batchMaterials.materialId, productId: batchMaterials.productId }).from(batchMaterials).where(eq(batchMaterials.batchId, id));
+    const affectedProductIds = new Set<string>([
+      ...preOutputs.map(o => o.productId),
+      ...preInputs.filter(bm => bm.productId && !bm.materialId).map(bm => bm.productId!),
+    ]);
+    const affectedMaterialIds = new Set<string>(preInputs.filter(bm => bm.materialId).map(bm => bm.materialId!));
+
+    // Direct db.transaction used here: multi-table cascade must be atomic.
     // Drizzle transactions require the tx context to be threaded through all statements,
     // so repository methods (which use the module-level db) cannot participate in this tx.
     await db.transaction(async (tx) => {
       const outputs = await tx.select().from(batchOutputs).where(eq(batchOutputs.batchId, id));
-      for (const output of outputs) {
-        const [product] = await tx.select().from(productsTable).where(eq(productsTable.id, output.productId));
-        if (product) {
-          const newStock = Math.max(0, parseFloat(product.currentStock || "0") - parseFloat(output.quantity)).toFixed(2);
-          await tx.update(productsTable).set({ currentStock: newStock }).where(eq(productsTable.id, output.productId));
-        }
-      }
       const inputMaterials = await tx.select().from(batchMaterials).where(eq(batchMaterials.batchId, id));
+
+      // Restore consumed input lot quantities before deleting batchMaterials
       for (const bm of inputMaterials) {
-        if (!bm.materialId) continue;
-        const [material] = await tx.select().from(materialsTable).where(eq(materialsTable.id, bm.materialId));
-        if (material) {
-          const restoredStock = (parseFloat(material.currentStock || "0") + parseFloat(bm.quantity)).toFixed(2);
-          await tx.update(materialsTable).set({ currentStock: restoredStock }).where(eq(materialsTable.id, bm.materialId));
+        const inputQty = parseFloat(bm.quantity || "0");
+        for (const lotColId of [bm.lotId, bm.sourceLotId]) {
+          if (!lotColId) continue;
+          const [currentLot] = await tx.select().from(lots).where(eq(lots.id, lotColId));
+          if (!currentLot) continue;
+          const newRemaining = (parseFloat(currentLot.remainingQuantity || "0") + inputQty).toFixed(3);
+          await tx.update(lots).set({ remainingQuantity: newRemaining, status: "active" }).where(eq(lots.id, lotColId));
         }
       }
+
       await tx.delete(stockMovements).where(eq(stockMovements.batchId, id));
       await tx.delete(lots).where(eq(lots.sourceBatchId, id));
       await tx.delete(batchMaterials).where(eq(batchMaterials.batchId, id));
@@ -118,6 +125,15 @@ export const productionService = {
         changes: JSON.stringify({ deleted: true, outputsReversed: outputs.length, materialsRestored: inputMaterials.length }),
       });
     });
+
+    // Recalc stock from lots after all lot deletions are committed
+    for (const productId of Array.from(affectedProductIds)) {
+      await recalcProductStock(productId);
+    }
+    for (const materialId of Array.from(affectedMaterialIds)) {
+      await recalcMaterialStock(materialId);
+    }
+
     const { customersService } = await import("../customers/service");
     await customersService.runStockAllocation();
   },
@@ -138,17 +154,9 @@ export const productionService = {
     await repo.updateLotRemainingAndStatus(lotId, newRemaining, newStatus);
 
     if (lot.materialId) {
-      const material = await repo.getMaterialById(lot.materialId);
-      if (material) {
-        const newStock = Math.max(0, parseFloat(material.currentStock || "0") - quantityNum).toFixed(3);
-        await repo.updateMaterialStock(lot.materialId, newStock);
-      }
+      await recalcMaterialStock(lot.materialId);
     } else if (lot.productId) {
-      const product = await repo.getProductById(lot.productId);
-      if (product) {
-        const newStock = Math.max(0, parseFloat(product.currentStock || "0") - quantityNum).toFixed(3);
-        await repo.updateProductStock(lot.productId, newStock);
-      }
+      await recalcProductStock(lot.productId);
     }
 
     const batchMaterial = await repo.insertBatchMaterial({
@@ -186,11 +194,26 @@ export const productionService = {
     const material = await repo.getMaterialById(materialId);
     if (!material) throw new Error("Material not found");
 
-    const currentStock = parseFloat(material.currentStock || "0");
-    if (quantityNum > currentStock) throw new Error(`Insufficient stock. Available: ${currentStock} ${material.unit || "KG"}`);
-
-    const newStock = (currentStock - quantityNum).toFixed(2);
-    await repo.updateMaterialStock(materialId, newStock);
+    // Deduct from active material lots FIFO so currentStock stays accurate
+    const availableLots = await inventoryRepository.getLotsByMaterial(materialId);
+    const totalAvailable = availableLots.reduce((sum, l) => sum + parseFloat(l.remainingQuantity || "0"), 0);
+    if (quantityNum > totalAvailable + 0.0001) {
+      throw new Error(`Insufficient stock. Available: ${totalAvailable.toFixed(2)} ${material.unit || "KG"}`);
+    }
+    let remaining = quantityNum;
+    for (const lot of availableLots) {
+      if (remaining <= 0) break;
+      const lotRemaining = parseFloat(lot.remainingQuantity || "0");
+      if (lotRemaining <= 0) continue;
+      const deduct = Math.min(remaining, lotRemaining);
+      const newRemainingQty = Math.max(0, lotRemaining - deduct).toFixed(3);
+      const newStatus = parseFloat(newRemainingQty) <= 0
+        ? 'consumed'
+        : (lot.status as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired');
+      await repo.updateLotRemainingAndStatus(lot.id, newRemainingQty, newStatus);
+      remaining -= deduct;
+    }
+    await recalcMaterialStock(materialId);
 
     const batchMaterial = await repo.insertBatchMaterial({ batchId, materialId, lotId: null, quantity });
 
@@ -222,9 +245,6 @@ export const productionService = {
     }
 
     // --- All constraints satisfied — now perform writes ---
-    const newStock = (currentStock - quantityNum).toFixed(2);
-    await repo.updateProductStock(productId, newStock);
-
     if (sourceLot && sourceLotId) {
       const lotRemaining = parseFloat(sourceLot.remainingQuantity || "0");
       const newRemainingQty = (lotRemaining - quantityNum).toFixed(2);
@@ -232,7 +252,24 @@ export const productionService = {
         ? 'consumed'
         : (sourceLot.status as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired');
       await repo.updateLotRemainingAndStatus(sourceLotId, newRemainingQty, newStatus);
+    } else {
+      // No source lot specified — deduct from available product lots FIFO so currentStock stays accurate
+      let remaining = quantityNum;
+      const availableLots = await inventoryRepository.getLotsByProduct(productId);
+      for (const lot of availableLots) {
+        if (remaining <= 0) break;
+        const lotRemaining = parseFloat(lot.remainingQuantity || "0");
+        if (lotRemaining <= 0) continue;
+        const deduct = Math.min(remaining, lotRemaining);
+        const newRemainingQty = Math.max(0, lotRemaining - deduct).toFixed(2);
+        const newStatus = parseFloat(newRemainingQty) <= 0
+          ? 'consumed'
+          : (lot.status as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired');
+        await repo.updateLotRemainingAndStatus(lot.id, newRemainingQty, newStatus);
+        remaining -= deduct;
+      }
     }
+    await recalcProductStock(productId);
 
     const batchMaterial = await repo.insertBatchMaterial({ batchId, materialId: null, productId, lotId: null, sourceLotId: sourceLotId || null, quantity });
 
@@ -263,18 +300,10 @@ export const productionService = {
       }
     }
     if (bm.materialId) {
-      const material = await repo.getMaterialById(bm.materialId);
-      if (material) {
-        const restoredStock = (parseFloat(material.currentStock || "0") + parseFloat(bm.quantity)).toFixed(2);
-        await repo.updateMaterialStock(bm.materialId, restoredStock);
-      }
+      await recalcMaterialStock(bm.materialId);
     }
     if (bm.productId && !bm.materialId) {
-      const product = await repo.getProductById(bm.productId);
-      if (product) {
-        const restoredStock = (parseFloat(product.currentStock || "0") + parseFloat(bm.quantity)).toFixed(2);
-        await repo.updateProductStock(bm.productId, restoredStock);
-      }
+      await recalcProductStock(bm.productId);
     }
 
     await createStockMovement({ movementType: "adjustment", materialId: bm.materialId, productId: bm.productId, lotId: bm.lotId || bm.sourceLotId, batchId: bm.batchId, quantity: bm.quantity, reference: "Batch input removed - reversal" });
@@ -329,14 +358,6 @@ export const productionService = {
     }
 
     // --- All constraints satisfied — now perform writes ---
-    if (material && bm.materialId) {
-      const materialStock = parseFloat(material.currentStock || "0");
-      await repo.updateMaterialStock(bm.materialId, (materialStock - delta).toFixed(2));
-    }
-    if (product && bm.productId) {
-      const productStock = parseFloat(product.currentStock || "0");
-      await repo.updateProductStock(bm.productId, (productStock - delta).toFixed(2));
-    }
     if (inputLot && bm.lotId) {
       const lotRemaining = parseFloat(inputLot.remainingQuantity || "0");
       const newLotRemaining = (lotRemaining - delta).toFixed(2);
@@ -348,6 +369,13 @@ export const productionService = {
       const newLotRemaining = (lotRemaining - delta).toFixed(2);
       const newLotStatus = parseFloat(newLotRemaining) <= 0 ? 'consumed' : (sourceLot.status === 'consumed' ? 'active' : sourceLot.status) as 'active' | 'quarantined' | 'released' | 'consumed' | 'expired';
       await repo.updateLotRemainingAndStatus(bm.sourceLotId, newLotRemaining, newLotStatus);
+    }
+
+    if (bm.materialId) {
+      await recalcMaterialStock(bm.materialId);
+    }
+    if (bm.productId && !bm.materialId) {
+      await recalcProductStock(bm.productId);
     }
 
     const updated = await repo.updateBatchMaterialQty(id, newQuantity);
@@ -366,8 +394,6 @@ export const productionService = {
     if (!product) throw new Error("Product not found");
 
     const output = await repo.insertBatchOutput({ batchId, productId, quantity });
-    const newStock = (parseFloat(product.currentStock || "0") + quantityNum).toFixed(2);
-    await repo.updateProductStock(productId, newStock);
 
     await createStockMovement({ movementType: "production_output", productId, batchId, quantity, reference: `Production output: ${product.name}` });
     await createAuditLog({ entityType: "batch", entityId: batchId, action: "output_added", changes: JSON.stringify({ productId, quantity }) });
@@ -397,7 +423,9 @@ export const productionService = {
         await repo.updateLotFields(lot.id, { quantity: totalQty, remainingQuantity: newRemaining });
         await createAuditLog({ entityType: "lot", entityId: lot.id, action: "finished_lot_qty_increased", changes: JSON.stringify({ productId, addedQty: quantity, newTotal: totalQty }) });
       }
+      await recalcProductStock(productId);
     }
+    // Non-completed batches: no lot created yet, so no stock change until finalization
 
     const { customersService } = await import("../customers/service");
     await customersService.runStockAllocation();
@@ -410,16 +438,6 @@ export const productionService = {
     if (!output) return;
 
     const batch = await repo.getBatch(output.batchId);
-
-    const product = await repo.getProductById(output.productId);
-    if (product) {
-      const currentStock = parseFloat(product.currentStock || "0");
-      const removeQty = parseFloat(output.quantity);
-      if (currentStock - removeQty < 0) {
-        throw new Error(`Cannot remove output: product "${product.name}" current stock (${currentStock.toFixed(2)} KG) is less than the output quantity being reversed (${removeQty.toFixed(2)} KG). Stock may have already been consumed.`);
-      }
-      await repo.updateProductStock(output.productId, (currentStock - removeQty).toFixed(2));
-    }
 
     // For completed batches, update or remove the associated finished-good lot
     if (batch && batch.status === "completed") {
@@ -450,7 +468,9 @@ export const productionService = {
           await createAuditLog({ entityType: "lot", entityId: lot.id, action: "finished_lot_qty_decreased", changes: JSON.stringify({ lotId: lot.id, productId: output.productId, removedQty: output.quantity, newTotal: remainingTotal.toFixed(3) }) });
         }
       }
+      await recalcProductStock(output.productId);
     }
+    // Non-completed batches: no lot was ever created for this output, so no stock change needed
 
     await createStockMovement({ movementType: "adjustment", productId: output.productId, batchId: output.batchId, quantity: `-${output.quantity}`, reference: "Production output removed - reversal" });
     await repo.deleteBatchOutputById(id);
@@ -471,16 +491,6 @@ export const productionService = {
     const delta = newQty - oldQty;
     if (delta === 0) return output;
 
-    // Adjust product stock by delta — reject if reduction would drive stock negative
-    const product = await repo.getProductById(output.productId);
-    if (product) {
-      const currentStock = parseFloat(product.currentStock || "0");
-      if (delta < 0 && currentStock + delta < 0) {
-        throw new Error(`Cannot reduce output: product "${product.name}" current stock (${currentStock.toFixed(2)} KG) is less than the quantity being reversed (${Math.abs(delta).toFixed(2)} KG). Stock may have already been consumed.`);
-      }
-      await repo.updateProductStock(output.productId, (currentStock + delta).toFixed(2));
-    }
-
     // Adjust the finished-good lot quantity if the batch is completed
     const batch = await repo.getBatch(output.batchId);
     if (batch && batch.status === "completed") {
@@ -500,7 +510,9 @@ export const productionService = {
         const newRemainingQty = Math.max(0, parseFloat(lot.remainingQuantity || "0") + delta).toFixed(3);
         await repo.updateLotFields(lot.id, { quantity: newLotQty, remainingQuantity: newRemainingQty });
       }
+      await recalcProductStock(output.productId);
     }
+    // Non-completed batches: no lot was ever created for this output, so no stock change needed
 
     const updated = await repo.updateBatchOutputQty(id, newQuantity);
 
@@ -616,6 +628,15 @@ export const productionService = {
       }
     }
 
+    // Recalc product stock from lots after finalizing (lots were created/updated above)
+    if (markCompleted) {
+      const affectedProductIds = new Set<string>(outputs.map(o => o.productId));
+      if (outputs.length === 0) affectedProductIds.add(batch.productId);
+      for (const productId of Array.from(affectedProductIds)) {
+        await recalcProductStock(productId);
+      }
+    }
+
     await createAuditLog({ entityType: "batch", entityId: batchId, action: markCompleted ? "completed" : "updated", changes: JSON.stringify({ totalOutput, wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, finishTime: effectiveFinishTime?.toISOString() ?? null, productAssessment: productAssessment ?? null, markCompleted }) });
 
     const outputLots = await inventoryRepository.getBatchOutputLots(batchId);
@@ -646,6 +667,8 @@ export const productionService = {
     const now = new Date();
     const batchDate = batch.startDate ? new Date(batch.startDate) : now;
 
+    const affectedProductIds = new Set<string>();
+
     if (outputs.length > 0) {
       for (const output of outputs) {
         const existing = await repo.getLotsForBatchAndProduct(batchId, output.productId);
@@ -659,6 +682,7 @@ export const productionService = {
           });
           await createStockMovement({ movementType: "production_output", productId: output.productId, lotId: finishedLot.id, batchId, quantity: output.quantity, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
           await createAuditLog({ entityType: "lot", entityId: finishedLot.id, action: "finished_lot_created", changes: JSON.stringify({ lotNumber, barcodeValue, productId: output.productId, quantity: output.quantity, sourceBatchId: batchId, regenerated: true }) });
+          affectedProductIds.add(output.productId);
         }
       }
     } else {
@@ -673,7 +697,12 @@ export const productionService = {
         });
         await createStockMovement({ movementType: "production_output", productId: batch.productId, lotId: finishedLot.id, batchId, quantity: batch.actualQuantity!, reference: `Finished lot assigned: ${finishedLot.lotNumber}` });
         await createAuditLog({ entityType: "lot", entityId: finishedLot.id, action: "finished_lot_created", changes: JSON.stringify({ lotNumber, barcodeValue, productId: batch.productId, quantity: batch.actualQuantity, sourceBatchId: batchId, regenerated: true }) });
+        affectedProductIds.add(batch.productId);
       }
+    }
+
+    for (const productId of Array.from(affectedProductIds)) {
+      await recalcProductStock(productId);
     }
 
     return inventoryRepository.getBatchOutputLots(batchId);
