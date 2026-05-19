@@ -29,7 +29,6 @@ export async function recalcProductStock(productId: string): Promise<void> {
     .where(
       and(
         eq(lots.productId, productId),
-        eq(lots.lotType, "finished_good"),
         eq(lots.status, "active"),
         gt(sql`CAST(${lots.remainingQuantity} AS NUMERIC)`, sql`0`)
       )
