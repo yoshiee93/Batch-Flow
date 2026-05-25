@@ -1,0 +1,96 @@
+Review only the label system.
+
+Do not rewrite the app.
+Do not change production, inventory, traceability, customers, or batch logic.
+Do not change existing print behaviour unless required for the requested label features.
+
+Focus on:
+client/src/features/labels/components/CustomLabelBuilder.tsx
+client/src/features/labels/components/PrintCustomLabel.tsx
+client/src/features/labels/api.ts
+server/domains/labels/routes.ts
+server/domains/labels/repository.ts
+shared/schema.ts
+
+Current system already supports:
+- label_templates table
+- customerId on label templates
+- default label templates
+- saved layout JSON inside settings.layout
+- customer defaultLabelTemplateId
+- print history
+
+Add these features only:
+
+1. In Custom Label Builder, add “Create Template”.
+Allow user to create a new label template from the builder.
+Fields:
+- template name
+- label type
+- optional customer
+- default yes/no
+- starting layout: blank or copy current layout
+
+2. Add “Duplicate Template”.
+Duplicate selected template under a new name.
+Keep layout and settings.
+Allow assigning a customer.
+
+3. Add “Rename Template”.
+Allow selected template name to be changed without editing database manually.
+
+4. Add customer filter in builder.
+Allow filter by:
+- All templates
+- Global templates
+- Customer-specific templates
+- Specific customer
+
+5. Add export button.
+Export selected label template as JSON.
+Include:
+- name
+- labelType
+- customerId or customer name if available
+- isDefault
+- settings
+- settings.layout
+
+6. Add import button.
+Import a label template JSON file.
+Validate before saving.
+Do not overwrite existing templates automatically.
+Ask for/import under a new name if name already exists.
+
+7. Add print custom label customer field.
+In PrintCustomLabel, allow selecting customer.
+When customer is selected, show customer-specific templates first.
+Save customerName into LabelDataContext.
+
+8. Add safe validation.
+Reject imported templates if:
+- missing name
+- missing labelType
+- invalid labelType
+- invalid settings/layout object
+- layout elements are not an array
+
+9. Do not add a new table.
+Use existing label_templates table.
+Store layout in settings.layout.
+
+10. Do not break existing default templates.
+Keep raw_intake, finished_output, and batch defaults working.
+
+11. Keep changes minimal.
+Prefer extending existing hooks:
+useCreateLabelTemplate
+useUpdateLabelTemplate
+useLabelTemplates
+
+12. Run:
+npm install
+npm run check
+npm run build
+
+Fix only build errors caused by this change.
