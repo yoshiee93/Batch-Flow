@@ -1,4 +1,4 @@
-import { eq, and, isNull, desc, gte, lte, or, ilike, sql, type SQL } from "drizzle-orm";
+import { eq, and, isNull, ne, desc, gte, lte, or, ilike, sql, type SQL } from "drizzle-orm";
 import { db } from "../../db";
 import {
   labelTemplates, customers, printHistory, users,
@@ -79,6 +79,20 @@ export const labelsRepository = {
 
   async deleteTemplate(id: string): Promise<void> {
     await db.delete(labelTemplates).where(eq(labelTemplates.id, id));
+  },
+
+  async clearDefaultsInScope(labelType: LabelTemplateType, customerId: string | null, excludeId: string): Promise<void> {
+    const scopeCond = customerId
+      ? eq(labelTemplates.customerId, customerId)
+      : isNull(labelTemplates.customerId);
+    await db.update(labelTemplates)
+      .set({ isDefault: false, updatedAt: new Date() })
+      .where(and(
+        eq(labelTemplates.labelType, labelType),
+        eq(labelTemplates.isDefault, true),
+        scopeCond,
+        ne(labelTemplates.id, excludeId),
+      ));
   },
 
   async ensureDefaultTemplates(): Promise<void> {

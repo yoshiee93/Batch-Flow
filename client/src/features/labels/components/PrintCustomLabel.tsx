@@ -11,17 +11,21 @@ import {
   parseLabelTemplateSettings,
   type LabelTemplate,
 } from "@/features/labels/api";
+import { useCustomers } from "@/features/customers/api";
 import { printLayoutLabel, type LabelDataContext } from "@/lib/labelLayoutPrint";
 import { printBarcodeLabel, type LabelData } from "@/lib/barcodePrint";
 import { useToast } from "@/hooks/use-toast";
 
 const NO_TEMPLATE = "__none__";
+const NO_CUSTOMER = "__none__";
 
 export default function PrintCustomLabel() {
   const { data: templates = [] } = useLabelTemplates();
+  const { data: customers = [] } = useCustomers();
   const recordPrint = useRecordPrint();
   const { toast } = useToast();
   const [templateId, setTemplateId] = useState<string>(NO_TEMPLATE);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(NO_CUSTOMER);
   const [productName, setProductName] = useState("");
   const [batchCode, setBatchCode] = useState("");
   const [lotNumber, setLotNumber] = useState("");
@@ -32,6 +36,19 @@ export default function PrintCustomLabel() {
   const [supplierLot, setSupplierLot] = useState("");
   const [barcodeValue, setBarcodeValue] = useState("");
   const [categoryName, setCategoryName] = useState("");
+
+  const selectedCustomer = useMemo(
+    () => (selectedCustomerId !== NO_CUSTOMER ? customers.find(c => c.id === selectedCustomerId) ?? null : null),
+    [customers, selectedCustomerId],
+  );
+
+  const sortedTemplates = useMemo(() => {
+    if (!selectedCustomer) return templates;
+    const customerTemplates = templates.filter(t => t.customerId === selectedCustomer.id);
+    const globalTemplates = templates.filter(t => !t.customerId);
+    const otherTemplates = templates.filter(t => t.customerId && t.customerId !== selectedCustomer.id);
+    return [...customerTemplates, ...globalTemplates, ...otherTemplates];
+  }, [templates, selectedCustomer]);
 
   const selected: LabelTemplate | undefined = useMemo(
     () => templates.find(t => t.id === templateId),
@@ -51,6 +68,7 @@ export default function PrintCustomLabel() {
       supplierLot: supplierLot || null,
       barcodeValue: barcodeValue || lotNumber || batchCode,
       categoryName: categoryName || null,
+      customerName: selectedCustomer?.name ?? null,
     };
 
     const settings = selected ? parseLabelTemplateSettings(selected.settings) : null;
@@ -104,7 +122,7 @@ export default function PrintCustomLabel() {
         ctx,
         legacyData,
         templateTypeForResolve: labelType,
-        customerId: null,
+        customerId: selectedCustomer?.id ?? null,
       },
     });
   }
@@ -121,19 +139,33 @@ export default function PrintCustomLabel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-1">
-          <Label>Template</Label>
-          <Select value={templateId} onValueChange={setTemplateId}>
-            <SelectTrigger data-testid="select-print-custom-template"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_TEMPLATE}>No template — standard format</SelectItem>
-              {templates.map(t => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.name} ({t.labelType.replace("_", " ")})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label>Customer <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+              <SelectTrigger data-testid="select-print-custom-customer"><SelectValue placeholder="No customer selected" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_CUSTOMER}>No customer selected</SelectItem>
+                {customers.filter(c => c.active).map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Template</Label>
+            <Select value={templateId} onValueChange={setTemplateId}>
+              <SelectTrigger data-testid="select-print-custom-template"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_TEMPLATE}>No template — standard format</SelectItem>
+                {sortedTemplates.map(t => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name} ({t.labelType.replace(/_/g, " ")}){t.customerId ? " ★" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

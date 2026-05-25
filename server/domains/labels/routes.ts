@@ -35,12 +35,23 @@ labelsRouter.get("/label-templates/:id", adminOnly, asyncHandler(async (req, res
 labelsRouter.post("/label-templates", adminOnly, asyncHandler(async (req, res) => {
   const data = insertLabelTemplateSchema.parse(req.body);
   const created = await labelsRepository.createTemplate(data);
+  if (created.isDefault) {
+    await labelsRepository.clearDefaultsInScope(created.labelType, created.customerId ?? null, created.id);
+  }
   await createAuditLog({ entityType: "label_template", entityId: created.id, action: "create", changes: JSON.stringify(data) });
   res.status(201).json(created);
 }));
 
 labelsRouter.patch("/label-templates/:id", adminOnly, asyncHandler(async (req, res) => {
   const data = insertLabelTemplateSchema.partial().parse(req.body);
+  if (data.isDefault) {
+    const existing = await labelsRepository.getTemplate(req.params.id);
+    if (existing) {
+      const scopedType = data.labelType ?? existing.labelType;
+      const scopedCustomerId = "customerId" in data ? (data.customerId ?? null) : (existing.customerId ?? null);
+      await labelsRepository.clearDefaultsInScope(scopedType, scopedCustomerId, req.params.id);
+    }
+  }
   const template = await labelsRepository.updateTemplate(req.params.id, data);
   if (!template) return res.status(404).json({ error: "Template not found" });
   await createAuditLog({ entityType: "label_template", entityId: req.params.id, action: "update", changes: JSON.stringify(data) });
