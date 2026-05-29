@@ -1,4 +1,4 @@
-import { useParams, Link } from 'wouter';
+import { useParams, Link, useLocation } from 'wouter';
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription
 } from '@/components/ui/card';
@@ -8,15 +8,16 @@ import { Separator } from '@/components/ui/separator';
 import {
   ArrowLeft, ChevronRight, Loader2, AlertCircle, Package, Factory,
   Tag, Truck, ArrowRight, ArrowUpRight, ClipboardList, Calendar,
-  Hash, Barcode, ExternalLink, Printer, ThermometerSnowflake, Eye, User as UserIcon, Camera, FlaskConical
+  Hash, Barcode, ExternalLink, Printer, ThermometerSnowflake, Eye, User as UserIcon, Camera, FlaskConical,
+  Pencil, Trash2
 } from 'lucide-react';
 import { useState } from 'react';
 import {
   useLotById, useLotUsage, useLotLineage, useMaterials, useProducts, useBatch,
-  useRecordLotTesting, useCategories,
-  type LotUsageEntry, type OutputLot, type VisualInspection
+  useRecordLotTesting, useCategories, useUpdateLot, useDeleteLot,
+  type LotUsageEntry, type OutputLot, type VisualInspection, type Lot
 } from '@/lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label as UiLabel } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -108,9 +109,15 @@ export default function LotDetail() {
   const recordPrint = useRecordPrint();
   const recordTesting = useRecordLotTesting();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const updateLot = useUpdateLot();
+  const deleteLot = useDeleteLot();
   const { isAdmin } = useRole();
   const [testingDialogOpen, setTestingDialogOpen] = useState(false);
   const [testingForm, setTestingForm] = useState<{ status: 'not_required' | 'pending' | 'passed' | 'failed'; notes: string; certificate: string }>({ status: 'pending', notes: '', certificate: '' });
+  const [editLotOpen, setEditLotOpen] = useState(false);
+  const [editLotForm, setEditLotForm] = useState({ status: '', remainingQuantity: '', notes: '', supplierName: '', supplierLot: '', expiryDate: '' });
+  const [deleteLotOpen, setDeleteLotOpen] = useState(false);
 
   if (lotLoading) {
     return (
@@ -470,6 +477,34 @@ export default function LotDetail() {
               Record Testing
             </Button>
           )}
+          <Button
+            variant="outline"
+            className="w-full"
+            data-testid="button-edit-lot"
+            onClick={() => {
+              setEditLotForm({
+                status: lot.status ?? 'active',
+                remainingQuantity: lot.remainingQuantity ?? lot.quantity ?? '',
+                notes: lot.notes ?? '',
+                supplierName: lot.supplierName ?? '',
+                supplierLot: lot.supplierLot ?? '',
+                expiryDate: lot.expiryDate ? lot.expiryDate.slice(0, 10) : '',
+              });
+              setEditLotOpen(true);
+            }}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit Lot
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full text-destructive hover:text-destructive"
+            data-testid="button-delete-lot"
+            onClick={() => setDeleteLotOpen(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete Lot
+          </Button>
         </div>
       </div>
 
@@ -744,6 +779,157 @@ export default function LotDetail() {
           </Link>
         </CardContent>
       </Card>
+
+      {/* Edit Lot Dialog */}
+      <Dialog open={editLotOpen} onOpenChange={setEditLotOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Lot</DialogTitle>
+            <DialogDescription>
+              Editing <span className="font-mono font-semibold">{lot.lotNumber}</span>. Lot number and item link cannot be changed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <UiLabel htmlFor="detail-edit-lot-status">Status</UiLabel>
+              <Select value={editLotForm.status} onValueChange={(v) => setEditLotForm({ ...editLotForm, status: v })}>
+                <SelectTrigger id="detail-edit-lot-status" data-testid="select-detail-edit-lot-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="quarantined">Quarantined</SelectItem>
+                  <SelectItem value="released">Released</SelectItem>
+                  <SelectItem value="consumed">Consumed</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <UiLabel htmlFor="detail-edit-lot-remaining">Remaining Quantity</UiLabel>
+              <Input
+                id="detail-edit-lot-remaining"
+                type="number"
+                min="0"
+                step="0.01"
+                value={editLotForm.remainingQuantity}
+                onChange={(e) => setEditLotForm({ ...editLotForm, remainingQuantity: e.target.value })}
+                data-testid="input-detail-edit-lot-remaining"
+              />
+            </div>
+            <div className="space-y-2">
+              <UiLabel htmlFor="detail-edit-lot-expiry">Expiry Date</UiLabel>
+              <Input
+                id="detail-edit-lot-expiry"
+                type="date"
+                value={editLotForm.expiryDate}
+                onChange={(e) => setEditLotForm({ ...editLotForm, expiryDate: e.target.value })}
+                data-testid="input-detail-edit-lot-expiry"
+              />
+            </div>
+            <div className="space-y-2">
+              <UiLabel htmlFor="detail-edit-lot-supplier">Supplier Name</UiLabel>
+              <Input
+                id="detail-edit-lot-supplier"
+                value={editLotForm.supplierName}
+                onChange={(e) => setEditLotForm({ ...editLotForm, supplierName: e.target.value })}
+                placeholder="Supplier or source name"
+                data-testid="input-detail-edit-lot-supplier"
+              />
+            </div>
+            <div className="space-y-2">
+              <UiLabel htmlFor="detail-edit-lot-supplier-lot">Supplier Lot Reference</UiLabel>
+              <Input
+                id="detail-edit-lot-supplier-lot"
+                value={editLotForm.supplierLot}
+                onChange={(e) => setEditLotForm({ ...editLotForm, supplierLot: e.target.value })}
+                placeholder="External lot or batch ref"
+                data-testid="input-detail-edit-lot-supplier-lot"
+              />
+            </div>
+            <div className="space-y-2">
+              <UiLabel htmlFor="detail-edit-lot-notes">Notes</UiLabel>
+              <Textarea
+                id="detail-edit-lot-notes"
+                value={editLotForm.notes}
+                onChange={(e) => setEditLotForm({ ...editLotForm, notes: e.target.value })}
+                rows={3}
+                data-testid="input-detail-edit-lot-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditLotOpen(false)}>Cancel</Button>
+            <Button
+              data-testid="button-detail-save-edit-lot"
+              disabled={updateLot.isPending}
+              onClick={async () => {
+                try {
+                  await updateLot.mutateAsync({
+                    id: lot.id,
+                    status: editLotForm.status as Lot['status'],
+                    remainingQuantity: editLotForm.remainingQuantity || undefined,
+                    notes: editLotForm.notes || null,
+                    supplierName: editLotForm.supplierName || null,
+                    supplierLot: editLotForm.supplierLot || null,
+                    expiryDate: editLotForm.expiryDate || null,
+                  });
+                  toast({ title: 'Lot updated', description: `${lot.lotNumber} has been updated.` });
+                  setEditLotOpen(false);
+                } catch (err) {
+                  toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to update lot', variant: 'destructive' });
+                }
+              }}
+            >
+              {updateLot.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Lot Dialog */}
+      <Dialog open={deleteLotOpen} onOpenChange={setDeleteLotOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Lot</DialogTitle>
+            <DialogDescription>
+              This will permanently remove lot <span className="font-mono font-semibold">{lot.lotNumber}</span>. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const orig = parseFloat(lot.originalQuantity || lot.quantity || '0');
+            const rem = parseFloat(lot.remainingQuantity || '0');
+            const hasBeenUsed = rem < orig || lot.status === 'consumed';
+            return hasBeenUsed ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                This lot has been partially or fully consumed. Deleting it may affect historical batch records.
+              </div>
+            ) : null;
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteLotOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              data-testid="button-detail-confirm-delete-lot"
+              disabled={deleteLot.isPending}
+              onClick={async () => {
+                const lotNumber = lot.lotNumber;
+                try {
+                  await deleteLot.mutateAsync(lot.id);
+                  toast({ title: 'Lot deleted', description: `${lotNumber} has been removed.` });
+                  navigate('/inventory');
+                } catch (err) {
+                  toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to delete lot', variant: 'destructive' });
+                }
+              }}
+            >
+              {deleteLot.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete Lot
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
