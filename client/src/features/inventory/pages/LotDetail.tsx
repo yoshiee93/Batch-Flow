@@ -917,16 +917,20 @@ export default function LotDetail() {
               This will permanently remove lot <span className="font-mono font-semibold">{lot.lotNumber}</span>. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          {(() => {
-            const orig = parseFloat(lot.originalQuantity || lot.quantity || '0');
-            const rem = parseFloat(lot.remainingQuantity || '0');
-            const hasBeenUsed = rem < orig || lot.status === 'consumed';
-            return hasBeenUsed ? (
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                This lot has been partially or fully consumed. Deleting it may affect historical batch records.
-              </div>
-            ) : null;
-          })()}
+          {usageLoading ? (
+            <div className="flex items-center gap-2 rounded-md border border-muted px-3 py-2 text-sm text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Checking batch usage&hellip;
+            </div>
+          ) : usage.length > 0 ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              This lot was used in <span className="font-semibold">{usage.length} {usage.length === 1 ? 'batch' : 'batches'}</span>. Deleting it will affect those historical batch records.
+            </div>
+          ) : (
+            <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+              This lot has not been used in any batch.
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteLotOpen(false)}>Cancel</Button>
             <Button

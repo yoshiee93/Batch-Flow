@@ -40,6 +40,7 @@ import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
 import { useRole } from '@/contexts/AuthContext';
 import { useSmartDefault } from '@/hooks/useSmartDefault';
+import { useLotUsage } from '@/features/traceability/api';
 
 const EMPTY_RECEIVE_FORM = {
   itemId: '',
@@ -116,6 +117,7 @@ export default function Inventory() {
   const [editLotForm, setEditLotForm] = useState({ status: '', remainingQuantity: '', notes: '', supplierName: '', supplierLot: '', expiryDate: '' });
   const [editLotFieldErrors, setEditLotFieldErrors] = useState<{ remainingQuantity?: string }>({});
   const [deleteLotTarget, setDeleteLotTarget] = useState<Lot | null>(null);
+  const { data: deleteLotUsage = [], isLoading: deleteLotUsageLoading } = useLotUsage(deleteLotTarget?.id ?? '');
   const [cardFilter, setCardFilter] = useState<CardFilter>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('filter') === 'lowstock' ? 'lowstock' : 'all';
@@ -2014,16 +2016,22 @@ export default function Inventory() {
               This will permanently remove lot <span className="font-mono font-semibold">{deleteLotTarget?.lotNumber}</span> from the system. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          {deleteLotTarget && (() => {
-            const orig = parseFloat(deleteLotTarget.originalQuantity || deleteLotTarget.quantity || '0');
-            const rem = parseFloat(deleteLotTarget.remainingQuantity || '0');
-            const hasBeenUsed = rem < orig || deleteLotTarget.status === 'consumed';
-            return hasBeenUsed ? (
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                This lot has been partially or fully consumed. Deleting it may affect historical batch records.
+          {deleteLotTarget && (
+            deleteLotUsageLoading ? (
+              <div className="flex items-center gap-2 rounded-md border border-muted px-3 py-2 text-sm text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Checking batch usage&hellip;
               </div>
-            ) : null;
-          })()}
+            ) : deleteLotUsage.length > 0 ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                This lot was used in <span className="font-semibold">{deleteLotUsage.length} {deleteLotUsage.length === 1 ? 'batch' : 'batches'}</span>. Deleting it will affect those historical batch records.
+              </div>
+            ) : (
+              <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                This lot has not been used in any batch.
+              </div>
+            )
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteLotTarget(null)}>Cancel</Button>
             <Button
