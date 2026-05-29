@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown, Archive, FlaskConical, ArrowUp, ArrowDown, BoxSelect, Ship, Layers, Box, ArrowLeft, GitBranch } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle2, AlertCircle, Truck, Clock, Loader2, Pencil, Trash2, Package, MoreHorizontal, ChevronsUpDown, Check, ChevronDown, Archive, FlaskConical, ArrowUp, ArrowDown, BoxSelect, Ship, Box, ArrowLeft, GitBranch } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -765,30 +765,6 @@ function PackOrderDialog({
     return Object.values(itemAllocs).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   };
 
-  const handleFIFOItem = (item: StockCheckItem) => {
-    let remaining = item.required;
-    const newAllocs: Record<string, string> = {};
-    const sortedLots = [...item.availableLots].sort((a, b) => {
-      if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime();
-      if (a.expiryDate) return -1;
-      if (b.expiryDate) return 1;
-      if (a.producedDate && b.producedDate) return new Date(a.producedDate).getTime() - new Date(b.producedDate).getTime();
-      return new Date(a.receivedDate).getTime() - new Date(b.receivedDate).getTime();
-    });
-    for (const lot of sortedLots) {
-      if (remaining <= 0) { newAllocs[lot.lotId] = '0'; continue; }
-      const take = Math.min(lot.remainingQuantity, remaining);
-      newAllocs[lot.lotId] = take.toFixed(3);
-      remaining -= take;
-    }
-    setAllocations(prev => ({ ...prev, [item.orderItemId]: newAllocs }));
-  };
-
-  const handleFIFOAll = () => {
-    if (!stockCheck) return;
-    for (const item of stockCheck.items) handleFIFOItem(item);
-  };
-
   const handleSubmit = async () => {
     const allocList: { orderItemId: string; lotId: string; quantityAllocated: number }[] = [];
     for (const [orderItemId, lots] of Object.entries(allocations)) {
@@ -879,12 +855,6 @@ function PackOrderDialog({
               }
             </div>
 
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={handleFIFOAll} data-testid="button-suggest-fifo-all">
-                <Layers size={14} className="mr-2" /> Suggest FIFO (All Items)
-              </Button>
-            </div>
-
             {stockCheck.items.map((item) => {
               const totalAllocated = getTotalAllocated(item);
               const isFullyAllocated = totalAllocated >= item.required - 0.001;
@@ -908,14 +878,9 @@ function PackOrderDialog({
                         {item.shortfall > 0 && <span className="text-destructive ml-2">· Short by {item.shortfall.toFixed(2)} {item.unit}</span>}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={cn("text-sm font-mono font-medium", isFullyAllocated ? "text-green-700" : "text-amber-700")}>
-                        {totalAllocated.toFixed(2)} / {item.required.toFixed(2)} {item.unit}
-                      </span>
-                      <Button variant="ghost" size="sm" onClick={() => handleFIFOItem(item)} data-testid={`button-fifo-${item.orderItemId}`}>
-                        FIFO
-                      </Button>
-                    </div>
+                    <span className={cn("text-sm font-mono font-medium", isFullyAllocated ? "text-green-700" : "text-amber-700")}>
+                      {totalAllocated.toFixed(2)} / {item.required.toFixed(2)} {item.unit}
+                    </span>
                   </div>
 
                   {item.availableLots.length === 0 ? (
