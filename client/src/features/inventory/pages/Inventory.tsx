@@ -114,6 +114,7 @@ export default function Inventory() {
   const [showHistoricalLots, setShowHistoricalLots] = useState(false);
   const [editLotTarget, setEditLotTarget] = useState<Lot | null>(null);
   const [editLotForm, setEditLotForm] = useState({ status: '', remainingQuantity: '', notes: '', supplierName: '', supplierLot: '', expiryDate: '' });
+  const [editLotFieldErrors, setEditLotFieldErrors] = useState<{ remainingQuantity?: string }>({});
   const [deleteLotTarget, setDeleteLotTarget] = useState<Lot | null>(null);
   const [cardFilter, setCardFilter] = useState<CardFilter>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -235,7 +236,7 @@ export default function Inventory() {
   };
   const [recentReceivePrints, setRecentReceivePrints] = useState<RecentReceivePrint[]>([]);
 
-  const { canReceiveStock, canManageSettings } = useRole();
+  const { canReceiveStock, canManageSettings, isInventory } = useRole();
   const { user: currentUser } = useAuth();
   const { data: usersList = [] } = useUsers();
   const smartSupplier = useSmartDefault('receiveStock:supplier');
@@ -824,39 +825,42 @@ export default function Inventory() {
               <Printer className="h-3.5 w-3.5" />
               {lot.barcodePrintedAt ? 'Print Again' : 'Print Label'}
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-lot-actions-${lot.id}`}>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  data-testid={`menuitem-edit-lot-${lot.id}`}
-                  onClick={() => {
-                    setEditLotTarget(lot);
-                    setEditLotForm({
-                      status: lot.status ?? 'active',
-                      remainingQuantity: lot.remainingQuantity ?? lot.quantity ?? '',
-                      notes: lot.notes ?? '',
-                      supplierName: lot.supplierName ?? '',
-                      supplierLot: lot.supplierLot ?? '',
-                      expiryDate: lot.expiryDate ? lot.expiryDate.slice(0, 10) : '',
-                    });
-                  }}
-                >
-                  <Pencil className="h-4 w-4 mr-2" /> Edit Lot
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  data-testid={`menuitem-delete-lot-${lot.id}`}
-                  onClick={() => setDeleteLotTarget(lot)}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" /> Delete Lot
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {isInventory && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-lot-actions-${lot.id}`}>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    data-testid={`menuitem-edit-lot-${lot.id}`}
+                    onClick={() => {
+                      setEditLotTarget(lot);
+                      setEditLotFieldErrors({});
+                      setEditLotForm({
+                        status: lot.status ?? 'active',
+                        remainingQuantity: lot.remainingQuantity ?? lot.quantity ?? '',
+                        notes: lot.notes ?? '',
+                        supplierName: lot.supplierName ?? '',
+                        supplierLot: lot.supplierLot ?? '',
+                        expiryDate: lot.expiryDate ? lot.expiryDate.slice(0, 10) : '',
+                      });
+                    }}
+                  >
+                    <Pencil className="h-4 w-4 mr-2" /> Edit Lot
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    data-testid={`menuitem-delete-lot-${lot.id}`}
+                    onClick={() => setDeleteLotTarget(lot)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete Lot
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </TableCell>
       </TableRow>
@@ -1911,9 +1915,16 @@ export default function Inventory() {
                 min="0"
                 step="0.01"
                 value={editLotForm.remainingQuantity}
-                onChange={(e) => setEditLotForm({ ...editLotForm, remainingQuantity: e.target.value })}
+                onChange={(e) => {
+                  setEditLotForm({ ...editLotForm, remainingQuantity: e.target.value });
+                  if (editLotFieldErrors.remainingQuantity) setEditLotFieldErrors({});
+                }}
+                className={editLotFieldErrors.remainingQuantity ? 'border-destructive' : ''}
                 data-testid="input-edit-lot-remaining"
               />
+              {editLotFieldErrors.remainingQuantity && (
+                <p className="text-xs text-destructive" data-testid="error-edit-lot-remaining">{editLotFieldErrors.remainingQuantity}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-lot-expiry">Expiry Date</Label>
@@ -1963,6 +1974,13 @@ export default function Inventory() {
               disabled={updateLot.isPending}
               onClick={async () => {
                 if (!editLotTarget) return;
+                const fieldErrors: { remainingQuantity?: string } = {};
+                if (editLotForm.remainingQuantity !== '') {
+                  const val = parseFloat(editLotForm.remainingQuantity);
+                  if (isNaN(val) || val < 0) fieldErrors.remainingQuantity = 'Must be a non-negative number';
+                }
+                if (Object.keys(fieldErrors).length > 0) { setEditLotFieldErrors(fieldErrors); return; }
+                setEditLotFieldErrors({});
                 try {
                   await updateLot.mutateAsync({
                     id: editLotTarget.id,
@@ -1976,7 +1994,7 @@ export default function Inventory() {
                   toast({ title: 'Lot updated', description: `${editLotTarget.lotNumber} has been updated.` });
                   setEditLotTarget(null);
                 } catch (err) {
-                  toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to update lot', variant: 'destructive' });
+                  toast({ title: 'Error saving lot', description: err instanceof Error ? err.message : 'Failed to update lot', variant: 'destructive' });
                 }
               }}
             >

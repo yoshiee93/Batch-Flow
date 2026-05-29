@@ -112,11 +112,12 @@ export default function LotDetail() {
   const [, navigate] = useLocation();
   const updateLot = useUpdateLot();
   const deleteLot = useDeleteLot();
-  const { isAdmin } = useRole();
+  const { isAdmin, isInventory } = useRole();
   const [testingDialogOpen, setTestingDialogOpen] = useState(false);
   const [testingForm, setTestingForm] = useState<{ status: 'not_required' | 'pending' | 'passed' | 'failed'; notes: string; certificate: string }>({ status: 'pending', notes: '', certificate: '' });
   const [editLotOpen, setEditLotOpen] = useState(false);
   const [editLotForm, setEditLotForm] = useState({ status: '', remainingQuantity: '', notes: '', supplierName: '', supplierLot: '', expiryDate: '' });
+  const [editLotFieldErrors, setEditLotFieldErrors] = useState<{ remainingQuantity?: string }>({});
   const [deleteLotOpen, setDeleteLotOpen] = useState(false);
 
   if (lotLoading) {
@@ -477,34 +478,39 @@ export default function LotDetail() {
               Record Testing
             </Button>
           )}
-          <Button
-            variant="outline"
-            className="w-full"
-            data-testid="button-edit-lot"
-            onClick={() => {
-              setEditLotForm({
-                status: lot.status ?? 'active',
-                remainingQuantity: lot.remainingQuantity ?? lot.quantity ?? '',
-                notes: lot.notes ?? '',
-                supplierName: lot.supplierName ?? '',
-                supplierLot: lot.supplierLot ?? '',
-                expiryDate: lot.expiryDate ? lot.expiryDate.slice(0, 10) : '',
-              });
-              setEditLotOpen(true);
-            }}
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit Lot
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full text-destructive hover:text-destructive"
-            data-testid="button-delete-lot"
-            onClick={() => setDeleteLotOpen(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete Lot
-          </Button>
+          {isInventory && (
+            <Button
+              variant="outline"
+              className="w-full"
+              data-testid="button-edit-lot"
+              onClick={() => {
+                setEditLotFieldErrors({});
+                setEditLotForm({
+                  status: lot.status ?? 'active',
+                  remainingQuantity: lot.remainingQuantity ?? lot.quantity ?? '',
+                  notes: lot.notes ?? '',
+                  supplierName: lot.supplierName ?? '',
+                  supplierLot: lot.supplierLot ?? '',
+                  expiryDate: lot.expiryDate ? lot.expiryDate.slice(0, 10) : '',
+                });
+                setEditLotOpen(true);
+              }}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Lot
+            </Button>
+          )}
+          {isInventory && (
+            <Button
+              variant="outline"
+              className="w-full text-destructive hover:text-destructive"
+              data-testid="button-delete-lot"
+              onClick={() => setDeleteLotOpen(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Lot
+            </Button>
+          )}
         </div>
       </div>
 
@@ -813,9 +819,16 @@ export default function LotDetail() {
                 min="0"
                 step="0.01"
                 value={editLotForm.remainingQuantity}
-                onChange={(e) => setEditLotForm({ ...editLotForm, remainingQuantity: e.target.value })}
+                onChange={(e) => {
+                  setEditLotForm({ ...editLotForm, remainingQuantity: e.target.value });
+                  if (editLotFieldErrors.remainingQuantity) setEditLotFieldErrors({});
+                }}
+                className={editLotFieldErrors.remainingQuantity ? 'border-destructive' : ''}
                 data-testid="input-detail-edit-lot-remaining"
               />
+              {editLotFieldErrors.remainingQuantity && (
+                <p className="text-xs text-destructive" data-testid="error-detail-edit-lot-remaining">{editLotFieldErrors.remainingQuantity}</p>
+              )}
             </div>
             <div className="space-y-2">
               <UiLabel htmlFor="detail-edit-lot-expiry">Expiry Date</UiLabel>
@@ -864,6 +877,13 @@ export default function LotDetail() {
               data-testid="button-detail-save-edit-lot"
               disabled={updateLot.isPending}
               onClick={async () => {
+                const fieldErrors: { remainingQuantity?: string } = {};
+                if (editLotForm.remainingQuantity !== '') {
+                  const val = parseFloat(editLotForm.remainingQuantity);
+                  if (isNaN(val) || val < 0) fieldErrors.remainingQuantity = 'Must be a non-negative number';
+                }
+                if (Object.keys(fieldErrors).length > 0) { setEditLotFieldErrors(fieldErrors); return; }
+                setEditLotFieldErrors({});
                 try {
                   await updateLot.mutateAsync({
                     id: lot.id,
@@ -877,7 +897,7 @@ export default function LotDetail() {
                   toast({ title: 'Lot updated', description: `${lot.lotNumber} has been updated.` });
                   setEditLotOpen(false);
                 } catch (err) {
-                  toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to update lot', variant: 'destructive' });
+                  toast({ title: 'Error saving lot', description: err instanceof Error ? err.message : 'Failed to update lot', variant: 'destructive' });
                 }
               }}
             >

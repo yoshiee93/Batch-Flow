@@ -143,7 +143,12 @@ export function useUpdateLot() {
   return useMutation({
     mutationFn: ({ id, ...data }: { id: string } & Partial<Lot>) =>
       fetchApi<Lot>(`/lots/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["lots"] }),
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
+      queryClient.invalidateQueries({ queryKey: ["lot", id] });
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
   });
 }
 
@@ -151,7 +156,11 @@ export function useDeleteLot() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => fetchApi(`/lots/${id}`, { method: "DELETE" }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["lots"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["lots"] });
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
   });
 }
 
