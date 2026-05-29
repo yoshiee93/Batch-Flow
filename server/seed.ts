@@ -45,6 +45,7 @@ export async function seedIfEmpty() {
   if (isFreshInstall) {
     console.log("Fresh install detected (no users, no materials, no batches) — seeding admin account...");
     await resetToAdminOnly();
+    console.warn("[SECURITY] Default admin / admin123 account created. Change this password immediately.");
   }
 }
 

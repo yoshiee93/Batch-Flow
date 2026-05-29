@@ -20,6 +20,12 @@ declare module "http" {
 }
 
 const PgStore = connectPgSimple(session);
+
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  console.error("[FATAL] SESSION_SECRET environment variable is required in production. Set it to a long random string before starting the server.");
+  process.exit(1);
+}
+
 app.use(session({
   store: new PgStore({ pool, createTableIfMissing: true }),
   secret: process.env.SESSION_SECRET || "cleartrace-dev-secret-change-in-prod",
@@ -71,7 +77,7 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
+      if (capturedJsonResponse && process.env.NODE_ENV !== "production") {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
