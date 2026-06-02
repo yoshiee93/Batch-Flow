@@ -158,7 +158,8 @@ export default function Orders() {
 
   const filteredOrders = ordersWithAllocation.filter(o =>
     o.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    o.customerName.toLowerCase().includes(searchTerm.toLowerCase())
+    o.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (o.poNumber ?? '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const currentOrders = filteredOrders.filter(o =>
