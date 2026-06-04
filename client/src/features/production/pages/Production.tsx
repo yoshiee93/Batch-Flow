@@ -17,7 +17,7 @@ import { ApiValidationError } from '@/lib/fetchApi';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle, ChevronDown, ChevronRight, ChevronsUpDown, Check, ExternalLink, Printer, RefreshCw } from 'lucide-react';
+import { Plus, CheckCircle, AlertCircle, Loader2, MoreHorizontal, Pencil, Trash2, Scale, Package, X, ArrowDownCircle, ChevronDown, ChevronRight, ChevronsUpDown, Check, ExternalLink, Printer, RefreshCw, Search, SlidersHorizontal } from 'lucide-react';
 import { Link } from 'wouter';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -120,7 +120,14 @@ export default function Production() {
   const [inputProductCategoryFilter, setInputProductCategoryFilter] = useState<string>('all');
   const [selectedSourceLotId, setSelectedSourceLotId] = useState<string>('');
   const [sourceLotSearchOpen, setSourceLotSearchOpen] = useState(false);
-  
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  type SortKey = 'newest' | 'oldest' | 'status' | 'productName';
+  const [sortKey, setSortKey] = useState<SortKey>('newest');
+
   const { canManageBatches } = useRole();
 
   const { data: batches = [], isLoading, isError } = useBatches();
@@ -488,6 +495,51 @@ export default function Production() {
     );
   }
 
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const visibleBatches = (() => {
+    let list = [...batches];
+    if (todayFilterActive) list = list.filter(b => b.createdAt && new Date(b.createdAt) >= startOfToday);
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      list = list.filter(b => {
+        const product = products.find(p => p.id === b.productId);
+        return (
+          b.batchNumber.toLowerCase().includes(q) ||
+          (b.batchCode ?? '').toLowerCase().includes(q) ||
+          (product?.name ?? '').toLowerCase().includes(q)
+        );
+      });
+    }
+    if (statusFilter !== 'all') list = list.filter(b => b.status === statusFilter);
+    if (dateFrom) list = list.filter(b => {
+      const d = b.startDate ?? b.createdAt;
+      return d && d >= dateFrom;
+    });
+    if (dateTo) list = list.filter(b => {
+      const d = b.startDate ?? b.createdAt;
+      return d && d <= dateTo + 'T23:59:59';
+    });
+    list.sort((a, b) => {
+      const getProduct = (id: string) => products.find(p => p.id === id);
+      if (sortKey === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (sortKey === 'status') return a.status.localeCompare(b.status);
+      if (sortKey === 'productName') return (getProduct(a.productId)?.name ?? '').localeCompare(getProduct(b.productId)?.name ?? '');
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    return list;
+  })();
+  const hasActiveFilters = !!searchTerm.trim() || statusFilter !== 'all' || !!dateFrom || !!dateTo;
+
+  const statusLabels: Record<string, string> = {
+    planned: 'Planned',
+    in_progress: 'In Progress',
+    quality_check: 'Quality Check',
+    completed: 'Completed',
+    released: 'Released',
+    quarantined: 'Quarantined',
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -690,6 +742,80 @@ export default function Production() {
         </Dialog>
       </div>
 
+      {/* Search and filter bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 border rounded-md px-3 py-1.5 bg-card flex-1 min-w-[200px] sm:max-w-xs">
+          <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <input
+            type="text"
+            placeholder="Search batch number or product…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+            data-testid="input-search-batches"
+          />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm('')} className="text-muted-foreground hover:text-foreground text-xs" data-testid="button-clear-search-batches">✕</button>
+          )}
+        </div>
+
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[160px]" data-testid="select-filter-status">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <SelectItem key={value} value={value}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex items-center gap-1">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => { setDateFrom(e.target.value); setTodayFilterActive(false); }}
+            className="h-9 rounded-md border border-input bg-card px-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+            title="From date"
+            data-testid="input-filter-date-from"
+          />
+          <span className="text-muted-foreground text-xs">–</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => { setDateTo(e.target.value); setTodayFilterActive(false); }}
+            className="h-9 rounded-md border border-input bg-card px-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+            title="To date"
+            data-testid="input-filter-date-to"
+          />
+        </div>
+
+        <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+          <SelectTrigger className="w-[160px]" data-testid="select-sort-batches">
+            <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+            <SelectItem value="status">Status</SelectItem>
+            <SelectItem value="productName">Product name</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setSearchTerm(''); setStatusFilter('all'); setDateFrom(''); setDateTo(''); }}
+            data-testid="button-clear-filters"
+          >
+            <X className="h-3.5 w-3.5 mr-1" /> Clear filters
+          </Button>
+        )}
+      </div>
+
       {todayFilterActive && (
         <div
           className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-blue-200 bg-blue-50 text-sm text-blue-800"
@@ -708,39 +834,28 @@ export default function Production() {
       )}
 
       <div className="grid gap-6">
-        {(() => {
-          const startOfToday = new Date();
-          startOfToday.setHours(0, 0, 0, 0);
-          const visibleBatches = todayFilterActive
-            ? batches.filter(b => b.createdAt && new Date(b.createdAt) >= startOfToday)
-            : batches;
-          return (
-            <>
-              {visibleBatches.map((batch) => (
-                <BatchCard
-                  key={batch.id}
-                  batch={batch}
-                  products={products}
-                  materials={materials}
-                  lots={lots}
-                  onEditClick={handleEditClick}
-                  onRecordInputClick={handleRecordInputClick}
-                  onRecordOutputClick={handleRecordOutputClick}
-                  onDeleteClick={handleDeleteClick}
-                />
-              ))}
-              {visibleBatches.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p>
-                    {todayFilterActive
-                      ? 'No batches were created today.'
-                      : 'No batches found. Create a new batch to get started.'}
-                  </p>
-                </div>
-              )}
-            </>
-          );
-        })()}
+        {visibleBatches.map((batch) => (
+          <BatchCard
+            key={batch.id}
+            batch={batch}
+            products={products}
+            materials={materials}
+            lots={lots}
+            onEditClick={handleEditClick}
+            onRecordInputClick={handleRecordInputClick}
+            onRecordOutputClick={handleRecordOutputClick}
+            onDeleteClick={handleDeleteClick}
+          />
+        ))}
+        {visibleBatches.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <p>
+              {hasActiveFilters || todayFilterActive
+                ? 'No batches match your filters.'
+                : 'No batches found. Create a new batch to get started.'}
+            </p>
+          </div>
+        )}
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
