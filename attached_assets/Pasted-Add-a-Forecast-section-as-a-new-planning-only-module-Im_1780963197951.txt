@@ -1,0 +1,108 @@
+Add a Forecast section as a new planning-only module.
+
+Important:
+There is no active Forecast section in this uploaded codebase, so create it cleanly without touching Orders, Inventory, Production, Traceability, Packing, Labels, or Invoicing logic.
+
+Goal:
+Allow potential orders to be entered, estimate required stock/materials, and convert forecasts into true orders later.
+
+Business rule:
+Forecast = what we might need.
+Order = what we must supply.
+Inventory = only changes from real activity.
+
+Core rules:
+- Forecasts must not reduce stock.
+- Forecasts must not create stock movements.
+- Forecasts must not create invoices.
+- Forecasts must not affect traceability.
+- Forecasts must not reserve inventory.
+- Forecasts are planning only until converted.
+- Conversion should use the existing order creation logic where possible.
+- After conversion, mark forecast as Converted so it is not double-counted.
+
+Add:
+1. Forecast sidebar item
+2. Forecast page
+3. Forecast backend domain
+4. Forecast schema/table only if no existing forecast table exists
+5. Forecast list
+6. Create/edit forecast form
+7. Stock requirement estimate
+8. Shortage/risk view
+9. Convert to Order button
+
+Forecast fields:
+- customerId
+- productId
+- quantity
+- expectedDate
+- confidenceLevel
+- status
+- notes
+- convertedOrderId, nullable
+- convertedAt, nullable
+
+Forecast statuses:
+- Draft
+- Likely
+- Confirmed Forecast
+- Converted
+- Cancelled
+
+Forecast list columns:
+- customer
+- product
+- quantity
+- expected date
+- confidence level
+- status
+- estimated stock risk
+- actions
+
+Stock estimate should show:
+- forecast demand
+- current stock
+- stock committed to real orders if available
+- projected shortage
+- required by date
+
+Shortage/risk view should show:
+- material/product
+- total required by forecasts
+- current stock
+- committed stock from real orders if available
+- projected available stock
+- shortage quantity
+- earliest required date
+
+Convert to Order:
+- Add “Convert to Order” button.
+- Create a normal order from the forecast details.
+- Use existing order creation logic where possible.
+- Do not duplicate order logic if avoidable.
+- Once converted, set forecast status to Converted.
+- Save convertedOrderId and convertedAt.
+- Prevent converting the same forecast twice.
+
+Do not touch:
+- inventory stock movement logic
+- production logic
+- traceability logic
+- invoice logic
+- packing logic
+- label logic
+- existing order numbering logic
+- existing invoice numbering logic
+
+Implementation style:
+- Follow existing domain structure.
+- Keep frontend consistent with existing Orders page style.
+- Keep changes minimal and isolated.
+- Do not refactor unrelated pages.
+
+After changes run:
+npm run check
+npm run build
+
+Fix only errors introduced by this Forecast task.
