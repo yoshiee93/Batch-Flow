@@ -1165,7 +1165,45 @@ export default function Inventory() {
                         <div key={lot.id} className="border rounded-md p-3 space-y-1.5 text-sm" data-testid={`card-lot-breakdown-${lot.id}`}>
                           <div className="flex items-center justify-between">
                             <span className="font-mono font-medium">{lot.lotNumber}</span>
-                            <span className="font-mono font-semibold">{parseFloat(lot.remainingQuantity || '0').toFixed(2)} {unit}</span>
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono font-semibold">{parseFloat(lot.remainingQuantity || '0').toFixed(2)} {unit}</span>
+                              {isInventory && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" data-testid={`button-lot-actions-${lot.id}`}>
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      data-testid={`menuitem-edit-lot-${lot.id}`}
+                                      onClick={() => {
+                                        setEditLotTarget(lot);
+                                        setEditLotFieldErrors({});
+                                        setEditLotForm({
+                                          status: lot.status ?? 'active',
+                                          remainingQuantity: lot.remainingQuantity ?? lot.quantity ?? '',
+                                          notes: lot.notes ?? '',
+                                          supplierName: lot.supplierName ?? '',
+                                          supplierLot: lot.supplierLot ?? '',
+                                          expiryDate: lot.expiryDate ? lot.expiryDate.slice(0, 10) : '',
+                                        });
+                                      }}
+                                    >
+                                      <Pencil className="h-4 w-4 mr-2" /> Edit Lot
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      data-testid={`menuitem-delete-lot-${lot.id}`}
+                                      onClick={() => setDeleteLotTarget(lot)}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" /> Delete Lot
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </div>
                           </div>
                           {sourceBatch && (
                             <div className="text-muted-foreground flex items-center gap-1">
