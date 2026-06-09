@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import {
   forecastOrders, customers, products, orderItems, orders, batchOutputs,
@@ -11,12 +11,14 @@ export interface ForecastOrderWithRefs extends ForecastOrder {
   productUnit: string;
 }
 
+const ACTIVE_STATUSES = ["Draft", "Likely", "Confirmed Forecast"] as const;
+
 export const forecastRepository = {
-  async list(opts: { from?: Date; to?: Date; status?: "open" | "converted" | "archived" } = {}): Promise<ForecastOrderWithRefs[]> {
+  async list(opts: { from?: Date; to?: Date; status?: string } = {}): Promise<ForecastOrderWithRefs[]> {
     const conds = [] as any[];
     if (opts.from) conds.push(gte(forecastOrders.expectedDate, opts.from));
     if (opts.to) conds.push(lte(forecastOrders.expectedDate, opts.to));
-    if (opts.status) conds.push(eq(forecastOrders.status, opts.status));
+    if (opts.status) conds.push(eq(forecastOrders.status, opts.status as any));
     const where = conds.length > 0 ? and(...conds) : undefined;
     const rows = await db
       .select({ f: forecastOrders, c: customers, p: products })
@@ -54,7 +56,7 @@ export const forecastRepository = {
 
   async markConverted(id: string, convertedOrderId: string): Promise<ForecastOrder | undefined> {
     const [updated] = await db.update(forecastOrders)
-      .set({ status: "converted", convertedOrderId, updatedAt: new Date() })
+      .set({ status: "Converted", convertedOrderId, convertedAt: new Date(), updatedAt: new Date() })
       .where(eq(forecastOrders.id, id))
       .returning();
     return updated;
@@ -115,5 +117,9 @@ export const forecastRepository = {
     const map = new Map<string, number>();
     for (const r of rows) map.set(r.productId, parseFloat(r.reserved ?? "0"));
     return map;
+  },
+
+  getActiveStatuses() {
+    return ACTIVE_STATUSES;
   },
 };

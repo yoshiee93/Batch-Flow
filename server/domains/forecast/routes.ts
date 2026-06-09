@@ -7,12 +7,20 @@ import { forecastService as svc } from "./service";
 
 const adminOnly = requireRole("admin");
 
-const forecastWriteSchema = insertForecastOrderSchema.omit({ status: true, convertedOrderId: true });
+const FORECAST_STATUSES = ["Draft", "Likely", "Confirmed Forecast", "Converted", "Cancelled"] as const;
+const CONFIDENCE_LEVELS = ["Low", "Medium", "High"] as const;
+
+const forecastWriteSchema = insertForecastOrderSchema
+  .omit({ convertedOrderId: true, convertedAt: true })
+  .extend({
+    status: z.enum(FORECAST_STATUSES).optional(),
+    confidenceLevel: z.enum(CONFIDENCE_LEVELS).nullable().optional(),
+  });
 
 export const forecastRouter = Router();
 
 forecastRouter.get("/forecast", adminOnly, asyncHandler(async (req, res) => {
-  const status = typeof req.query.status === "string" ? req.query.status as "open" | "converted" | "archived" : undefined;
+  const status = typeof req.query.status === "string" ? req.query.status : undefined;
   const months = req.query.months === "3" || req.query.months === "6" || req.query.months === "12" ? Number(req.query.months) : undefined;
   let from: Date | undefined;
   let to: Date | undefined;
@@ -46,12 +54,12 @@ forecastRouter.get("/forecast/history", adminOnly, asyncHandler(async (req, res)
 
 forecastRouter.post("/forecast", adminOnly, asyncHandler(async (req, res) => {
   const data = forecastWriteSchema.parse(req.body);
-  res.status(201).json(await svc.create(data));
+  res.status(201).json(await svc.create(data as any));
 }));
 
 forecastRouter.patch("/forecast/:id", adminOnly, asyncHandler(async (req, res) => {
   const data = forecastWriteSchema.partial().parse(req.body);
-  const row = await svc.update(req.params.id, data);
+  const row = await svc.update(req.params.id, data as any);
   if (!row) return res.status(404).json({ error: "Forecast not found" });
   res.json(row);
 }));
@@ -71,5 +79,10 @@ const convertSchema = z.object({
 
 forecastRouter.post("/forecast/:id/convert", adminOnly, asyncHandler(async (req, res) => {
   const data = convertSchema.parse(req.body);
-  res.json(await svc.convert(req.params.id, data));
+  try {
+    res.json(await svc.convert(req.params.id, data));
+  } catch (err: any) {
+    const code = err.statusCode ?? 500;
+    res.status(code).json({ error: err.message });
+  }
 }));

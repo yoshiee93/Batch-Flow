@@ -10,9 +10,10 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Loader2, Pencil, Trash2, ArrowRightLeft, AlertTriangle, ExternalLink } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, ArrowRightLeft, AlertTriangle, ExternalLink, MoreHorizontal, CheckCircle2, XCircle } from "lucide-react";
 import { format, isSameDay, parseISO, subYears, startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { CalendarDayButton } from "@/components/ui/calendar";
 import { Link } from "wouter";
@@ -21,9 +22,13 @@ import { useCustomers } from "@/features/customers/api";
 import { useProducts } from "@/features/catalog/api";
 import {
   useForecasts, useForecastSummary, useCreateForecast, useUpdateForecast, useDeleteForecast, useConvertForecast, useForecastHistory, useForecastHistoryRange,
-  type ForecastOrder, type ForecastRange,
+  type ForecastOrder, type ForecastRange, type ForecastStatus, type ConfidenceLevel,
 } from "@/features/forecast/api";
 import { ApiValidationError } from "@/lib/fetchApi";
+
+const FORECAST_STATUSES: ForecastStatus[] = ["Draft", "Likely", "Confirmed Forecast", "Converted", "Cancelled"];
+const ACTIVE_STATUSES: ForecastStatus[] = ["Draft", "Likely", "Confirmed Forecast"];
+const CONFIDENCE_LEVELS: ConfidenceLevel[] = ["Low", "Medium", "High"];
 
 type FormState = {
   customerId: string;
@@ -31,12 +36,47 @@ type FormState = {
   quantity: string;
   expectedDate: string;
   notes: string;
+  confidenceLevel: string;
+  status: ForecastStatus;
 };
 
-const emptyForm: FormState = { customerId: "", productId: "", quantity: "", expectedDate: "", notes: "" };
+const emptyForm: FormState = {
+  customerId: "",
+  productId: "",
+  quantity: "",
+  expectedDate: "",
+  notes: "",
+  confidenceLevel: "",
+  status: "Draft",
+};
+
+function statusBadge(s: ForecastStatus) {
+  switch (s) {
+    case "Converted":
+      return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200" data-testid={`badge-status-converted`}>Converted</Badge>;
+    case "Cancelled":
+      return <Badge variant="outline" className="text-muted-foreground" data-testid={`badge-status-cancelled`}>Cancelled</Badge>;
+    case "Confirmed Forecast":
+      return <Badge className="bg-blue-100 text-blue-800 border-blue-200" data-testid={`badge-status-confirmed`}>Confirmed</Badge>;
+    case "Likely":
+      return <Badge className="bg-amber-100 text-amber-800 border-amber-200" data-testid={`badge-status-likely`}>Likely</Badge>;
+    default:
+      return <Badge variant="secondary" data-testid={`badge-status-draft`}>Draft</Badge>;
+  }
+}
+
+function confidenceBadge(c: string | null) {
+  if (!c) return null;
+  const colors: Record<string, string> = {
+    Low: "bg-red-50 text-red-700 border-red-200",
+    Medium: "bg-amber-50 text-amber-700 border-amber-200",
+    High: "bg-green-50 text-green-700 border-green-200",
+  };
+  return <Badge variant="outline" className={colors[c] ?? ""}>{c}</Badge>;
+}
 
 export default function Forecast() {
-  const [view, setView] = useState<"list" | "calendar" | "history">("list");
+  const [view, setView] = useState<"list" | "shortage" | "calendar" | "history">("list");
   const [range, setRange] = useState<ForecastRange>(3);
   const [calendarDay, setCalendarDay] = useState<Date | undefined>(new Date());
   const [calendarMonth, setCalendarMonth] = useState<Date>(startOfMonth(new Date()));
@@ -49,6 +89,7 @@ export default function Forecast() {
   const [editTarget, setEditTarget] = useState<ForecastOrder | null>(null);
   const [convertTarget, setConvertTarget] = useState<ForecastOrder | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ForecastOrder | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [convertForm, setConvertForm] = useState({ orderNumber: "", dueDate: "" });
   const { toast } = useToast();
@@ -141,6 +182,8 @@ export default function Forecast() {
       quantity: f.quantity,
       expectedDate: f.expectedDate.slice(0, 10),
       notes: f.notes ?? "",
+      confidenceLevel: f.confidenceLevel ?? "",
+      status: f.status,
     });
   };
 
@@ -162,6 +205,8 @@ export default function Forecast() {
         quantity: form.quantity,
         expectedDate: new Date(form.expectedDate).toISOString(),
         notes: form.notes || null,
+        confidenceLevel: form.confidenceLevel || null,
+        status: form.status,
       });
       toast({ title: "Forecast created" });
       setCreateOpen(false);
@@ -183,6 +228,8 @@ export default function Forecast() {
         quantity: form.quantity,
         expectedDate: new Date(form.expectedDate).toISOString(),
         notes: form.notes || null,
+        confidenceLevel: form.confidenceLevel || null,
+        status: form.status,
       });
       toast({ title: "Forecast updated" });
       setEditTarget(null);
@@ -229,11 +276,7 @@ export default function Forecast() {
     }
   };
 
-  const statusBadge = (s: ForecastOrder["status"]) => {
-    if (s === "converted") return <Badge variant="secondary" data-testid={`badge-forecast-status-converted`}>Converted</Badge>;
-    if (s === "archived") return <Badge variant="outline">Archived</Badge>;
-    return <Badge>Open</Badge>;
-  };
+  const isConvertable = (f: ForecastOrder) => f.status !== "Converted" && f.status !== "Cancelled";
 
   return (
     <div className="p-6 space-y-6">
@@ -248,13 +291,15 @@ export default function Forecast() {
         </Button>
       </div>
 
-      <Tabs value={view} onValueChange={(v) => setView(v as "list" | "calendar" | "history")}>
+      <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
         <TabsList>
           <TabsTrigger value="list" data-testid="tab-view-list">List</TabsTrigger>
+          <TabsTrigger value="shortage" data-testid="tab-view-shortage">Shortage / Risk</TabsTrigger>
           <TabsTrigger value="calendar" data-testid="tab-view-calendar">Calendar</TabsTrigger>
           <TabsTrigger value="history" data-testid="tab-view-history">History</TabsTrigger>
         </TabsList>
 
+        {/* LIST TAB */}
         <TabsContent value="list" className="space-y-6 mt-4">
           <Tabs value={String(range)} onValueChange={(v) => setRange(Number(v) as ForecastRange)}>
             <TabsList>
@@ -264,112 +309,189 @@ export default function Forecast() {
             </TabsList>
           </Tabs>
 
-          <Card className="p-4">
-        <h2 className="font-semibold mb-3">Stock required</h2>
-        {summary && summary.products.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No open forecasts in this range.</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-right">Forecast demand</TableHead>
-                <TableHead className="text-right">Current stock</TableHead>
-                <TableHead className="text-right">Reserved</TableHead>
-                <TableHead className="text-right">Shortfall</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {summary?.products.map(p => (
-                <TableRow key={p.productId} data-testid={`row-summary-${p.productId}`}>
-                  <TableCell className="font-medium">{p.productName}</TableCell>
-                  <TableCell className="text-right" data-testid={`text-demand-${p.productId}`}>{p.demand.toFixed(2)} {p.unit}</TableCell>
-                  <TableCell className="text-right">{p.currentStock.toFixed(2)} {p.unit}</TableCell>
-                  <TableCell className="text-right">{p.reserved.toFixed(2)} {p.unit}</TableCell>
-                  <TableCell className="text-right">
-                    {p.shortfall > 0 ? (
-                      <span className="inline-flex items-center gap-1 text-destructive font-medium" data-testid={`text-shortfall-${p.productId}`}>
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        {p.shortfall.toFixed(2)} {p.unit}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">0</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
-
-      {isLoading ? (
-        <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin" /></div>
-      ) : grouped.length === 0 ? (
-        <Card className="p-10 text-center text-muted-foreground" data-testid="text-empty">
-          No forecasts in this range. Click <strong>New Forecast</strong> to add one.
-        </Card>
-      ) : (
-        grouped.map(([month, items]) => (
-          <Card key={month} className="p-4">
-            <h3 className="font-semibold mb-3" data-testid={`heading-month-${month}`}>{month}</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Expected</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map(f => (
-                  <TableRow key={f.id} data-testid={`row-forecast-${f.id}`}>
-                    <TableCell>{format(new Date(f.expectedDate), "d MMM yyyy")}</TableCell>
-                    <TableCell>{f.customerName}</TableCell>
-                    <TableCell>{f.productName}</TableCell>
-                    <TableCell className="text-right">{parseFloat(f.quantity).toFixed(2)} {f.productUnit}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {statusBadge(f.status)}
-                        {f.status === "converted" && f.convertedOrderId && (
-                          <Link href="/orders" data-testid={`link-converted-order-${f.id}`}>
-                            <span className="inline-flex items-center text-xs text-primary hover:underline">
-                              <ExternalLink className="h-3 w-3 mr-0.5" />
-                              order
-                            </span>
-                          </Link>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">{f.notes ?? ""}</TableCell>
-                    <TableCell className="text-right space-x-1">
-                      {f.status === "open" && (
+          {isLoading ? (
+            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          ) : grouped.length === 0 ? (
+            <Card className="p-10 text-center text-muted-foreground" data-testid="text-empty">
+              No forecasts in this range. Click <strong>New Forecast</strong> to add one.
+            </Card>
+          ) : (
+            grouped.map(([month, items]) => (
+              <Card key={month} className="p-4">
+                <h3 className="font-semibold mb-3" data-testid={`heading-month-${month}`}>{month}</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Expected</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead>Confidence</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Stock Risk</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map(f => {
+                      const summaryRow = summary?.products.find(p => p.productId === f.productId);
+                      const isExpanded = expandedId === f.id;
+                      return (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => openConvert(f)} data-testid={`button-convert-${f.id}`}>
-                            <ArrowRightLeft className="h-3.5 w-3.5 mr-1" /> Convert
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => openEdit(f)} data-testid={`button-edit-${f.id}`}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => setDeleteTarget(f)} data-testid={`button-delete-${f.id}`}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <TableRow key={f.id} data-testid={`row-forecast-${f.id}`} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedId(isExpanded ? null : f.id)}>
+                            <TableCell>{format(new Date(f.expectedDate), "d MMM yyyy")}</TableCell>
+                            <TableCell>{f.customerName}</TableCell>
+                            <TableCell>{f.productName}</TableCell>
+                            <TableCell className="text-right font-mono">{parseFloat(f.quantity).toFixed(2)} {f.productUnit}</TableCell>
+                            <TableCell>{confidenceBadge(f.confidenceLevel)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {statusBadge(f.status)}
+                                {f.status === "Converted" && f.convertedOrderId && (
+                                  <Link href="/orders" data-testid={`link-converted-order-${f.id}`}>
+                                    <span className="inline-flex items-center text-xs text-primary hover:underline">
+                                      <ExternalLink className="h-3 w-3 mr-0.5" />
+                                      order
+                                    </span>
+                                  </Link>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {summaryRow && ACTIVE_STATUSES.includes(f.status) ? (
+                                summaryRow.shortfall > 0 ? (
+                                  <span className="inline-flex items-center gap-1 text-destructive text-xs font-medium" data-testid={`text-risk-${f.id}`}>
+                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                    Shortage
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-emerald-600 text-xs" data-testid={`text-risk-ok-${f.id}`}>
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    OK
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-muted-foreground text-xs">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="icon" variant="ghost" data-testid={`button-actions-${f.id}`} onClick={(e) => e.stopPropagation()}>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEdit(f); }} data-testid={`button-edit-${f.id}`}>
+                                    <Pencil className="h-4 w-4 mr-2" /> Edit
+                                  </DropdownMenuItem>
+                                  {isConvertable(f) && (
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openConvert(f); }} data-testid={`button-convert-${f.id}`}>
+                                      <ArrowRightLeft className="h-4 w-4 mr-2" /> Convert to Order
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(f); }}
+                                    data-testid={`button-delete-${f.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && (
+                            <TableRow key={`${f.id}-detail`} data-testid={`row-detail-${f.id}`}>
+                              <TableCell colSpan={8} className="bg-muted/20 px-6 py-3">
+                                <StockEstimatePanel forecast={f} summaryRow={summaryRow} />
+                              </TableCell>
+                            </TableRow>
+                          )}
                         </>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        ))
-      )}
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
+            ))
+          )}
         </TabsContent>
 
+        {/* SHORTAGE / RISK TAB */}
+        <TabsContent value="shortage" className="mt-4 space-y-4">
+          <Tabs value={String(range)} onValueChange={(v) => setRange(Number(v) as ForecastRange)}>
+            <TabsList>
+              <TabsTrigger value="3" data-testid="tab-shortage-range-3">3 months</TabsTrigger>
+              <TabsTrigger value="6" data-testid="tab-shortage-range-6">6 months</TabsTrigger>
+              <TabsTrigger value="12" data-testid="tab-shortage-range-12">12 months</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Card className="p-4">
+            <h2 className="font-semibold mb-1">Shortage &amp; Risk View</h2>
+            <p className="text-sm text-muted-foreground mb-4">Per-product breakdown of forecast demand vs. available stock across active forecasts (Draft, Likely, Confirmed).</p>
+
+            {!summary || summary.products.length === 0 ? (
+              <p className="text-sm text-muted-foreground" data-testid="text-shortage-empty">No active forecasts in this range.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead className="text-right">Total Required</TableHead>
+                    <TableHead className="text-right">Current Stock</TableHead>
+                    <TableHead className="text-right">Committed to Orders</TableHead>
+                    <TableHead className="text-right">Projected Available</TableHead>
+                    <TableHead className="text-right">Shortage</TableHead>
+                    <TableHead>Earliest Required</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {summary.products.map(p => {
+                    const projectedAvailable = Math.max(0, p.currentStock - p.reserved);
+                    return (
+                      <TableRow key={p.productId} data-testid={`row-shortage-${p.productId}`}>
+                        <TableCell className="font-medium">{p.productName}</TableCell>
+                        <TableCell className="text-right font-mono" data-testid={`text-required-${p.productId}`}>
+                          {p.demand.toFixed(2)} {p.unit}
+                        </TableCell>
+                        <TableCell className="text-right font-mono" data-testid={`text-stock-${p.productId}`}>
+                          {p.currentStock.toFixed(2)} {p.unit}
+                        </TableCell>
+                        <TableCell className="text-right font-mono" data-testid={`text-committed-${p.productId}`}>
+                          {p.reserved.toFixed(2)} {p.unit}
+                        </TableCell>
+                        <TableCell className="text-right font-mono" data-testid={`text-available-${p.productId}`}>
+                          {projectedAvailable.toFixed(2)} {p.unit}
+                        </TableCell>
+                        <TableCell className="text-right" data-testid={`text-shortage-${p.productId}`}>
+                          {p.shortfall > 0 ? (
+                            <span className="inline-flex items-center gap-1 text-destructive font-medium font-mono">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              {p.shortfall.toFixed(2)} {p.unit}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-emerald-600 font-mono">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              0
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground" data-testid={`text-earliest-${p.productId}`}>
+                          {p.earliestDate ? format(new Date(p.earliestDate), "d MMM yyyy") : "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* CALENDAR TAB */}
         <TabsContent value="calendar" className="mt-4 space-y-4">
           <Card className="p-3">
             <div className="flex flex-wrap items-center gap-4">
@@ -456,7 +578,7 @@ export default function Forecast() {
                         </div>
                         <div className="text-right">
                           <div className="font-mono font-semibold">{parseFloat(f.quantity).toFixed(2)} {f.productUnit}</div>
-                          <div className="mt-1">{statusBadge(f.status)}</div>
+                          <div className="mt-1 flex gap-1 justify-end">{statusBadge(f.status)}{confidenceBadge(f.confidenceLevel)}</div>
                         </div>
                       </div>
                       {f.notes && <div className="text-xs text-muted-foreground mt-2">{f.notes}</div>}
@@ -469,6 +591,7 @@ export default function Forecast() {
           </div>
         </TabsContent>
 
+        {/* HISTORY TAB */}
         <TabsContent value="history" className="space-y-4 mt-4">
           <Card className="p-4">
             <div className="flex flex-wrap items-end gap-3 mb-4">
@@ -487,16 +610,17 @@ export default function Forecast() {
                 <Select value={String(historyMonths)} onValueChange={(v) => setHistoryMonths(Number(v))}>
                   <SelectTrigger data-testid="select-history-months"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="3">3</SelectItem>
-                    <SelectItem value="6">6</SelectItem>
-                    <SelectItem value="12">12</SelectItem>
+                    <SelectItem value="3">3 months</SelectItem>
+                    <SelectItem value="6">6 months</SelectItem>
+                    <SelectItem value="12">12 months</SelectItem>
+                    <SelectItem value="24">24 months</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             {!history ? (
-              <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin" /></div>
+              <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>
             ) : history.months.length === 0 ? (
               <p className="text-sm text-muted-foreground">No history in this range.</p>
             ) : (
@@ -541,6 +665,7 @@ export default function Forecast() {
         </TabsContent>
       </Tabs>
 
+      {/* CREATE / EDIT DIALOG */}
       <Dialog open={createOpen || !!editTarget} onOpenChange={(o) => { if (!o) { setCreateOpen(false); setEditTarget(null); setForm(emptyForm); } }}>
         <DialogContent>
           <DialogHeader>
@@ -576,6 +701,27 @@ export default function Forecast() {
                 <Input type="date" value={form.expectedDate} onChange={(e) => setForm({ ...form, expectedDate: e.target.value })} data-testid="input-forecast-date" />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Confidence</Label>
+                <Select value={form.confidenceLevel || "none"} onValueChange={(v) => setForm({ ...form, confidenceLevel: v === "none" ? "" : v })}>
+                  <SelectTrigger data-testid="select-forecast-confidence"><SelectValue placeholder="Select confidence" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— None —</SelectItem>
+                    {CONFIDENCE_LEVELS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as ForecastStatus })}>
+                  <SelectTrigger data-testid="select-forecast-status"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {FORECAST_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div>
               <Label>Notes</Label>
               <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="input-forecast-notes" />
@@ -591,6 +737,7 @@ export default function Forecast() {
         </DialogContent>
       </Dialog>
 
+      {/* CONVERT DIALOG */}
       <Dialog open={!!convertTarget} onOpenChange={(o) => { if (!o) setConvertTarget(null); }}>
         <DialogContent>
           <DialogHeader>
@@ -626,6 +773,58 @@ export default function Forecast() {
         description="This permanently removes the forecast entry."
         onConfirm={submitDelete}
       />
+    </div>
+  );
+}
+
+function StockEstimatePanel({
+  forecast,
+  summaryRow,
+}: {
+  forecast: ForecastOrder;
+  summaryRow?: { demand: number; currentStock: number; reserved: number; shortfall: number; unit: string; earliestDate?: string | null } | null;
+}) {
+  if (!summaryRow) {
+    return (
+      <div className="text-sm text-muted-foreground" data-testid={`panel-stock-estimate-${forecast.id}`}>
+        Stock estimate not available for this product.
+      </div>
+    );
+  }
+
+  const fDemand = parseFloat(forecast.quantity);
+  const projectedAvailable = Math.max(0, summaryRow.currentStock - summaryRow.reserved);
+  const projectedShortage = Math.max(0, fDemand - projectedAvailable);
+
+  return (
+    <div className="text-sm" data-testid={`panel-stock-estimate-${forecast.id}`}>
+      <div className="font-semibold mb-2 text-xs uppercase tracking-wide text-muted-foreground">Stock Estimate for {forecast.productName}</div>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div>
+          <div className="text-xs text-muted-foreground">Forecast demand</div>
+          <div className="font-mono font-semibold" data-testid={`text-estimate-demand-${forecast.id}`}>{fDemand.toFixed(2)} {forecast.productUnit}</div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">Current stock</div>
+          <div className="font-mono font-semibold" data-testid={`text-estimate-stock-${forecast.id}`}>{summaryRow.currentStock.toFixed(2)} {summaryRow.unit}</div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">Committed to orders</div>
+          <div className="font-mono font-semibold" data-testid={`text-estimate-committed-${forecast.id}`}>{summaryRow.reserved.toFixed(2)} {summaryRow.unit}</div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">Projected shortage</div>
+          <div className={`font-mono font-semibold ${projectedShortage > 0 ? "text-destructive" : "text-emerald-600"}`} data-testid={`text-estimate-shortage-${forecast.id}`}>
+            {projectedShortage > 0 ? `−${projectedShortage.toFixed(2)} ${forecast.productUnit}` : "None"}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">Required by</div>
+          <div className="font-semibold" data-testid={`text-estimate-date-${forecast.id}`}>
+            {format(new Date(forecast.expectedDate), "d MMM yyyy")}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/fetchApi";
 
+export type ForecastStatus = "Draft" | "Likely" | "Confirmed Forecast" | "Converted" | "Cancelled";
+export type ConfidenceLevel = "Low" | "Medium" | "High";
+
 export interface ForecastOrder {
   id: string;
   customerId: string;
@@ -8,8 +11,10 @@ export interface ForecastOrder {
   quantity: string;
   expectedDate: string;
   notes: string | null;
-  status: "open" | "converted" | "archived";
+  confidenceLevel: string | null;
+  status: ForecastStatus;
   convertedOrderId: string | null;
+  convertedAt: string | null;
   createdAt: string;
   updatedAt: string;
   customerName: string;
@@ -25,6 +30,7 @@ export interface ForecastSummaryProduct {
   currentStock: number;
   reserved: number;
   shortfall: number;
+  earliestDate: string | null;
 }
 
 export interface ForecastSummary {
@@ -53,8 +59,15 @@ export function useForecastSummary(range: ForecastRange) {
 export function useCreateForecast() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { customerId: string; productId: string; quantity: string; expectedDate: string; notes?: string | null; status?: "open" | "converted" | "archived" }) =>
-      fetchApi<ForecastOrder>("/forecast", { method: "POST", body: JSON.stringify(data) }),
+    mutationFn: (data: {
+      customerId: string;
+      productId: string;
+      quantity: string;
+      expectedDate: string;
+      notes?: string | null;
+      confidenceLevel?: string | null;
+      status?: ForecastStatus;
+    }) => fetchApi<ForecastOrder>("/forecast", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["forecasts"] });
       qc.invalidateQueries({ queryKey: ["forecastSummary"] });
@@ -65,8 +78,16 @@ export function useCreateForecast() {
 export function useUpdateForecast() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: string } & Partial<{ customerId: string; productId: string; quantity: string; expectedDate: string; notes: string | null; status: "open" | "converted" | "archived" }>) =>
-      fetchApi<ForecastOrder>(`/forecast/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    mutationFn: ({ id, ...data }: {
+      id: string;
+      customerId?: string;
+      productId?: string;
+      quantity?: string;
+      expectedDate?: string;
+      notes?: string | null;
+      confidenceLevel?: string | null;
+      status?: ForecastStatus;
+    }) => fetchApi<ForecastOrder>(`/forecast/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["forecasts"] });
       qc.invalidateQueries({ queryKey: ["forecastSummary"] });
@@ -134,8 +155,14 @@ export function useForecastHistoryRange(opts: { productId?: string; customerId?:
 export function useConvertForecast() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: string; orderNumber: string; dueDate: string; priority?: "low" | "normal" | "high" | "urgent"; poNumber?: string | null; notes?: string | null }) =>
-      fetchApi<{ forecast: ForecastOrder; order: { id: string; orderNumber: string } }>(`/forecast/${id}/convert`, { method: "POST", body: JSON.stringify(data) }),
+    mutationFn: ({ id, ...data }: {
+      id: string;
+      orderNumber: string;
+      dueDate: string;
+      priority?: "low" | "normal" | "high" | "urgent";
+      poNumber?: string | null;
+      notes?: string | null;
+    }) => fetchApi<{ forecast: ForecastOrder; order: { id: string; orderNumber: string } }>(`/forecast/${id}/convert`, { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["forecasts"] });
       qc.invalidateQueries({ queryKey: ["forecastSummary"] });

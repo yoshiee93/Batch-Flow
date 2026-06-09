@@ -1,10 +1,12 @@
-import { eq, and } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { forecastOrders } from "@shared/schema";
 import { forecastRepository as repo } from "./repository";
 import { customersService } from "../customers/service";
 import { createAuditLog } from "../../lib/auditLog";
 import type { InsertForecastOrder, ForecastOrder, Order } from "@shared/schema";
+
+const ACTIVE_STATUSES = ["Draft", "Likely", "Confirmed Forecast"];
 
 function rangeFromMonths(months: 3 | 6 | 12): { from: Date; to: Date } {
   const from = new Date();
@@ -71,7 +73,6 @@ export const forecastService = {
     for (const o of pastOrders) ensure(monthKey(new Date(o.createdAt))).orderQty += parseFloat(o.quantity);
     for (const b of pastOutputs) ensure(monthKey(new Date(b.addedAt))).producedQty += parseFloat(b.quantity);
 
-    // Weekly buckets keyed by ISO week start (Monday) in UTC
     const weekStart = (d: Date): string => {
       const u = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
       const dow = u.getUTCDay() || 7;
@@ -101,11 +102,22 @@ export const forecastService = {
 
   async summary(months: 3 | 6 | 12) {
     const { from, to } = rangeFromMonths(months);
-    const forecasts = await repo.list({ from, to, status: "open" });
+    const allForecasts = await repo.list({ from, to });
+    const activeForecasts = allForecasts.filter(f => ACTIVE_STATUSES.includes(f.status));
     const reservedMap = await repo.getReservedByProduct();
 
-    const byProduct = new Map<string, { productId: string; productName: string; unit: string; demand: number; currentStock: number; reserved: number; shortfall: number }>();
-    for (const f of forecasts) {
+    const byProduct = new Map<string, {
+      productId: string;
+      productName: string;
+      unit: string;
+      demand: number;
+      currentStock: number;
+      reserved: number;
+      shortfall: number;
+      earliestDate: string | null;
+    }>();
+
+    for (const f of activeForecasts) {
       const key = f.productId;
       const qty = parseFloat(f.quantity);
       if (!byProduct.has(key)) {
@@ -118,10 +130,17 @@ export const forecastService = {
           currentStock: parseFloat(p?.currentStock ?? "0"),
           reserved: reservedMap.get(key) ?? 0,
           shortfall: 0,
+          earliestDate: null,
         });
       }
-      byProduct.get(key)!.demand += qty;
+      const entry = byProduct.get(key)!;
+      entry.demand += qty;
+      const dateStr = f.expectedDate instanceof Date ? f.expectedDate.toISOString() : String(f.expectedDate);
+      if (!entry.earliestDate || dateStr < entry.earliestDate) {
+        entry.earliestDate = dateStr;
+      }
     }
+
     const productList = Array.from(byProduct.values());
     for (const v of productList) {
       v.shortfall = Math.max(0, v.demand + v.reserved - v.currentStock);
@@ -136,15 +155,26 @@ export const forecastService = {
 
   async convert(id: string, opts: { orderNumber: string; dueDate: Date; priority?: "low" | "normal" | "high" | "urgent"; poNumber?: string | null; notes?: string | null }): Promise<{ forecast: ForecastOrder; order: Order }> {
     return await db.transaction(async (tx) => {
+      // Atomic claim: only succeeds if the row exists AND is in an active (non-terminal) status.
+      // The status predicate prevents concurrent requests from both converting the same forecast.
       const [claimed] = await tx
         .update(forecastOrders)
-        .set({ status: "converted", updatedAt: new Date() })
-        .where(and(eq(forecastOrders.id, id), eq(forecastOrders.status, "open")))
+        .set({ status: "Converted", convertedAt: new Date(), updatedAt: new Date() })
+        .where(
+          and(
+            eq(forecastOrders.id, id),
+            // Only allow conversion from non-terminal statuses
+            sql`${forecastOrders.status} NOT IN ('Converted', 'Cancelled')`
+          )
+        )
         .returning();
+
       if (!claimed) {
+        // Row was not updated — either it doesn't exist or it's already Converted/Cancelled.
         const existing = await repo.get(id);
-        if (!existing) throw new Error("Forecast not found");
-        throw new Error("Forecast is not open and cannot be converted");
+        if (!existing) throw Object.assign(new Error("Forecast not found"), { statusCode: 404 });
+        if (existing.status === "Converted") throw Object.assign(new Error("This forecast has already been converted to an order."), { statusCode: 409 });
+        throw Object.assign(new Error("Cancelled forecasts cannot be converted."), { statusCode: 409 });
       }
 
       const customer = await repo.getCustomer(claimed.customerId);

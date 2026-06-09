@@ -631,7 +631,7 @@ export const insertProcessCodeDefinitionSchema = z.object({
 export type InsertProcessCodeDefinition = z.infer<typeof insertProcessCodeDefinitionSchema>;
 export type ProcessCodeDefinition = typeof processCodeDefinitions.$inferSelect;
 
-export const forecastStatusEnum = pgEnum("forecast_status", ["open", "converted", "archived"]);
+export const forecastStatusEnum = pgEnum("forecast_status", ["Draft", "Likely", "Confirmed Forecast", "Converted", "Cancelled"]);
 
 export const forecastOrders = pgTable("forecast_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -640,8 +640,10 @@ export const forecastOrders = pgTable("forecast_orders", {
   quantity: decimal("quantity", { precision: 12, scale: 3 }).notNull(),
   expectedDate: timestamp("expected_date").notNull(),
   notes: text("notes"),
-  status: forecastStatusEnum("status").notNull().default("open"),
+  confidenceLevel: text("confidence_level"),
+  status: forecastStatusEnum("status").notNull().default("Draft"),
   convertedOrderId: varchar("converted_order_id").references(() => orders.id),
+  convertedAt: timestamp("converted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -654,8 +656,9 @@ export const forecastOrdersRelations = relations(forecastOrders, ({ one }) => ({
 
 export const insertForecastOrderSchema = createInsertSchema(forecastOrders).omit({ id: true, createdAt: true, updatedAt: true }).extend({
   expectedDate: z.union([z.string(), z.date()]).transform((val) => typeof val === 'string' ? new Date(val) : val),
+  convertedAt: z.union([z.string(), z.date(), z.null()]).transform((val) => val === null || val === undefined ? null : typeof val === 'string' ? new Date(val) : val).optional(),
 });
 
 export type InsertForecastOrder = z.infer<typeof insertForecastOrderSchema>;
 export type ForecastOrder = typeof forecastOrders.$inferSelect;
-export type ForecastStatus = "open" | "converted" | "archived";
+export type ForecastStatus = "Draft" | "Likely" | "Confirmed Forecast" | "Converted" | "Cancelled";
