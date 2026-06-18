@@ -26,11 +26,25 @@ export interface ForecastSummaryProduct {
   productId: string;
   productName: string;
   unit: string;
-  demand: number;
+  forecastDemand: number;
+  orderedQty: number;
   currentStock: number;
-  reserved: number;
   shortfall: number;
   earliestDate: string | null;
+}
+
+export interface ForecastOrderLine {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  orderStatus: string;
+  customerId: string | null;
+  customerName: string;
+  productId: string;
+  productName: string;
+  productUnit: string;
+  quantity: string;
+  dueDate: string;
 }
 
 export interface ForecastSummary {
@@ -53,6 +67,13 @@ export function useForecastSummary(range: ForecastRange) {
   return useQuery<ForecastSummary>({
     queryKey: ["forecastSummary", range],
     queryFn: () => fetchApi(`/forecast/summary?months=${range}`),
+  });
+}
+
+export function useForecastOrderLines(range: ForecastRange) {
+  return useQuery<ForecastOrderLine[]>({
+    queryKey: ["forecastOrderLines", range],
+    queryFn: () => fetchApi(`/forecast/order-lines?months=${range}`),
   });
 }
 

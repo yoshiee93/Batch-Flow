@@ -23,8 +23,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useCustomers } from "@/features/customers/api";
 import { useProducts } from "@/features/catalog/api";
 import {
-  useForecasts, useForecastSummary, useCreateForecast, useUpdateForecast, useDeleteForecast, useConvertForecast, useForecastHistory, useForecastHistoryRange,
-  type ForecastOrder, type ForecastRange, type ForecastStatus, type ConfidenceLevel,
+  useForecasts, useForecastSummary, useForecastOrderLines, useCreateForecast, useUpdateForecast, useDeleteForecast, useConvertForecast, useForecastHistory, useForecastHistoryRange,
+  type ForecastOrder, type ForecastOrderLine, type ForecastRange, type ForecastStatus, type ConfidenceLevel,
 } from "@/features/forecast/api";
 import { ApiValidationError } from "@/lib/fetchApi";
 import { cn } from "@/lib/utils";
@@ -101,6 +101,7 @@ export default function Forecast() {
   const { toast } = useToast();
 
   const { data: forecasts = [], isLoading } = useForecasts(range);
+  const { data: orderLines = [], isLoading: isLoadingOrders } = useForecastOrderLines(range);
   const { data: summary } = useForecastSummary(range);
   const { data: customers = [] } = useCustomers();
   const { data: products = [] } = useProducts();
@@ -164,19 +165,31 @@ export default function Forecast() {
     return m || 1;
   }, [history]);
 
+  type ListRow = { kind: "forecast"; data: ForecastOrder } | { kind: "order"; data: ForecastOrderLine };
+
   const grouped = useMemo(() => {
-    const map = new Map<string, ForecastOrder[]>();
+    const map = new Map<string, ListRow[]>();
     for (const f of forecasts) {
       const key = format(new Date(f.expectedDate), "MMM yyyy");
       if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(f);
+      map.get(key)!.push({ kind: "forecast", data: f });
+    }
+    for (const o of orderLines) {
+      const key = format(new Date(o.dueDate), "MMM yyyy");
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ kind: "order", data: o });
     }
     const entries = Array.from(map.entries());
     for (const [, arr] of entries) {
-      arr.sort((a: ForecastOrder, b: ForecastOrder) => new Date(a.expectedDate).getTime() - new Date(b.expectedDate).getTime());
+      arr.sort((a, b) => {
+        const da = a.kind === "forecast" ? new Date(a.data.expectedDate) : new Date(a.data.dueDate);
+        const db_ = b.kind === "forecast" ? new Date(b.data.expectedDate) : new Date(b.data.dueDate);
+        return da.getTime() - db_.getTime();
+      });
     }
+    entries.sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime());
     return entries;
-  }, [forecasts]);
+  }, [forecasts, orderLines]);
 
   const openCreate = () => { setForm(emptyForm); setCreateOpen(true); };
 
@@ -315,11 +328,11 @@ export default function Forecast() {
             </TabsList>
           </Tabs>
 
-          {isLoading ? (
+          {(isLoading || isLoadingOrders) ? (
             <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : grouped.length === 0 ? (
             <Card className="p-10 text-center text-muted-foreground" data-testid="text-empty">
-              No forecasts in this range. Click <strong>New Forecast</strong> to add one.
+              No forecasts or unfilled orders in this range. Click <strong>New Forecast</strong> to add one.
             </Card>
           ) : (
             grouped.map(([month, items]) => (
@@ -328,7 +341,7 @@ export default function Forecast() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Expected</TableHead>
+                      <TableHead>Date</TableHead>
                       <TableHead>Customer</TableHead>
                       <TableHead>Product</TableHead>
                       <TableHead className="text-right">Quantity</TableHead>
@@ -339,7 +352,33 @@ export default function Forecast() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.map(f => {
+                    {items.map(row => {
+                      if (row.kind === "order") {
+                        const o = row.data;
+                        return (
+                          <TableRow key={`order-${o.id}`} data-testid={`row-order-${o.id}`} className="bg-muted/10">
+                            <TableCell>{format(new Date(o.dueDate), "d MMM yyyy")}</TableCell>
+                            <TableCell>{o.customerName}</TableCell>
+                            <TableCell>{o.productName}</TableCell>
+                            <TableCell className="text-right font-mono">{parseFloat(o.quantity).toFixed(2)} {o.productUnit}</TableCell>
+                            <TableCell><span className="text-muted-foreground text-xs">—</span></TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-sky-700 border-sky-300 bg-sky-50" data-testid={`badge-order-${o.id}`}>Order</Badge>
+                                <Link href="/orders" data-testid={`link-order-${o.id}`}>
+                                  <span className="inline-flex items-center text-xs text-primary hover:underline">
+                                    <ExternalLink className="h-3 w-3 mr-0.5" />
+                                    {o.orderNumber}
+                                  </span>
+                                </Link>
+                              </div>
+                            </TableCell>
+                            <TableCell><span className="text-muted-foreground text-xs">—</span></TableCell>
+                            <TableCell />
+                          </TableRow>
+                        );
+                      }
+                      const f = row.data;
                       const summaryRow = summary?.products.find(p => p.productId === f.productId);
                       const isExpanded = expandedId === f.id;
                       return (
@@ -437,40 +476,44 @@ export default function Forecast() {
 
           <Card className="p-4">
             <h2 className="font-semibold mb-1">Shortage &amp; Risk View</h2>
-            <p className="text-sm text-muted-foreground mb-4">Per-product breakdown of forecast demand vs. available stock across active forecasts (Draft, Likely, Confirmed).</p>
+            <p className="text-sm text-muted-foreground mb-4">Per-product breakdown of total demand vs. available stock — includes active forecasts (Draft, Likely, Confirmed) and all unfilled orders (pending, in production, ready).</p>
 
             {!summary || summary.products.length === 0 ? (
-              <p className="text-sm text-muted-foreground" data-testid="text-shortage-empty">No active forecasts in this range.</p>
+              <p className="text-sm text-muted-foreground" data-testid="text-shortage-empty">No active forecasts or unfilled orders in this range.</p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
+                    <TableHead className="text-right">Forecast Demand</TableHead>
+                    <TableHead className="text-right">Unfilled Orders</TableHead>
                     <TableHead className="text-right">Total Required</TableHead>
                     <TableHead className="text-right">Current Stock</TableHead>
-                    <TableHead className="text-right">Committed to Orders</TableHead>
-                    <TableHead className="text-right">Projected Available</TableHead>
                     <TableHead className="text-right">Shortage</TableHead>
                     <TableHead>Earliest Required</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {summary.products.map(p => {
-                    const projectedAvailable = Math.max(0, p.currentStock - p.reserved);
+                    const totalRequired = p.forecastDemand + p.orderedQty;
                     return (
                       <TableRow key={p.productId} data-testid={`row-shortage-${p.productId}`}>
                         <TableCell className="font-medium">{p.productName}</TableCell>
+                        <TableCell className="text-right font-mono" data-testid={`text-forecast-demand-${p.productId}`}>
+                          {p.forecastDemand.toFixed(2)} {p.unit}
+                        </TableCell>
+                        <TableCell className="text-right font-mono" data-testid={`text-ordered-qty-${p.productId}`}>
+                          {p.orderedQty > 0 ? (
+                            <span className="text-sky-700">{p.orderedQty.toFixed(2)} {p.unit}</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-mono" data-testid={`text-required-${p.productId}`}>
-                          {p.demand.toFixed(2)} {p.unit}
+                          {totalRequired.toFixed(2)} {p.unit}
                         </TableCell>
                         <TableCell className="text-right font-mono" data-testid={`text-stock-${p.productId}`}>
                           {p.currentStock.toFixed(2)} {p.unit}
-                        </TableCell>
-                        <TableCell className="text-right font-mono" data-testid={`text-committed-${p.productId}`}>
-                          {p.reserved.toFixed(2)} {p.unit}
-                        </TableCell>
-                        <TableCell className="text-right font-mono" data-testid={`text-available-${p.productId}`}>
-                          {projectedAvailable.toFixed(2)} {p.unit}
                         </TableCell>
                         <TableCell className="text-right" data-testid={`text-shortage-${p.productId}`}>
                           {p.shortfall > 0 ? (
@@ -857,7 +900,7 @@ function StockEstimatePanel({
   summaryRow,
 }: {
   forecast: ForecastOrder;
-  summaryRow?: { demand: number; currentStock: number; reserved: number; shortfall: number; unit: string; earliestDate?: string | null } | null;
+  summaryRow?: { forecastDemand: number; orderedQty: number; currentStock: number; shortfall: number; unit: string; earliestDate?: string | null } | null;
 }) {
   if (!summaryRow) {
     return (
@@ -867,9 +910,8 @@ function StockEstimatePanel({
     );
   }
 
-  const fDemand = parseFloat(forecast.quantity);
-  const projectedAvailable = Math.max(0, summaryRow.currentStock - summaryRow.reserved);
-  const projectedShortage = Math.max(0, fDemand - projectedAvailable);
+  const totalRequired = summaryRow.forecastDemand + summaryRow.orderedQty;
+  const projectedShortage = Math.max(0, totalRequired - summaryRow.currentStock);
 
   return (
     <div className="text-sm" data-testid={`panel-stock-estimate-${forecast.id}`}>
@@ -877,15 +919,15 @@ function StockEstimatePanel({
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div>
           <div className="text-xs text-muted-foreground">Forecast demand</div>
-          <div className="font-mono font-semibold" data-testid={`text-estimate-demand-${forecast.id}`}>{fDemand.toFixed(2)} {forecast.productUnit}</div>
+          <div className="font-mono font-semibold" data-testid={`text-estimate-demand-${forecast.id}`}>{summaryRow.forecastDemand.toFixed(2)} {summaryRow.unit}</div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">Unfilled orders</div>
+          <div className="font-mono font-semibold" data-testid={`text-estimate-committed-${forecast.id}`}>{summaryRow.orderedQty.toFixed(2)} {summaryRow.unit}</div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Current stock</div>
           <div className="font-mono font-semibold" data-testid={`text-estimate-stock-${forecast.id}`}>{summaryRow.currentStock.toFixed(2)} {summaryRow.unit}</div>
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Committed to orders</div>
-          <div className="font-mono font-semibold" data-testid={`text-estimate-committed-${forecast.id}`}>{summaryRow.reserved.toFixed(2)} {summaryRow.unit}</div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Projected shortage</div>

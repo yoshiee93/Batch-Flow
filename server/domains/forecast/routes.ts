@@ -38,6 +38,11 @@ forecastRouter.get("/forecast/summary", adminOnly, asyncHandler(async (req, res)
   res.json(await svc.summary(months));
 }));
 
+forecastRouter.get("/forecast/order-lines", adminOnly, asyncHandler(async (req, res) => {
+  const months = (req.query.months === "6" ? 6 : req.query.months === "12" ? 12 : 3) as 3 | 6 | 12;
+  res.json(await svc.getActiveOrderLines(months));
+}));
+
 forecastRouter.get("/forecast/history", adminOnly, asyncHandler(async (req, res) => {
   const productId = typeof req.query.productId === "string" && req.query.productId ? req.query.productId : undefined;
   const customerId = typeof req.query.customerId === "string" && req.query.customerId ? req.query.customerId : undefined;

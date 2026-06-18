@@ -119,6 +119,62 @@ export const forecastRepository = {
     return map;
   },
 
+  async getOrderedQtyByProduct(): Promise<Map<string, number>> {
+    const rows = await db
+      .select({
+        productId: orderItems.productId,
+        orderedQty: sql<string>`COALESCE(SUM(${orderItems.quantity}), 0)`,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(sql`${orders.status} IN ('pending', 'in_production', 'ready')`)
+      .groupBy(orderItems.productId);
+    const map = new Map<string, number>();
+    for (const r of rows) map.set(r.productId, parseFloat(r.orderedQty ?? "0"));
+    return map;
+  },
+
+  async getActiveOrderLines(from: Date, to: Date): Promise<{
+    id: string;
+    orderId: string;
+    orderNumber: string;
+    orderStatus: string;
+    customerId: string | null;
+    customerName: string;
+    productId: string;
+    productName: string;
+    productUnit: string;
+    quantity: string;
+    dueDate: Date;
+  }[]> {
+    const rows = await db
+      .select({
+        id: orderItems.id,
+        orderId: orders.id,
+        orderNumber: orders.orderNumber,
+        orderStatus: orders.status,
+        customerId: orders.customerId,
+        customerName: orders.customerName,
+        productId: orderItems.productId,
+        productName: products.name,
+        productUnit: products.unit,
+        quantity: orderItems.quantity,
+        dueDate: orders.dueDate,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .innerJoin(products, eq(orderItems.productId, products.id))
+      .where(
+        and(
+          sql`${orders.status} IN ('pending', 'in_production', 'ready')`,
+          gte(orders.dueDate, from),
+          lte(orders.dueDate, to),
+        )
+      )
+      .orderBy(orders.dueDate);
+    return rows;
+  },
+
   getActiveStatuses() {
     return ACTIVE_STATUSES;
   },

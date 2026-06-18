@@ -102,17 +102,19 @@ export const forecastService = {
 
   async summary(months: 3 | 6 | 12) {
     const { from, to } = rangeFromMonths(months);
-    const allForecasts = await repo.list({ from, to });
+    const [allForecasts, orderedQtyMap] = await Promise.all([
+      repo.list({ from, to }),
+      repo.getOrderedQtyByProduct(),
+    ]);
     const activeForecasts = allForecasts.filter(f => ACTIVE_STATUSES.includes(f.status));
-    const reservedMap = await repo.getReservedByProduct();
 
     const byProduct = new Map<string, {
       productId: string;
       productName: string;
       unit: string;
-      demand: number;
+      forecastDemand: number;
+      orderedQty: number;
       currentStock: number;
-      reserved: number;
       shortfall: number;
       earliestDate: string | null;
     }>();
@@ -126,31 +128,54 @@ export const forecastService = {
           productId: key,
           productName: p?.name ?? f.productName,
           unit: p?.unit ?? f.productUnit,
-          demand: 0,
+          forecastDemand: 0,
+          orderedQty: orderedQtyMap.get(key) ?? 0,
           currentStock: parseFloat(p?.currentStock ?? "0"),
-          reserved: reservedMap.get(key) ?? 0,
           shortfall: 0,
           earliestDate: null,
         });
       }
       const entry = byProduct.get(key)!;
-      entry.demand += qty;
+      entry.forecastDemand += qty;
       const dateStr = f.expectedDate instanceof Date ? f.expectedDate.toISOString() : String(f.expectedDate);
       if (!entry.earliestDate || dateStr < entry.earliestDate) {
         entry.earliestDate = dateStr;
       }
     }
 
+    for (const [productId, orderedQty] of orderedQtyMap) {
+      if (!byProduct.has(productId)) {
+        const p = await repo.getProduct(productId);
+        if (p) {
+          byProduct.set(productId, {
+            productId,
+            productName: p.name,
+            unit: p.unit,
+            forecastDemand: 0,
+            orderedQty,
+            currentStock: parseFloat(p.currentStock ?? "0"),
+            shortfall: 0,
+            earliestDate: null,
+          });
+        }
+      }
+    }
+
     const productList = Array.from(byProduct.values());
     for (const v of productList) {
-      v.shortfall = Math.max(0, v.demand + v.reserved - v.currentStock);
+      v.shortfall = Math.max(0, v.forecastDemand + v.orderedQty - v.currentStock);
     }
     return {
       months,
       from: from.toISOString(),
       to: to.toISOString(),
-      products: productList.sort((a, b) => b.shortfall - a.shortfall || b.demand - a.demand),
+      products: productList.sort((a, b) => b.shortfall - a.shortfall || (b.forecastDemand + b.orderedQty) - (a.forecastDemand + a.orderedQty)),
     };
+  },
+
+  async getActiveOrderLines(months: 3 | 6 | 12) {
+    const { from, to } = rangeFromMonths(months);
+    return repo.getActiveOrderLines(from, to);
   },
 
   async convert(id: string, opts: { orderNumber: string; dueDate: Date; priority?: "low" | "normal" | "high" | "urgent"; poNumber?: string | null; notes?: string | null }): Promise<{ forecast: ForecastOrder; order: Order }> {
