@@ -101,7 +101,14 @@ productionRouter.patch("/batches/:id/barcode-printed", productionOrAdmin, asyncH
 
 productionRouter.post("/batches", productionOrAdmin, asyncHandler(async (req, res) => {
   const data = insertBatchSchema.parse(req.body);
-  res.status(201).json(await svc.createBatch(data));
+  try {
+    res.status(201).json(await svc.createBatch(data));
+  } catch (err: any) {
+    if (err?.code === '23505') {
+      return res.status(409).json({ error: "A batch with this number already exists. Please use a different batch number." });
+    }
+    throw err;
+  }
 }));
 
 productionRouter.patch("/batches/:id", productionOrAdmin, asyncHandler(async (req, res) => {

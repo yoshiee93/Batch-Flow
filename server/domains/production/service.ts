@@ -57,8 +57,16 @@ export const productionService = {
       if (category?.processCode) {
         const batchDate: Date = data.startDate ?? new Date();
         try {
-          batchCode = buildBatchCode(product.fruitCode, category.processCode, batchDate);
-          barcodeValue = batchCode;
+          const candidateCode = buildBatchCode(product.fruitCode, category.processCode, batchDate);
+          const codeExists = await db.execute(
+            sql`SELECT 1 FROM batches WHERE batch_code = ${candidateCode} LIMIT 1`
+          );
+          if (codeExists.rows.length === 0) {
+            batchCode = candidateCode;
+            barcodeValue = candidateCode;
+          } else {
+            barcodeValue = await generateBarcodeValue();
+          }
         } catch (err) {
           console.warn("[createBatch] SOP code generation skipped:", (err as Error).message);
           barcodeValue = await generateBarcodeValue();
@@ -70,8 +78,29 @@ export const productionService = {
       barcodeValue = await generateBarcodeValue();
     }
 
-    const created = await repo.createBatchRaw({ ...data, barcodeValue, batchCode });
-    await createAuditLog({ entityType: "batch", entityId: created.id, action: "create", changes: JSON.stringify({ ...data, barcodeValue, batchCode }) });
+    // Deduplicate batchNumber: if the supplied number is already taken, append -2, -3, …
+    let uniqueBatchNumber = data.batchNumber;
+    const bnExists = await db.execute(
+      sql`SELECT 1 FROM batches WHERE batch_number = ${uniqueBatchNumber} LIMIT 1`
+    );
+    if (bnExists.rows.length > 0) {
+      let found = false;
+      for (let i = 2; i <= 999; i++) {
+        const candidate = `${data.batchNumber}-${i}`;
+        const check = await db.execute(
+          sql`SELECT 1 FROM batches WHERE batch_number = ${candidate} LIMIT 1`
+        );
+        if (check.rows.length === 0) {
+          uniqueBatchNumber = candidate;
+          found = true;
+          break;
+        }
+      }
+      if (!found) throw new Error(`Unable to generate a unique batch number for "${data.batchNumber}" after 999 attempts`);
+    }
+
+    const created = await repo.createBatchRaw({ ...data, batchNumber: uniqueBatchNumber, barcodeValue, batchCode });
+    await createAuditLog({ entityType: "batch", entityId: created.id, action: "create", changes: JSON.stringify({ ...data, batchNumber: uniqueBatchNumber, barcodeValue, batchCode }) });
     return created;
   },
 
