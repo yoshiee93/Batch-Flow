@@ -143,7 +143,7 @@ export const forecastService = {
       }
     }
 
-    for (const [productId, orderedQty] of orderedQtyMap) {
+    for (const [productId, orderedQty] of Array.from(orderedQtyMap.entries())) {
       if (!byProduct.has(productId)) {
         const p = await repo.getProduct(productId);
         if (p) {
