@@ -10,10 +10,12 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Loader2, Pencil, Trash2, ArrowRightLeft, AlertTriangle, ExternalLink, MoreHorizontal, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, ArrowRightLeft, AlertTriangle, ExternalLink, MoreHorizontal, CheckCircle2, XCircle, ChevronsUpDown, Check } from "lucide-react";
 import { format, isSameDay, parseISO, subYears, startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { CalendarDayButton } from "@/components/ui/calendar";
 import { Link } from "wouter";
@@ -25,6 +27,7 @@ import {
   type ForecastOrder, type ForecastRange, type ForecastStatus, type ConfidenceLevel,
 } from "@/features/forecast/api";
 import { ApiValidationError } from "@/lib/fetchApi";
+import { cn } from "@/lib/utils";
 
 const FORECAST_STATUSES: ForecastStatus[] = ["Draft", "Likely", "Confirmed Forecast", "Converted", "Cancelled"];
 const ACTIVE_STATUSES: ForecastStatus[] = ["Draft", "Likely", "Confirmed Forecast"];
@@ -85,6 +88,9 @@ export default function Forecast() {
   const [compareProductId, setCompareProductId] = useState<string>("");
   const [historyProductId, setHistoryProductId] = useState<string>("");
   const [historyMonths, setHistoryMonths] = useState<number>(6);
+  const [compareProductOpen, setCompareProductOpen] = useState(false);
+  const [historyProductOpen, setHistoryProductOpen] = useState(false);
+  const [formProductOpen, setFormProductOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ForecastOrder | null>(null);
   const [convertTarget, setConvertTarget] = useState<ForecastOrder | null>(null);
@@ -511,13 +517,37 @@ export default function Forecast() {
               {compareMode && (
                 <div className="flex items-center gap-2">
                   <Label className="text-sm text-muted-foreground">Product</Label>
-                  <Select value={compareProductId || "none"} onValueChange={(v) => setCompareProductId(v === "none" ? "" : v)}>
-                    <SelectTrigger className="w-[220px]" data-testid="select-compare-product"><SelectValue placeholder="Pick product" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— Pick a product —</SelectItem>
-                      {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={compareProductOpen} onOpenChange={setCompareProductOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" aria-expanded={compareProductOpen}
+                        className="w-[220px] justify-between font-normal" data-testid="select-compare-product">
+                        <span className="truncate">
+                          {compareProductId ? products.find(p => p.id === compareProductId)?.name ?? "Pick product" : "— Pick a product —"}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[220px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search products..." />
+                        <CommandList>
+                          <CommandEmpty>No product found.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem value="none" onSelect={() => { setCompareProductId(""); setCompareProductOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4", !compareProductId ? "opacity-100" : "opacity-0")} />
+                              — Pick a product —
+                            </CommandItem>
+                            {products.map(p => (
+                              <CommandItem key={p.id} value={p.name} onSelect={() => { setCompareProductId(p.id); setCompareProductOpen(false); }}>
+                                <Check className={cn("mr-2 h-4 w-4", compareProductId === p.id ? "opacity-100" : "opacity-0")} />
+                                {p.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
               <p className="text-xs text-muted-foreground ml-auto">Each day cell shows the forecast and last-year same-week real orders.</p>
@@ -597,13 +627,37 @@ export default function Forecast() {
             <div className="flex flex-wrap items-end gap-3 mb-4">
               <div className="min-w-[220px]">
                 <Label>Product</Label>
-                <Select value={historyProductId || "all"} onValueChange={(v) => setHistoryProductId(v === "all" ? "" : v)}>
-                  <SelectTrigger data-testid="select-history-product"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All products</SelectItem>
-                    {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Popover open={historyProductOpen} onOpenChange={setHistoryProductOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={historyProductOpen}
+                      className="w-full justify-between font-normal" data-testid="select-history-product">
+                      <span className="truncate">
+                        {historyProductId ? products.find(p => p.id === historyProductId)?.name ?? "All products" : "All products"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[260px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search products..." />
+                      <CommandList>
+                        <CommandEmpty>No product found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem value="all" onSelect={() => { setHistoryProductId(""); setHistoryProductOpen(false); }}>
+                            <Check className={cn("mr-2 h-4 w-4", !historyProductId ? "opacity-100" : "opacity-0")} />
+                            All products
+                          </CommandItem>
+                          {products.map(p => (
+                            <CommandItem key={p.id} value={p.name} onSelect={() => { setHistoryProductId(p.id); setHistoryProductOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4", historyProductId === p.id ? "opacity-100" : "opacity-0")} />
+                              {p.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <Label>Months back</Label>
@@ -684,12 +738,33 @@ export default function Forecast() {
             </div>
             <div>
               <Label>Product</Label>
-              <Select value={form.productId} onValueChange={(v) => setForm({ ...form, productId: v })}>
-                <SelectTrigger data-testid="select-forecast-product"><SelectValue placeholder="Select product" /></SelectTrigger>
-                <SelectContent>
-                  {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Popover open={formProductOpen} onOpenChange={setFormProductOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={formProductOpen}
+                    className="w-full justify-between font-normal" data-testid="select-forecast-product">
+                    <span className={cn("truncate", !form.productId && "text-muted-foreground")}>
+                      {form.productId ? products.find(p => p.id === form.productId)?.name ?? "Select product" : "Select product"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search products..." />
+                    <CommandList>
+                      <CommandEmpty>No product found.</CommandEmpty>
+                      <CommandGroup>
+                        {products.map(p => (
+                          <CommandItem key={p.id} value={p.name} onSelect={() => { setForm({ ...form, productId: p.id }); setFormProductOpen(false); }}>
+                            <Check className={cn("mr-2 h-4 w-4", form.productId === p.id ? "opacity-100" : "opacity-0")} />
+                            {p.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
