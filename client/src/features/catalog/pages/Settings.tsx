@@ -14,13 +14,14 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import {
   Plus, Loader2, AlertCircle, Pencil, Trash2, Settings2, Tags, LayoutList, Leaf,
   Database, Download, Upload, ShieldAlert, Tag, Wrench, ShieldCheck, Construction, Printer, History,
+  Users, Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useProducts, useUpdateProduct, useProcessCodeDefinitions, useUpsertProcessCodeDefinition, type Category, type Product } from '@/features/catalog/api';
 import { FRUIT_CODE_MAP } from '@shared/batchCodeConfig';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/use-settings';
-import { useRole } from '@/contexts/AuthContext';
+import { useRole, usePermissions } from '@/contexts/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 import LabelTemplatesPanel from '@/features/labels/pages/Labels';
 import CustomLabelBuilder from '@/features/labels/components/CustomLabelBuilder';
@@ -30,8 +31,10 @@ import ActivityLogPanel from '@/features/security/components/ActivityLogPanel';
 import { Activity, FileText } from 'lucide-react';
 import TemplatesPanel from '@/features/templates/TemplatesPanel';
 import { BatchStandardForm, ProductSpecForm } from '@/features/templates/kindForms';
+import UsersTab from '@/features/admin/UsersTab';
+import GroupsTab from '@/features/admin/GroupsTab';
 
-const TAB_VALUES = ['general', 'production', 'labels', 'data', 'security'] as const;
+const TAB_VALUES = ['general', 'production', 'labels', 'data', 'security', 'users'] as const;
 type TabValue = typeof TAB_VALUES[number];
 
 interface SectionDescriptor {
@@ -79,6 +82,8 @@ export default function Settings() {
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
 
   const { canManageSettings, isAdmin } = useRole();
+  const { hasPermission } = usePermissions();
+  const canManageUsers = hasPermission('users.manage');
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<TabValue>(() => readQueryParams().tab);
   const [activeSection, setActiveSection] = useState<string | null>(() => readQueryParams().section);
@@ -784,6 +789,10 @@ export default function Settings() {
         ? [{ id: 'activity-log', label: 'Activity Log', icon: Activity, render: () => <ActivityLogPanel /> }]
         : []),
     ],
+    users: canManageUsers ? [
+      { id: 'users', label: 'User Accounts', icon: Users, render: () => <UsersTab /> },
+      { id: 'groups', label: 'Permission Groups', icon: Shield, render: () => <GroupsTab /> },
+    ] : [],
   };
 
   const tabSections = sectionsByTab[activeTab];
@@ -847,7 +856,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <TabsList className="grid grid-cols-3 sm:grid-cols-5 w-full">
+        <TabsList className={`grid w-full ${canManageUsers ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-3 sm:grid-cols-5'}`}>
           <TabsTrigger value="general" data-testid="tab-general">
             <Settings2 className="h-4 w-4 mr-1.5 hidden sm:inline" />
             General
@@ -868,6 +877,12 @@ export default function Settings() {
             <ShieldCheck className="h-4 w-4 mr-1.5 hidden sm:inline" />
             Security
           </TabsTrigger>
+          {canManageUsers && (
+            <TabsTrigger value="users" data-testid="tab-users">
+              <Users className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              Users
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Mobile: stacked accordion */}

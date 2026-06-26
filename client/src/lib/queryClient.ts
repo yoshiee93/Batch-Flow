@@ -6,6 +6,14 @@ async function throwIfResNotOk(res: Response) {
     if (res.status === 403 && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("api:forbidden", { detail: { message: text } }));
     }
+    if (res.status === 401 && typeof window !== "undefined") {
+      try {
+        const body = JSON.parse(text);
+        if (body.error === "permissions_changed") {
+          window.dispatchEvent(new CustomEvent("api:permissions_changed", { detail: body }));
+        }
+      } catch {}
+    }
     throw new Error(`${res.status}: ${text}`);
   }
 }

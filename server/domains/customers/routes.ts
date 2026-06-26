@@ -4,10 +4,16 @@ import {
   insertCustomerSchema, insertOrderSchema, insertOrderItemSchema,
 } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { requireRole } from "../../lib/authMiddleware";
+import { requirePermission } from "../../lib/authMiddleware";
 import { customersService as svc, TestingRequiredError } from "./service";
 
-const adminOnly = requireRole("admin");
+const canCreateCustomer = requirePermission("customers.create");
+const canEditCustomer = requirePermission("customers.edit");
+const canDeleteCustomer = requirePermission("customers.delete");
+const canCreateOrder = requirePermission("orders.create");
+const canEditOrder = requirePermission("orders.edit");
+const canDeleteOrder = requirePermission("orders.delete");
+const canPackOrder = requirePermission("pack_orders.create");
 
 export const customersRouter = Router();
 
@@ -21,19 +27,19 @@ customersRouter.get("/customers/:id", asyncHandler(async (req, res) => {
   res.json(customer);
 }));
 
-customersRouter.post("/customers", adminOnly, asyncHandler(async (req, res) => {
+customersRouter.post("/customers", canCreateCustomer, asyncHandler(async (req, res) => {
   const data = insertCustomerSchema.parse(req.body);
   res.status(201).json(await svc.createCustomer(data));
 }));
 
-customersRouter.patch("/customers/:id", adminOnly, asyncHandler(async (req, res) => {
+customersRouter.patch("/customers/:id", canEditCustomer, asyncHandler(async (req, res) => {
   const data = insertCustomerSchema.partial().parse(req.body);
   const customer = await svc.updateCustomer(req.params.id, data);
   if (!customer) return res.status(404).json({ error: "Customer not found" });
   res.json(customer);
 }));
 
-customersRouter.delete("/customers/:id", adminOnly, asyncHandler(async (req, res) => {
+customersRouter.delete("/customers/:id", canDeleteCustomer, asyncHandler(async (req, res) => {
   await svc.deleteCustomer(req.params.id);
   res.status(204).send();
 }));
@@ -61,7 +67,7 @@ customersRouter.get("/orders/:id/allocations", asyncHandler(async (req, res) => 
   res.json(await customersRepository.getOrderAllocations(orderId));
 }));
 
-customersRouter.post("/orders/:id/pack", adminOnly, asyncHandler(async (req, res) => {
+customersRouter.post("/orders/:id/pack", canPackOrder, asyncHandler(async (req, res) => {
   const orderId = req.params.id;
   const order = await svc.getOrder(orderId);
   if (!order) return res.status(404).json({ error: "Order not found" });
@@ -86,7 +92,7 @@ customersRouter.post("/orders/:id/pack", adminOnly, asyncHandler(async (req, res
   }
 }));
 
-customersRouter.post("/orders/:id/ship", adminOnly, asyncHandler(async (req, res) => {
+customersRouter.post("/orders/:id/ship", canEditOrder, asyncHandler(async (req, res) => {
   const orderId = req.params.id;
   const order = await svc.getOrder(orderId);
   if (!order) return res.status(404).json({ error: "Order not found" });
@@ -119,19 +125,19 @@ customersRouter.get("/orders", asyncHandler(async (_req, res) => {
   res.json(await svc.getOrders());
 }));
 
-customersRouter.post("/orders", adminOnly, asyncHandler(async (req, res) => {
+customersRouter.post("/orders", canCreateOrder, asyncHandler(async (req, res) => {
   const data = insertOrderSchema.parse(req.body);
   res.status(201).json(await svc.createOrder(data));
 }));
 
-customersRouter.patch("/orders/:id", adminOnly, asyncHandler(async (req, res) => {
+customersRouter.patch("/orders/:id", canEditOrder, asyncHandler(async (req, res) => {
   const data = insertOrderSchema.partial().parse(req.body);
   const order = await svc.updateOrder(req.params.id, data);
   if (!order) return res.status(404).json({ error: "Order not found" });
   res.json(order);
 }));
 
-customersRouter.delete("/orders/:id", adminOnly, asyncHandler(async (req, res) => {
+customersRouter.delete("/orders/:id", canDeleteOrder, asyncHandler(async (req, res) => {
   await svc.deleteOrder(req.params.id);
   res.status(204).send();
 }));
@@ -143,17 +149,17 @@ const orderItemPayloadSchema = insertOrderItemSchema.extend({
   }, { message: "Quantity must be greater than 0" }),
   productId: z.string().min(1, "Product is required"),
 });
-customersRouter.post("/orders/:id/items", adminOnly, asyncHandler(async (req, res) => {
+customersRouter.post("/orders/:id/items", canCreateOrder, asyncHandler(async (req, res) => {
   const data = orderItemPayloadSchema.parse({ ...req.body, orderId: req.params.id });
   res.status(201).json(await svc.createOrderItem(data));
 }));
 
-customersRouter.delete("/order-items/:id", adminOnly, asyncHandler(async (req, res) => {
+customersRouter.delete("/order-items/:id", canEditOrder, asyncHandler(async (req, res) => {
   await svc.deleteOrderItem(req.params.id);
   res.status(204).send();
 }));
 
-customersRouter.post("/orders/:id/complete", adminOnly, asyncHandler(async (req, res) => {
+customersRouter.post("/orders/:id/complete", canEditOrder, asyncHandler(async (req, res) => {
   const orderId = req.params.id;
   const order = await svc.getOrder(orderId);
   if (!order) return res.status(404).json({ error: "Order not found" });
@@ -178,7 +184,7 @@ customersRouter.get("/orders/:id/testing-blockers", asyncHandler(async (req, res
   res.json(await svc.getOrderTestingBlockers(req.params.id));
 }));
 
-customersRouter.post("/allocation/run", adminOnly, asyncHandler(async (_req, res) => {
+customersRouter.post("/allocation/run", canCreateOrder, asyncHandler(async (_req, res) => {
   await svc.runStockAllocation();
   res.json({ success: true, message: "Stock allocation completed" });
 }));

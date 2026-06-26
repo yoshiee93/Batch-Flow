@@ -17,19 +17,19 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, usePermissions } from '@/contexts/AuthContext';
 import { QuickCreate } from '@/components/QuickCreate';
 
 const navItems = [
-  { label: 'Dashboard', icon: LayoutDashboard, href: '/', adminOnly: false },
-  { label: 'Orders', icon: ShoppingCart, href: '/orders', adminOnly: true },
-  { label: 'Forecast', icon: TrendingUp, href: '/forecast', adminOnly: true },
-  { label: 'Customers', icon: Users, href: '/customers', adminOnly: true },
-  { label: 'Production', icon: Factory, href: '/production', adminOnly: false },
-  { label: 'Inventory', icon: Box, href: '/inventory', adminOnly: false },
-  { label: 'Tracking', icon: ScanSearch, href: '/traceability', adminOnly: false },
-  { label: 'Calculator', icon: Calculator, href: '/calculator', adminOnly: false },
-  { label: 'Reports', icon: BarChart3, href: '/reports/production', adminOnly: false, productionOrAdmin: true },
+  { label: 'Dashboard', icon: LayoutDashboard, href: '/', permission: null },
+  { label: 'Orders', icon: ShoppingCart, href: '/orders', permission: 'orders.view' },
+  { label: 'Forecast', icon: TrendingUp, href: '/forecast', permission: 'orders.view' },
+  { label: 'Customers', icon: Users, href: '/customers', permission: 'orders.view' },
+  { label: 'Production', icon: Factory, href: '/production', permission: null },
+  { label: 'Inventory', icon: Box, href: '/inventory', permission: null },
+  { label: 'Tracking', icon: ScanSearch, href: '/traceability', permission: null },
+  { label: 'Calculator', icon: Calculator, href: '/calculator', permission: null },
+  { label: 'Reports', icon: BarChart3, href: '/reports/production', permission: 'reports.view' },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -42,13 +42,13 @@ const ROLE_LABELS: Record<string, string> = {
 export function Sidebar({ className }: { className?: string }) {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
+  const { hasPermission } = usePermissions();
 
   const initials = user
     ? user.fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : '??';
 
-  const isAdmin = user?.role === 'admin';
-  const isProductionOrAdmin = user?.role === 'admin' || user?.role === 'production';
+  const canViewSettings = hasPermission('settings.view');
 
   async function handleLogout() {
     await logout();
@@ -73,8 +73,7 @@ export function Sidebar({ className }: { className?: string }) {
 
       <nav className="flex-1 p-4 space-y-1">
         {navItems.filter(item => {
-          if (item.adminOnly && !isAdmin) return false;
-          if ((item as any).productionOrAdmin && !isProductionOrAdmin) return false;
+          if (item.permission && !hasPermission(item.permission)) return false;
           return true;
         }).map((item) => {
           const isActive = location === item.href;
@@ -106,7 +105,7 @@ export function Sidebar({ className }: { className?: string }) {
             </span>
           </div>
           <div className="flex items-center gap-1">
-            {isAdmin && (
+            {canViewSettings && (
               <Link href="/settings">
                 <Button variant="ghost" size="icon" className="text-sidebar-foreground/60 hover:text-sidebar-foreground" data-testid="button-settings">
                   <Settings size={16} />

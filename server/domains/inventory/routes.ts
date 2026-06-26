@@ -2,10 +2,12 @@ import { Router } from "express";
 import { z } from "zod";
 import { insertLotSchema, insertStockMovementSchema } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { requireRole } from "../../lib/authMiddleware";
+import { requirePermission } from "../../lib/authMiddleware";
 import { inventoryService as svc } from "./service";
 
-const inventoryOrAdmin = requireRole("inventory", "admin");
+const canView = requirePermission("inventory.view");
+const canCreate = requirePermission("inventory.create");
+const canEdit = requirePermission("inventory.edit");
 
 export const inventoryRouter = Router();
 
@@ -51,11 +53,11 @@ const receiveStockSchema = z.object({
     .optional(),
 });
 
-inventoryRouter.get("/receivable-items", asyncHandler(async (_req, res) => {
+inventoryRouter.get("/receivable-items", canView, asyncHandler(async (_req, res) => {
   res.json(await svc.getReceivableItems());
 }));
 
-inventoryRouter.get("/lots/barcode/:value", asyncHandler(async (req, res) => {
+inventoryRouter.get("/lots/barcode/:value", canView, asyncHandler(async (req, res) => {
   const lot = await svc.getLotByBarcode(req.params.value);
   if (!lot) return res.status(404).json({ error: "Lot not found for barcode" });
   let materialName: string | undefined;
@@ -75,11 +77,11 @@ inventoryRouter.get("/lots/barcode/:value", asyncHandler(async (req, res) => {
   res.json({ ...lot, materialName, materialUnit, productName, productUnit });
 }));
 
-inventoryRouter.get("/lots/:id/usage", asyncHandler(async (req, res) => {
+inventoryRouter.get("/lots/:id/usage", canView, asyncHandler(async (req, res) => {
   res.json(await svc.getLotUsage(req.params.id));
 }));
 
-inventoryRouter.get("/lots/:id/lineage", asyncHandler(async (req, res) => {
+inventoryRouter.get("/lots/:id/lineage", canView, asyncHandler(async (req, res) => {
   const lineage = await svc.getLotLineage(req.params.id);
   if (!lineage) return res.status(404).json({ error: "Lot not found" });
   res.json(lineage);
@@ -91,38 +93,38 @@ const recordTestingSchema = z.object({
   testingCertificate: z.string().max(500).optional().nullable(),
 });
 
-inventoryRouter.patch("/lots/:id/testing", requireRole("admin"), asyncHandler(async (req, res) => {
+inventoryRouter.patch("/lots/:id/testing", canEdit, asyncHandler(async (req, res) => {
   const data = recordTestingSchema.parse(req.body);
   const lot = await svc.recordLotTesting(req.params.id, data);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
   res.json(lot);
 }));
 
-inventoryRouter.patch("/lots/:id/barcode-printed", inventoryOrAdmin, asyncHandler(async (req, res) => {
+inventoryRouter.patch("/lots/:id/barcode-printed", canEdit, asyncHandler(async (req, res) => {
   const lot = await svc.updateLotBarcodePrinted(req.params.id);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
   res.json(lot);
 }));
 
-inventoryRouter.get("/lots/:id", asyncHandler(async (req, res) => {
+inventoryRouter.get("/lots/:id", canView, asyncHandler(async (req, res) => {
   const lot = await svc.getLot(req.params.id);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
   res.json(lot);
 }));
 
-inventoryRouter.get("/lots", asyncHandler(async (req, res) => {
+inventoryRouter.get("/lots", canView, asyncHandler(async (req, res) => {
   const currentOnly = req.query.currentOnly === 'true';
   const productId = req.query.productId as string | undefined;
   const materialId = req.query.materialId as string | undefined;
   res.json(await svc.getLots({ currentOnly, productId, materialId }));
 }));
 
-inventoryRouter.post("/lots", inventoryOrAdmin, asyncHandler(async (req, res) => {
+inventoryRouter.post("/lots", canCreate, asyncHandler(async (req, res) => {
   const data = insertLotSchema.parse(req.body);
   res.status(201).json(await svc.createLot(data));
 }));
 
-inventoryRouter.patch("/lots/:id", inventoryOrAdmin, asyncHandler(async (req, res) => {
+inventoryRouter.patch("/lots/:id", canEdit, asyncHandler(async (req, res) => {
   const data = insertLotSchema
     .omit({ testingStatus: true, testingNotes: true, testingCertificate: true, testedAt: true, testedById: true })
     .partial()
@@ -132,33 +134,33 @@ inventoryRouter.patch("/lots/:id", inventoryOrAdmin, asyncHandler(async (req, re
   res.json(lot);
 }));
 
-inventoryRouter.delete("/lots/:id", inventoryOrAdmin, asyncHandler(async (req, res) => {
+inventoryRouter.delete("/lots/:id", canEdit, asyncHandler(async (req, res) => {
   await svc.deleteLot(req.params.id);
   res.status(204).send();
 }));
 
-inventoryRouter.get("/materials/:id/lots", asyncHandler(async (req, res) => {
+inventoryRouter.get("/materials/:id/lots", canView, asyncHandler(async (req, res) => {
   const includeHistorical = req.query.includeHistorical === 'true';
   res.json(await svc.getLotsByMaterial(req.params.id, { includeHistorical }));
 }));
 
-inventoryRouter.get("/products/:id/lots", asyncHandler(async (req, res) => {
+inventoryRouter.get("/products/:id/lots", canView, asyncHandler(async (req, res) => {
   const includeHistorical = req.query.includeHistorical === 'true';
   res.json(await svc.getLotsByProduct(req.params.id, { includeHistorical }));
 }));
 
-inventoryRouter.post("/receive-stock", inventoryOrAdmin, asyncHandler(async (req, res) => {
+inventoryRouter.post("/receive-stock", canCreate, asyncHandler(async (req, res) => {
   const data = receiveStockSchema.parse(req.body);
   res.status(201).json(await svc.receiveStock(data));
 }));
 
-inventoryRouter.get("/stock-movements", asyncHandler(async (req, res) => {
+inventoryRouter.get("/stock-movements", canView, asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit as string) || 100;
   const batchId = req.query.batchId as string | undefined;
   res.json(await svc.getStockMovements(limit, batchId));
 }));
 
-inventoryRouter.post("/stock-movements", inventoryOrAdmin, asyncHandler(async (req, res) => {
+inventoryRouter.post("/stock-movements", canCreate, asyncHandler(async (req, res) => {
   const data = insertStockMovementSchema.parse(req.body);
   res.status(201).json(await svc.createStockMovement(data));
 }));

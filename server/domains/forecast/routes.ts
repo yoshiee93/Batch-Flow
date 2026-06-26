@@ -2,10 +2,11 @@ import { Router } from "express";
 import { z } from "zod";
 import { insertForecastOrderSchema } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { requireRole } from "../../lib/authMiddleware";
+import { requirePermission } from "../../lib/authMiddleware";
 import { forecastService as svc } from "./service";
 
-const adminOnly = requireRole("admin");
+const canView = requirePermission("orders.view");
+const canWrite = requirePermission("orders.create");
 
 const FORECAST_STATUSES = ["Draft", "Likely", "Confirmed Forecast", "Converted", "Cancelled"] as const;
 const CONFIDENCE_LEVELS = ["Low", "Medium", "High"] as const;
@@ -19,7 +20,7 @@ const forecastWriteSchema = insertForecastOrderSchema
 
 export const forecastRouter = Router();
 
-forecastRouter.get("/forecast", adminOnly, asyncHandler(async (req, res) => {
+forecastRouter.get("/forecast", canView, asyncHandler(async (req, res) => {
   const status = typeof req.query.status === "string" ? req.query.status : undefined;
   const months = req.query.months === "3" || req.query.months === "6" || req.query.months === "12" ? Number(req.query.months) : undefined;
   let from: Date | undefined;
@@ -33,17 +34,17 @@ forecastRouter.get("/forecast", adminOnly, asyncHandler(async (req, res) => {
   res.json(await svc.list({ from, to, status }));
 }));
 
-forecastRouter.get("/forecast/summary", adminOnly, asyncHandler(async (req, res) => {
+forecastRouter.get("/forecast/summary", canView, asyncHandler(async (req, res) => {
   const months = (req.query.months === "6" ? 6 : req.query.months === "12" ? 12 : 3) as 3 | 6 | 12;
   res.json(await svc.summary(months));
 }));
 
-forecastRouter.get("/forecast/order-lines", adminOnly, asyncHandler(async (req, res) => {
+forecastRouter.get("/forecast/order-lines", canView, asyncHandler(async (req, res) => {
   const months = (req.query.months === "6" ? 6 : req.query.months === "12" ? 12 : 3) as 3 | 6 | 12;
   res.json(await svc.getActiveOrderLines(months));
 }));
 
-forecastRouter.get("/forecast/history", adminOnly, asyncHandler(async (req, res) => {
+forecastRouter.get("/forecast/history", canView, asyncHandler(async (req, res) => {
   const productId = typeof req.query.productId === "string" && req.query.productId ? req.query.productId : undefined;
   const customerId = typeof req.query.customerId === "string" && req.query.customerId ? req.query.customerId : undefined;
   const parseDate = (v: unknown): Date | undefined => {
@@ -57,19 +58,19 @@ forecastRouter.get("/forecast/history", adminOnly, asyncHandler(async (req, res)
   res.json(await svc.history({ productId, customerId, from, to, monthsBack }));
 }));
 
-forecastRouter.post("/forecast", adminOnly, asyncHandler(async (req, res) => {
+forecastRouter.post("/forecast", canWrite, asyncHandler(async (req, res) => {
   const data = forecastWriteSchema.parse(req.body);
   res.status(201).json(await svc.create(data as any));
 }));
 
-forecastRouter.patch("/forecast/:id", adminOnly, asyncHandler(async (req, res) => {
+forecastRouter.patch("/forecast/:id", canWrite, asyncHandler(async (req, res) => {
   const data = forecastWriteSchema.partial().parse(req.body);
   const row = await svc.update(req.params.id, data as any);
   if (!row) return res.status(404).json({ error: "Forecast not found" });
   res.json(row);
 }));
 
-forecastRouter.delete("/forecast/:id", adminOnly, asyncHandler(async (req, res) => {
+forecastRouter.delete("/forecast/:id", canWrite, asyncHandler(async (req, res) => {
   await svc.delete(req.params.id);
   res.status(204).send();
 }));
@@ -82,7 +83,7 @@ const convertSchema = z.object({
   notes: z.string().nullish(),
 });
 
-forecastRouter.post("/forecast/:id/convert", adminOnly, asyncHandler(async (req, res) => {
+forecastRouter.post("/forecast/:id/convert", canWrite, asyncHandler(async (req, res) => {
   const data = convertSchema.parse(req.body);
   try {
     res.json(await svc.convert(req.params.id, data));

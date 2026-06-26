@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { requireRole } from "../../lib/authMiddleware";
+import { requirePermission } from "../../lib/authMiddleware";
 import { templatesRepository } from "./repository";
 import { insertTemplateSchema } from "@shared/schema";
 import { getTemplateKind, validateTemplatePayload } from "@shared/templateKinds";
 import { createAuditLog } from "../../lib/auditLog";
 
-const adminOnly = requireRole("admin");
+const adminOnly = requirePermission("settings.view");
 
 export const templatesRouter = Router();
 

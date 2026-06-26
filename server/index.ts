@@ -6,6 +6,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedIfEmpty } from "./seed";
+import { runGroupMigration, seedDefaultGroups } from "./lib/groupSeed";
 import { labelsRepository } from "./domains/labels/repository";
 import { requestContextMiddleware } from "./lib/requestContext";
 import { syncAllStockFromLots } from "./domains/inventory/repository";
@@ -89,6 +90,8 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await runGroupMigration();
+  await seedDefaultGroups();
   await seedIfEmpty();
   await labelsRepository.ensureDefaultTemplates();
   await syncAllStockFromLots();

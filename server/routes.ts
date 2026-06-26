@@ -17,7 +17,7 @@ import { securityRouter } from "./domains/security/routes";
 import { forecastRouter } from "./domains/forecast/routes";
 import { reportsRouter } from "./domains/reports/routes";
 import { searchRouter } from "./domains/search/routes";
-import { requireAuth } from "./lib/authMiddleware";
+import { requireAuth, requireFreshPermissions } from "./lib/authMiddleware";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -26,6 +26,7 @@ export async function registerRoutes(
   app.use("/api", authRouter);
 
   app.use("/api", requireAuth);
+  app.use("/api", requireFreshPermissions);
 
   app.use("/api", catalogRouter);
   app.use("/api", inventoryRouter);

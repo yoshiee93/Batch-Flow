@@ -5,7 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SettingsProvider } from "@/hooks/use-settings";
-import { AuthProvider, useAuth, useRole, type UserRole } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth, usePermissions } from "@/contexts/AuthContext";
 import { Layout } from "@/components/layout/Layout";
 import Dashboard from "@/features/dashboard/pages/Dashboard";
 import Orders from "@/features/customers/pages/Orders";
@@ -51,16 +51,16 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function RequireRole({ roles, children }: { roles: UserRole[]; children: ReactNode }) {
-  const { role } = useRole();
+function RequirePermission({ perm, children }: { perm: string; children: ReactNode }) {
+  const { hasPermission } = usePermissions();
   const { toast } = useToast();
-  const allowed = roles.includes(role);
+  const allowed = hasPermission(perm);
 
   useEffect(() => {
     if (!allowed) {
       toast({
         title: "Access denied",
-        description: "You don't have access to that page.",
+        description: "You don't have permission to access that page.",
         variant: "destructive",
       });
     }
@@ -90,6 +90,22 @@ function ForbiddenToastBridge() {
   return null;
 }
 
+function PermissionsChangedBridge() {
+  const { toast } = useToast();
+  useEffect(() => {
+    function onPermissionsChanged() {
+      toast({
+        title: "Session expired",
+        description: "Your permissions changed. Please log in again.",
+        variant: "destructive",
+      });
+    }
+    window.addEventListener("api:permissions_changed", onPermissionsChanged);
+    return () => window.removeEventListener("api:permissions_changed", onPermissionsChanged);
+  }, [toast]);
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
@@ -100,16 +116,16 @@ function Router() {
             <Switch>
               <Route path="/" component={Dashboard} />
               <Route path="/orders">
-                <RequireRole roles={["admin"]}><Orders /></RequireRole>
+                <RequirePermission perm="orders.view"><Orders /></RequirePermission>
               </Route>
               <Route path="/forecast">
-                <RequireRole roles={["admin"]}><Forecast /></RequireRole>
+                <RequirePermission perm="orders.view"><Forecast /></RequirePermission>
               </Route>
               <Route path="/reports/production">
-                <RequireRole roles={["admin", "production"]}><ProductionYtd /></RequireRole>
+                <RequirePermission perm="reports.view"><ProductionYtd /></RequirePermission>
               </Route>
               <Route path="/customers">
-                <RequireRole roles={["admin"]}><Customers /></RequireRole>
+                <RequirePermission perm="orders.view"><Customers /></RequirePermission>
               </Route>
               <Route path="/production" component={Production} />
               <Route path="/batches/:id/timeline" component={BatchTimeline} />
@@ -123,7 +139,7 @@ function Router() {
               </Route>
               <Route path="/calculator" component={Calculator} />
               <Route path="/settings">
-                <RequireRole roles={["admin"]}><Settings /></RequireRole>
+                <RequirePermission perm="settings.view"><Settings /></RequirePermission>
               </Route>
               <Route path="/labels"><Redirect to="/settings?tab=labels" /></Route>
               <Route component={NotFound} />
@@ -143,6 +159,7 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <ForbiddenToastBridge />
+            <PermissionsChangedBridge />
             <Router />
           </TooltipProvider>
         </SettingsProvider>

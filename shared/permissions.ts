@@ -1,0 +1,28 @@
+export const VALID_PERMISSIONS = [
+  "dashboard.view",
+  "customers.view",
+  "customers.create",
+  "customers.edit",
+  "customers.delete",
+  "orders.view",
+  "orders.create",
+  "orders.edit",
+  "orders.delete",
+  "pack_orders.view",
+  "pack_orders.create",
+  "inventory.view",
+  "inventory.create",
+  "inventory.edit",
+  "production.view",
+  "production.create",
+  "production.edit",
+  "traceability.view",
+  "labels.view",
+  "labels.print",
+  "reports.view",
+  "reports.export",
+  "settings.view",
+  "users.manage",
+] as const;
+
+export type PermissionKey = typeof VALID_PERMISSIONS[number];

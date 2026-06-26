@@ -4,10 +4,10 @@ import {
   insertRecipeItemSchema, insertCategorySchema, insertProcessCodeDefinitionSchema,
 } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { requireRole } from "../../lib/authMiddleware";
+import { requirePermission } from "../../lib/authMiddleware";
 import { catalogService as svc } from "./service";
 
-const adminOnly = requireRole("admin");
+const adminOnly = requirePermission("settings.view");
 
 export const catalogRouter = Router();
 

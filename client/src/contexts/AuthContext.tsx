@@ -6,8 +6,16 @@ export interface AuthUser {
   id: string;
   username: string;
   fullName: string;
+  email?: string | null;
   role: UserRole;
   active: boolean;
+  groupId?: string | null;
+  permissions?: Record<string, boolean> | null;
+}
+
+interface LoginError extends Error {
+  status?: number;
+  unlocksAt?: string;
 }
 
 interface AuthContextValue {
@@ -42,6 +50,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchMe().finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    function onPermissionsChanged() {
+      setUser(null);
+    }
+    window.addEventListener('api:permissions_changed', onPermissionsChanged);
+    return () => window.removeEventListener('api:permissions_changed', onPermissionsChanged);
+  }, []);
+
   async function login(username: string, password: string) {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -51,6 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
+      if (res.status === 423) {
+        const err = new Error(data.error || 'Account locked') as LoginError;
+        err.status = 423;
+        err.unlocksAt = data.unlocksAt;
+        throw err;
+      }
       throw new Error(data.error || 'Login failed');
     }
     const data = await res.json();
@@ -91,4 +113,18 @@ export function useRole() {
     canManageCustomers: role === 'admin',
     role,
   };
+}
+
+export function usePermissions() {
+  const { user } = useAuth();
+
+  function hasPermission(key: string): boolean {
+    if (!user) return false;
+    const perms = user.permissions;
+    if (!perms && user.role === 'admin') return true;
+    if (!perms) return false;
+    return perms[key] === true;
+  }
+
+  return { hasPermission };
 }

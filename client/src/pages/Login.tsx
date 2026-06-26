@@ -1,11 +1,20 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useLocation } from 'wouter';
-import { Factory, Loader2 } from 'lucide-react';
+import { Factory, Loader2, Lock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return '0s';
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
 
 export default function Login() {
   const { login } = useAuth();
@@ -14,16 +23,45 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [lockedUntil, setLockedUntil] = useState<Date | null>(null);
+  const [countdown, setCountdown] = useState('');
+
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const tick = () => {
+      const remaining = lockedUntil.getTime() - Date.now();
+      if (remaining <= 0) {
+        setLockedUntil(null);
+        setCountdown('');
+        setError('');
+      } else {
+        setCountdown(formatCountdown(remaining));
+      }
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [lockedUntil]);
+
+  const isLocked = lockedUntil !== null && lockedUntil.getTime() > Date.now();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (isLocked) return;
     setError('');
     setLoading(true);
     try {
       await login(username, password);
       setLocation('/');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      const e = err as Error & { status?: number; unlocksAt?: string };
+      if (e.status === 423 && e.unlocksAt) {
+        setLockedUntil(new Date(e.unlocksAt));
+        setError(e.message);
+      } else {
+        setError(e.message || 'Login failed');
+        setLockedUntil(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -59,7 +97,7 @@ export default function Login() {
                   autoFocus
                   value={username}
                   onChange={e => setUsername(e.target.value)}
-                  disabled={loading}
+                  disabled={loading || isLocked}
                   placeholder="Enter username"
                 />
               </div>
@@ -72,17 +110,23 @@ export default function Login() {
                   autoComplete="current-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  disabled={loading}
+                  disabled={loading || isLocked}
                   placeholder="Enter password"
                 />
               </div>
-              {error && (
+              {isLocked && (
+                <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" data-testid="text-lockout-notice">
+                  <Lock size={14} className="shrink-0" />
+                  <span>Account locked. Try again in <strong>{countdown}</strong>.</span>
+                </div>
+              )}
+              {error && !isLocked && (
                 <p className="text-sm text-destructive" data-testid="text-login-error">{error}</p>
               )}
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loading || !username || !password}
+                disabled={loading || isLocked || !username || !password}
                 data-testid="button-login"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

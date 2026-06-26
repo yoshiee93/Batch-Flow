@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { requireRole } from "../../lib/authMiddleware";
+import { requirePermission } from "../../lib/authMiddleware";
 import { labelsRepository, printHistoryRepository } from "./repository";
 import { insertLabelTemplateSchema, insertPrintHistorySchema } from "@shared/schema";
 import { createAuditLog } from "../../lib/auditLog";
 
-const adminOnly = requireRole("admin");
+const adminOnly = requirePermission("settings.view");
 
 export const labelsRouter = Router();
 
@@ -19,9 +19,11 @@ labelsRouter.get("/label-templates", asyncHandler(async (req, res) => {
     const template = await labelsRepository.getTemplateForContext(type, cid);
     return res.json(template ?? null);
   }
-  // List all templates — admin only
-  if (!req.session?.userRole || req.session.userRole !== "admin") {
-    return res.status(403).json({ error: "Admin access required" });
+  // List all templates — requires labels.view permission
+  const _lPerms = req.session?.permissions;
+  const _hasLabelsView = (_lPerms && _lPerms["labels.view"] === true) || (!_lPerms && req.session?.userRole === "admin");
+  if (!_hasLabelsView) {
+    return res.status(403).json({ error: "Insufficient permissions" });
   }
   res.json(await labelsRepository.getAllTemplates());
 }));

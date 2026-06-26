@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { requireRole } from "../../lib/authMiddleware";
+import { requirePermission } from "../../lib/authMiddleware";
 import { securityRepository } from "./repository";
 
-const adminOnly = requireRole("admin");
+const adminOnly = requirePermission("settings.view");
 
 export const securityRouter = Router();
 

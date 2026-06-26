@@ -137,8 +137,13 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   fullName: text("full_name").notNull(),
+  email: text("email"),
   role: userRoleEnum("role").notNull().default("readonly"),
   active: boolean("active").notNull().default(true),
+  groupId: varchar("group_id").references(() => userGroups.id),
+  failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until"),
+  sessionInvalidatedAt: timestamp("session_invalidated_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -662,3 +667,24 @@ export const insertForecastOrderSchema = createInsertSchema(forecastOrders).omit
 export type InsertForecastOrder = z.infer<typeof insertForecastOrderSchema>;
 export type ForecastOrder = typeof forecastOrders.$inferSelect;
 export type ForecastStatus = "Draft" | "Likely" | "Confirmed Forecast" | "Converted" | "Cancelled";
+
+export const userGroups = pgTable("user_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  permissions: jsonb("permissions").$type<Record<string, boolean>>().notNull().default({}),
+  isSystem: boolean("is_system").notNull().default(false),
+  permissionsVersion: integer("permissions_version").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const userGroupsRelations = relations(userGroups, ({ many }) => ({
+  users: many(users),
+}));
+
+export const insertUserGroupSchema = createInsertSchema(userGroups, {
+  permissions: z.record(z.boolean()).optional(),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserGroup = z.infer<typeof insertUserGroupSchema>;
+export type UserGroup = typeof userGroups.$inferSelect;

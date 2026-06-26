@@ -7,9 +7,11 @@ import {
   stockMovements, auditLogs, processCodeDefinitions,
 } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { requireRole } from "../../lib/authMiddleware";
+import { requirePermission } from "../../lib/authMiddleware";
+import { adminUsersRouter } from "./usersRoutes";
+import { adminGroupsRouter } from "./groupsRoutes";
 
-const adminOnly = requireRole("admin");
+const adminOnly = requirePermission("settings.view");
 
 export const adminRouter = Router();
 
@@ -158,3 +160,6 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
 
   res.json({ success: true, message: "Database restored successfully from backup." });
 }));
+
+adminRouter.use(adminUsersRouter);
+adminRouter.use(adminGroupsRouter);

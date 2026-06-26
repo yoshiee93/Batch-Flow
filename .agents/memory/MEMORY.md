@@ -1,0 +1,1 @@
+- [Permission system architecture](permission-system.md) — group-based JSON permissions replace hardcoded roles; backward compat via admin role fallback when no group assigned

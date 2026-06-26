@@ -3,9 +3,9 @@ import { and, eq, gte, lte, sql, desc } from "drizzle-orm";
 import { db } from "../../db";
 import { batches, batchOutputs, products, categories } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { requireRole } from "../../lib/authMiddleware";
+import { requirePermission } from "../../lib/authMiddleware";
 
-const adminOrProduction = requireRole("admin", "production");
+const adminOrProduction = requirePermission("reports.view");
 
 type Range = "calendar" | "financial" | "last12";
 
