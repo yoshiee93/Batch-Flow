@@ -1,12 +1,7 @@
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { userGroups } from "@shared/schema";
-import {
-  ADMIN_PERMISSIONS,
-  GENERAL_STAFF_PERMISSIONS,
-  PRODUCTION_STAFF_PERMISSIONS,
-  INVENTORY_STAFF_PERMISSIONS,
-} from "./permissions";
+import { ADMIN_PERMISSIONS, GENERAL_STAFF_PERMISSIONS } from "./permissions";
 
 export async function runGroupMigration(): Promise<void> {
   await db.execute(sql`
@@ -41,34 +36,16 @@ export async function seedDefaultGroups(): Promise<void> {
       name: "General Staff",
       description: "Dashboard access only by default",
       permissions: GENERAL_STAFF_PERMISSIONS,
-      isSystem: true,
-    },
-    {
-      name: "Production Staff",
-      description: "Production, inventory reads, and label printing",
-      permissions: PRODUCTION_STAFF_PERMISSIONS,
-      isSystem: false,
-    },
-    {
-      name: "Inventory Staff",
-      description: "Inventory and stock receiving",
-      permissions: INVENTORY_STAFF_PERMISSIONS,
       isSystem: false,
     },
   ]).onConflictDoNothing();
 
   const groups = await db.select().from(userGroups);
-  const getId = (name: string) => groups.find(g => g.name === name)?.id ?? null;
-
-  const adminId = getId("Admin");
-  const staffId = getId("General Staff");
-  const prodId = getId("Production Staff");
-  const invId = getId("Inventory Staff");
+  const adminId = groups.find(g => g.name === "Admin")?.id ?? null;
+  const staffId = groups.find(g => g.name === "General Staff")?.id ?? null;
 
   if (!adminId || !staffId) return;
 
   await db.execute(sql`UPDATE users SET group_id = ${adminId} WHERE role = 'admin' AND group_id IS NULL`);
-  if (prodId) await db.execute(sql`UPDATE users SET group_id = ${prodId} WHERE role = 'production' AND group_id IS NULL`);
-  if (invId) await db.execute(sql`UPDATE users SET group_id = ${invId} WHERE role = 'inventory' AND group_id IS NULL`);
   await db.execute(sql`UPDATE users SET group_id = ${staffId} WHERE group_id IS NULL`);
 }

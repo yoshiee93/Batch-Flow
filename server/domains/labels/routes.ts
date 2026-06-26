@@ -73,7 +73,7 @@ labelsRouter.delete("/label-templates/:id", adminOnly, asyncHandler(async (req, 
 
 const recordPrintBody = insertPrintHistorySchema.omit({ printedByUserId: true });
 
-labelsRouter.post("/print-history", asyncHandler(async (req, res) => {
+labelsRouter.post("/print-history", requirePermission("labels.print"), asyncHandler(async (req, res) => {
   const body = recordPrintBody.parse(req.body);
   const userId = req.session?.userId ?? null;
   const row = await printHistoryRepository.record({ ...body, printedByUserId: userId });

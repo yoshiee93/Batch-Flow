@@ -89,10 +89,10 @@ function GroupForm({
 
       <div className="space-y-2">
         <Label>Permissions</Label>
-        {group?.isSystem ? (
+        {group?.isSystem && group?.name === "Admin" ? (
           <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-            <span className="font-medium">System group — </span>
-            permissions for this group are managed by the system and cannot be edited.
+            <span className="font-medium">Admin group — </span>
+            permissions are locked full-on and cannot be edited.
           </div>
         ) : (
           <Accordion type="multiple" className="space-y-1">

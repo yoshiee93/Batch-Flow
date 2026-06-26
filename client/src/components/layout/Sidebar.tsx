@@ -25,9 +25,9 @@ const navItems = [
   { label: 'Orders', icon: ShoppingCart, href: '/orders', permission: 'orders.view' },
   { label: 'Forecast', icon: TrendingUp, href: '/forecast', permission: 'orders.view' },
   { label: 'Customers', icon: Users, href: '/customers', permission: 'customers.view' },
-  { label: 'Production', icon: Factory, href: '/production', permission: null },
-  { label: 'Inventory', icon: Box, href: '/inventory', permission: null },
-  { label: 'Tracking', icon: ScanSearch, href: '/traceability', permission: null },
+  { label: 'Production', icon: Factory, href: '/production', permission: 'production.view' },
+  { label: 'Inventory', icon: Box, href: '/inventory', permission: 'inventory.view' },
+  { label: 'Tracking', icon: ScanSearch, href: '/traceability', permission: 'traceability.view' },
   { label: 'Calculator', icon: Calculator, href: '/calculator', permission: null },
   { label: 'Reports', icon: BarChart3, href: '/reports/production', permission: 'reports.view' },
 ];
