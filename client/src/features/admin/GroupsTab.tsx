@@ -89,49 +89,53 @@ function GroupForm({
 
       <div className="space-y-2">
         <Label>Permissions</Label>
-        {group?.isSystem && group?.name === "Admin" ? (
-          <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-            <span className="font-medium">Admin group — </span>
-            permissions are locked full-on and cannot be edited.
-          </div>
-        ) : (
-          <Accordion type="multiple" className="space-y-1">
-            {PERMISSION_GROUPS.map(grp => {
-              const allOn = grp.keys.every(k => perms[k]);
-              const someOn = grp.keys.some(k => perms[k]);
-              return (
-                <AccordionItem key={grp.label} value={grp.label} className="border rounded-md px-3">
-                  <AccordionTrigger className="py-2 hover:no-underline">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={allOn}
-                        data-state={someOn && !allOn ? 'indeterminate' : allOn ? 'checked' : 'unchecked'}
-                        onCheckedChange={v => toggleGroup(grp.keys, !!v)}
-                        onClick={e => e.stopPropagation()}
-                        data-testid={`checkbox-group-${grp.label}`}
-                      />
-                      <span className="text-sm font-medium">{grp.label}</span>
-                      <Badge variant="secondary" className="text-xs ml-1">{grp.keys.filter(k => perms[k]).length}/{grp.keys.length}</Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-2 space-y-1.5">
-                    {grp.keys.map(key => (
-                      <div key={key} className="flex items-center gap-2 pl-6">
-                        <Switch
-                          id={`perm-${key}`}
-                          checked={!!perms[key]}
-                          onCheckedChange={() => togglePerm(key)}
-                          data-testid={`switch-perm-${key}`}
-                        />
-                        <Label htmlFor={`perm-${key}`} className="font-mono text-xs cursor-pointer">{permLabel(key)}</Label>
-                      </div>
-                    ))}
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
+        {group?.isSystem && group?.name === "Admin" && (
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Shield size={12} className="text-amber-500" />
+            Admin group permissions are locked full-on and cannot be edited.
+          </p>
         )}
+        <Accordion type="multiple" className="space-y-1">
+          {PERMISSION_GROUPS.map(grp => {
+            const isAdminLocked = !!(group?.isSystem && group?.name === "Admin");
+            const allOn = isAdminLocked ? true : grp.keys.every(k => perms[k]);
+            const someOn = isAdminLocked ? true : grp.keys.some(k => perms[k]);
+            return (
+              <AccordionItem key={grp.label} value={grp.label} className="border rounded-md px-3">
+                <AccordionTrigger className="py-2 hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={allOn}
+                      data-state={someOn && !allOn ? 'indeterminate' : allOn ? 'checked' : 'unchecked'}
+                      onCheckedChange={v => !isAdminLocked && toggleGroup(grp.keys, !!v)}
+                      onClick={e => e.stopPropagation()}
+                      disabled={isAdminLocked}
+                      data-testid={`checkbox-group-${grp.label}`}
+                    />
+                    <span className="text-sm font-medium">{grp.label}</span>
+                    <Badge variant="secondary" className="text-xs ml-1">
+                      {isAdminLocked ? `${grp.keys.length}/${grp.keys.length}` : `${grp.keys.filter(k => perms[k]).length}/${grp.keys.length}`}
+                    </Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pb-2 space-y-1.5">
+                  {grp.keys.map(key => (
+                    <div key={key} className="flex items-center gap-2 pl-6">
+                      <Switch
+                        id={`perm-${key}`}
+                        checked={isAdminLocked ? true : !!perms[key]}
+                        onCheckedChange={() => !isAdminLocked && togglePerm(key)}
+                        disabled={isAdminLocked}
+                        data-testid={`switch-perm-${key}`}
+                      />
+                      <Label htmlFor={`perm-${key}`} className="font-mono text-xs cursor-pointer">{permLabel(key)}</Label>
+                    </div>
+                  ))}
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
       </div>
 
       <DialogFooter className="sticky bottom-0 bg-background pt-2 pb-1">

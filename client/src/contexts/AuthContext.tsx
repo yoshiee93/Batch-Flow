@@ -99,19 +99,19 @@ export function useAuth() {
 
 export function useRole() {
   const { user } = useAuth();
-  const role = user?.role ?? 'readonly';
+  const { hasPermission } = usePermissions();
 
   return {
-    isAdmin: role === 'admin',
-    isProduction: role === 'production' || role === 'admin',
-    isInventory: role === 'inventory' || role === 'admin',
-    canWrite: role !== 'readonly',
-    canManageSettings: role === 'admin',
-    canReceiveStock: role === 'inventory' || role === 'admin',
-    canManageBatches: role === 'production' || role === 'admin',
-    canManageOrders: role === 'admin',
-    canManageCustomers: role === 'admin',
-    role,
+    isAdmin: hasPermission("users.manage"),
+    isProduction: hasPermission("production.view"),
+    isInventory: hasPermission("inventory.view"),
+    canWrite: hasPermission("production.create") || hasPermission("inventory.create") || hasPermission("orders.create") || hasPermission("customers.create"),
+    canManageSettings: hasPermission("settings.view"),
+    canReceiveStock: hasPermission("inventory.create"),
+    canManageBatches: hasPermission("production.create"),
+    canManageOrders: hasPermission("orders.create"),
+    canManageCustomers: hasPermission("customers.create"),
+    role: user?.role ?? 'readonly',
   };
 }
 

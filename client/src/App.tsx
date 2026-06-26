@@ -114,7 +114,9 @@ function Router() {
         <ProtectedRoute>
           <Layout>
             <Switch>
-              <Route path="/" component={Dashboard} />
+              <Route path="/">
+                <RequirePermission perm="dashboard.view"><Dashboard /></RequirePermission>
+              </Route>
               <Route path="/orders">
                 <RequirePermission perm="orders.view"><Orders /></RequirePermission>
               </Route>

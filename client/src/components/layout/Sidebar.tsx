@@ -21,7 +21,7 @@ import { useAuth, usePermissions } from '@/contexts/AuthContext';
 import { QuickCreate } from '@/components/QuickCreate';
 
 const navItems = [
-  { label: 'Dashboard', icon: LayoutDashboard, href: '/', permission: null },
+  { label: 'Dashboard', icon: LayoutDashboard, href: '/', permission: 'dashboard.view' },
   { label: 'Orders', icon: ShoppingCart, href: '/orders', permission: 'orders.view' },
   { label: 'Forecast', icon: TrendingUp, href: '/forecast', permission: 'orders.view' },
   { label: 'Customers', icon: Users, href: '/customers', permission: 'customers.view' },

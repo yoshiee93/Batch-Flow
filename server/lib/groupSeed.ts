@@ -36,7 +36,7 @@ export async function seedDefaultGroups(): Promise<void> {
       name: "General Staff",
       description: "Dashboard access only by default",
       permissions: GENERAL_STAFF_PERMISSIONS,
-      isSystem: false,
+      isSystem: true,
     },
   ]).onConflictDoNothing();
 
