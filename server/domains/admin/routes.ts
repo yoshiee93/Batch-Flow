@@ -7,11 +7,11 @@ import {
   stockMovements, auditLogs, processCodeDefinitions,
 } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { requirePermission } from "../../lib/authMiddleware";
+import { requireRole } from "../../lib/authMiddleware";
 import { adminUsersRouter } from "./usersRoutes";
 import { adminGroupsRouter } from "./groupsRoutes";
 
-const adminOnly = requirePermission("settings.view");
+const adminOnly = requireRole("admin");
 
 export const adminRouter = Router();
 

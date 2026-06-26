@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db } from "../../db";
 import { users, userGroups } from "@shared/schema";
-import { eq, sql, and, ne } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { asyncHandler } from "../../lib/asyncHandler";
 import { requirePermission } from "../../lib/authMiddleware";
 import { createAuditLog } from "../../lib/auditLog";
@@ -14,7 +14,7 @@ const manageUsers = requirePermission("users.manage");
 
 const createUserSchema = z.object({
   username: z.string().min(1).max(100),
-  password: z.string().min(6),
+  password: z.string().min(8, "Password must be at least 8 characters"),
   fullName: z.string().min(1),
   email: z.string().email().optional().nullable(),
   role: z.enum(["admin", "production", "inventory", "readonly"]).default("readonly"),
@@ -31,7 +31,7 @@ const updateUserSchema = z.object({
 });
 
 const changePasswordSchema = z.object({
-  password: z.string().min(6),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 adminUsersRouter.get("/admin/users", manageUsers, asyncHandler(async (_req, res) => {
@@ -80,6 +80,20 @@ adminUsersRouter.patch("/admin/users/:id", manageUsers, asyncHandler(async (req,
   const [existing] = await db.select().from(users).where(eq(users.id, req.params.id)).limit(1);
   if (!existing) return res.status(404).json({ error: "User not found" });
 
+  const requestingUserId = req.session.userId;
+
+  if (req.params.id === requestingUserId && data.active === false) {
+    return res.status(400).json({ error: "Cannot deactivate your own account" });
+  }
+
+  if (data.active === false && existing.role === "admin") {
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
+      .from(users).where(and(eq(users.role, "admin"), eq(users.active, true)));
+    if (count <= 1) {
+      return res.status(400).json({ error: "Cannot deactivate the last active admin account" });
+    }
+  }
+
   const groupChanged = "groupId" in data && data.groupId !== existing.groupId;
   const updates: Partial<typeof existing> = { ...data };
 
@@ -122,20 +136,25 @@ adminUsersRouter.post("/admin/users/:id/unlock", manageUsers, asyncHandler(async
 adminUsersRouter.delete("/admin/users/:id", manageUsers, asyncHandler(async (req, res) => {
   const requestingUserId = req.session.userId;
   if (req.params.id === requestingUserId) {
-    return res.status(400).json({ error: "Cannot delete your own account" });
+    return res.status(400).json({ error: "Cannot deactivate your own account" });
   }
 
   const [existing] = await db.select().from(users).where(eq(users.id, req.params.id)).limit(1);
   if (!existing) return res.status(404).json({ error: "User not found" });
 
   if (existing.role === "admin") {
-    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(eq(users.role, "admin"), eq(users.active, true)));
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
+      .from(users).where(and(eq(users.role, "admin"), eq(users.active, true)));
     if (count <= 1) {
-      return res.status(400).json({ error: "Cannot delete the last admin user" });
+      return res.status(400).json({ error: "Cannot deactivate the last active admin account" });
     }
   }
 
-  await db.delete(users).where(eq(users.id, req.params.id));
-  await createAuditLog({ entityType: "user", entityId: req.params.id, action: "delete", changes: JSON.stringify({ username: existing.username }) });
-  return res.status(204).send();
+  await db.update(users).set({
+    active: false,
+    sessionInvalidatedAt: new Date(),
+  } as any).where(eq(users.id, req.params.id));
+
+  await createAuditLog({ entityType: "user", entityId: req.params.id, action: "update", changes: JSON.stringify({ active: false }) });
+  return res.status(200).json({ ok: true });
 }));

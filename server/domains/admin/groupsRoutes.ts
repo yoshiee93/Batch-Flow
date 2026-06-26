@@ -72,6 +72,10 @@ adminGroupsRouter.patch("/admin/groups/:id", manageUsers, asyncHandler(async (re
     return res.status(400).json({ error: "Cannot rename a system group" });
   }
 
+  if (existing.isSystem && data.permissions !== undefined) {
+    return res.status(400).json({ error: "Cannot modify permissions of a system group" });
+  }
+
   const permissionsChanged = data.permissions !== undefined;
   const updates: Record<string, unknown> = {
     ...data,

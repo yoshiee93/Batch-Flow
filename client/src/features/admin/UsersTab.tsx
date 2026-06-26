@@ -66,7 +66,7 @@ function UserForm({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="u-password">Password</Label>
-            <Input id="u-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} data-testid="input-user-password" />
+            <Input id="u-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} data-testid="input-user-password" />
           </div>
         </>
       )}
@@ -199,11 +199,11 @@ export default function UsersTab() {
     if (!deleteTarget) return;
     try {
       await deleteUser(deleteTarget.id);
-      toast({ title: 'User deleted' });
+      toast({ title: 'User deactivated', description: `${deleteTarget.fullName} has been deactivated.` });
       qc.invalidateQueries({ queryKey: ['/api/admin/users'] });
       setDeleteTarget(null);
     } catch (err: unknown) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to delete user', variant: 'destructive' });
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to deactivate user', variant: 'destructive' });
     }
   }
 
@@ -278,9 +278,11 @@ export default function UsersTab() {
                   <Button size="icon" variant="ghost" onClick={() => setEditUser(user)} data-testid={`button-edit-user-${user.id}`}>
                     <Pencil size={14} />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => setDeleteTarget(user)} data-testid={`button-delete-user-${user.id}`}>
-                    <Trash2 size={14} />
-                  </Button>
+                  {user.active && (
+                    <Button size="icon" variant="ghost" title="Deactivate account" onClick={() => setDeleteTarget(user)} data-testid={`button-delete-user-${user.id}`}>
+                      <Trash2 size={14} />
+                    </Button>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
@@ -310,8 +312,9 @@ export default function UsersTab() {
         <ConfirmDialog
           open
           onOpenChange={open => { if (!open) setDeleteTarget(null); }}
-          title="Delete user"
-          description={`Are you sure you want to delete "${deleteTarget.fullName}"? This cannot be undone.`}
+          title="Deactivate user"
+          description={`Deactivate "${deleteTarget.fullName}"? Their account will be disabled and they won't be able to log in. Data is preserved.`}
+          confirmLabel="Deactivate"
           onConfirm={handleDelete}
         />
       )}

@@ -7,9 +7,11 @@ import { asyncHandler } from "../../lib/asyncHandler";
 import { requirePermission } from "../../lib/authMiddleware";
 import { customersService as svc, TestingRequiredError } from "./service";
 
+const canViewCustomers = requirePermission("customers.view");
 const canCreateCustomer = requirePermission("customers.create");
 const canEditCustomer = requirePermission("customers.edit");
 const canDeleteCustomer = requirePermission("customers.delete");
+const canViewOrders = requirePermission("orders.view");
 const canCreateOrder = requirePermission("orders.create");
 const canEditOrder = requirePermission("orders.edit");
 const canDeleteOrder = requirePermission("orders.delete");
@@ -17,11 +19,11 @@ const canPackOrder = requirePermission("pack_orders.create");
 
 export const customersRouter = Router();
 
-customersRouter.get("/customers", asyncHandler(async (_req, res) => {
+customersRouter.get("/customers", canViewCustomers, asyncHandler(async (_req, res) => {
   res.json(await svc.getCustomers());
 }));
 
-customersRouter.get("/customers/:id", asyncHandler(async (req, res) => {
+customersRouter.get("/customers/:id", canViewCustomers, asyncHandler(async (req, res) => {
   const customer = await svc.getCustomer(req.params.id);
   if (!customer) return res.status(404).json({ error: "Customer not found" });
   res.json(customer);
@@ -44,22 +46,22 @@ customersRouter.delete("/customers/:id", canDeleteCustomer, asyncHandler(async (
   res.status(204).send();
 }));
 
-customersRouter.get("/orders/with-allocation", asyncHandler(async (_req, res) => {
+customersRouter.get("/orders/with-allocation", canViewOrders, asyncHandler(async (_req, res) => {
   res.json(await svc.getOrdersWithAllocation());
 }));
 
-customersRouter.get("/orders/:id/items", asyncHandler(async (req, res) => {
+customersRouter.get("/orders/:id/items", canViewOrders, asyncHandler(async (req, res) => {
   res.json(await svc.getOrderItems(req.params.id));
 }));
 
-customersRouter.get("/orders/:id/stock-check", asyncHandler(async (req, res) => {
+customersRouter.get("/orders/:id/stock-check", canViewOrders, asyncHandler(async (req, res) => {
   const orderId = req.params.id;
   const order = await svc.getOrder(orderId);
   if (!order) return res.status(404).json({ error: "Order not found" });
   res.json(await svc.getOrderStockCheck(orderId));
 }));
 
-customersRouter.get("/orders/:id/allocations", asyncHandler(async (req, res) => {
+customersRouter.get("/orders/:id/allocations", canViewOrders, asyncHandler(async (req, res) => {
   const orderId = req.params.id;
   const order = await svc.getOrder(orderId);
   if (!order) return res.status(404).json({ error: "Order not found" });
@@ -115,13 +117,17 @@ customersRouter.post("/orders/:id/ship", canEditOrder, asyncHandler(async (req, 
   }
 }));
 
-customersRouter.get("/orders/:id", asyncHandler(async (req, res) => {
+customersRouter.get("/orders/:id/testing-blockers", canViewOrders, asyncHandler(async (req, res) => {
+  res.json(await svc.getOrderTestingBlockers(req.params.id));
+}));
+
+customersRouter.get("/orders/:id", canViewOrders, asyncHandler(async (req, res) => {
   const order = await svc.getOrder(req.params.id);
   if (!order) return res.status(404).json({ error: "Order not found" });
   res.json(order);
 }));
 
-customersRouter.get("/orders", asyncHandler(async (_req, res) => {
+customersRouter.get("/orders", canViewOrders, asyncHandler(async (_req, res) => {
   res.json(await svc.getOrders());
 }));
 
@@ -149,6 +155,7 @@ const orderItemPayloadSchema = insertOrderItemSchema.extend({
   }, { message: "Quantity must be greater than 0" }),
   productId: z.string().min(1, "Product is required"),
 });
+
 customersRouter.post("/orders/:id/items", canCreateOrder, asyncHandler(async (req, res) => {
   const data = orderItemPayloadSchema.parse({ ...req.body, orderId: req.params.id });
   res.status(201).json(await svc.createOrderItem(data));
@@ -178,10 +185,6 @@ customersRouter.post("/orders/:id/complete", canEditOrder, asyncHandler(async (r
     const msg = err instanceof Error ? err.message : "Failed to complete order";
     return res.status(400).json({ error: msg });
   }
-}));
-
-customersRouter.get("/orders/:id/testing-blockers", asyncHandler(async (req, res) => {
-  res.json(await svc.getOrderTestingBlockers(req.params.id));
 }));
 
 customersRouter.post("/allocation/run", canCreateOrder, asyncHandler(async (_req, res) => {
