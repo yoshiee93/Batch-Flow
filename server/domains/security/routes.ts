@@ -20,18 +20,9 @@ const listFiltersSchema = z.object({
   offset: z.coerce.number().int().nonnegative().optional(),
 });
 
-// Admin-wide listing with full filters; scoped (entityType+entityId) queries are allowed
-// for any authenticated user so per-entity "Recent Activity" panels keep working.
-securityRouter.get("/audit-logs", asyncHandler(async (req, res) => {
+securityRouter.get("/audit-logs", adminOnly, asyncHandler(async (req, res) => {
   const filters = listFiltersSchema.parse(req.query);
   const isScoped = !!(filters.entityType && filters.entityId);
-  const role = req.session?.userRole;
-  if (!isScoped && role !== "admin") {
-    return res.status(403).json({ error: "Admin access required" });
-  }
-  // Scoped per-entity reads (used by BatchDetail/LotDetail "Recent Activity") historically
-  // returned the full history. Preserve that behavior: when the caller is in scoped+legacy
-  // mode and didn't request a page, default to a high cap (200, our schema max).
   const isLegacyScoped = isScoped && req.query._format !== "page";
   const effectiveLimit = filters.limit ?? (isLegacyScoped ? 200 : 20);
   const result = await securityRepository.listAuditLogs({
@@ -40,7 +31,6 @@ securityRouter.get("/audit-logs", asyncHandler(async (req, res) => {
     from: filters.from ? new Date(filters.from) : undefined,
     to: filters.to ? new Date(filters.to) : undefined,
   });
-  // Backwards compatibility: scoped batch/lot panels expect a plain array
   if (isLegacyScoped) {
     return res.json(result.items);
   }

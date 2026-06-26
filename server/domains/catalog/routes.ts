@@ -11,11 +11,11 @@ const adminOnly = requirePermission("settings.view");
 
 export const catalogRouter = Router();
 
-catalogRouter.get("/categories", asyncHandler(async (_req, res) => {
+catalogRouter.get("/categories", adminOnly, asyncHandler(async (_req, res) => {
   res.json(await svc.getCategories());
 }));
 
-catalogRouter.get("/categories/:id", asyncHandler(async (req, res) => {
+catalogRouter.get("/categories/:id", adminOnly, asyncHandler(async (req, res) => {
   const category = await svc.getCategory(req.params.id);
   if (!category) return res.status(404).json({ error: "Category not found" });
   res.json(category);
@@ -44,21 +44,21 @@ catalogRouter.delete("/categories/:id", adminOnly, asyncHandler(async (req, res)
   }
 }));
 
-catalogRouter.get("/products/by-category/:categoryId", asyncHandler(async (req, res) => {
+catalogRouter.get("/products/by-category/:categoryId", adminOnly, asyncHandler(async (req, res) => {
   res.json(await svc.getProductsByCategory(req.params.categoryId));
 }));
 
-catalogRouter.get("/products/:id/recipes", asyncHandler(async (req, res) => {
+catalogRouter.get("/products/:id/recipes", adminOnly, asyncHandler(async (req, res) => {
   res.json(await svc.getRecipesByProduct(req.params.id));
 }));
 
-catalogRouter.get("/products/:id", asyncHandler(async (req, res) => {
+catalogRouter.get("/products/:id", adminOnly, asyncHandler(async (req, res) => {
   const product = await svc.getProduct(req.params.id);
   if (!product) return res.status(404).json({ error: "Product not found" });
   res.json(product);
 }));
 
-catalogRouter.get("/products", asyncHandler(async (_req, res) => {
+catalogRouter.get("/products", adminOnly, asyncHandler(async (_req, res) => {
   res.json(await svc.getProducts());
 }));
 
@@ -79,13 +79,13 @@ catalogRouter.delete("/products/:id", adminOnly, asyncHandler(async (req, res) =
   res.status(204).send();
 }));
 
-catalogRouter.get("/materials/:id", asyncHandler(async (req, res) => {
+catalogRouter.get("/materials/:id", adminOnly, asyncHandler(async (req, res) => {
   const material = await svc.getMaterial(req.params.id);
   if (!material) return res.status(404).json({ error: "Material not found" });
   res.json(material);
 }));
 
-catalogRouter.get("/materials", asyncHandler(async (_req, res) => {
+catalogRouter.get("/materials", adminOnly, asyncHandler(async (_req, res) => {
   res.json(await svc.getMaterials());
 }));
 
@@ -106,17 +106,17 @@ catalogRouter.delete("/materials/:id", adminOnly, asyncHandler(async (req, res) 
   res.status(204).send();
 }));
 
-catalogRouter.get("/recipes/:id/items", asyncHandler(async (req, res) => {
+catalogRouter.get("/recipes/:id/items", adminOnly, asyncHandler(async (req, res) => {
   res.json(await svc.getRecipeItemsWithMaterials(req.params.id));
 }));
 
-catalogRouter.get("/recipes/:id", asyncHandler(async (req, res) => {
+catalogRouter.get("/recipes/:id", adminOnly, asyncHandler(async (req, res) => {
   const recipe = await svc.getRecipe(req.params.id);
   if (!recipe) return res.status(404).json({ error: "Recipe not found" });
   res.json(recipe);
 }));
 
-catalogRouter.get("/recipes", asyncHandler(async (_req, res) => {
+catalogRouter.get("/recipes", adminOnly, asyncHandler(async (_req, res) => {
   res.json(await svc.getRecipes());
 }));
 
@@ -130,7 +130,7 @@ catalogRouter.post("/recipes/:id/items", adminOnly, asyncHandler(async (req, res
   res.status(201).json(await svc.createRecipeItem(data));
 }));
 
-catalogRouter.get("/process-code-definitions", asyncHandler(async (_req, res) => {
+catalogRouter.get("/process-code-definitions", adminOnly, asyncHandler(async (_req, res) => {
   res.json(await svc.getProcessCodeDefinitions());
 }));
 

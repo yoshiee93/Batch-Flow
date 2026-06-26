@@ -23,10 +23,24 @@ export class ApiError extends Error {
 export async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: { "Content-Type": "application/json", ...options?.headers },
+    credentials: "include",
     ...options,
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({} as Record<string, unknown>));
+
+    if (res.status === 401 && typeof window !== "undefined") {
+      const errorKey = (body as { error?: string }).error;
+      if (errorKey === "permissions_changed") {
+        window.dispatchEvent(new CustomEvent("api:permissions_changed", { detail: body }));
+      }
+    }
+
+    if (res.status === 403 && typeof window !== "undefined") {
+      const message = (body as { error?: string }).error || "You don't have permission to do this.";
+      window.dispatchEvent(new CustomEvent("api:forbidden", { detail: { message } }));
+    }
+
     const fields = (body as { fields?: unknown }).fields;
     if (fields && typeof fields === "object") {
       const map: Record<string, string> = {};
@@ -36,12 +50,10 @@ export async function fetchApi<T>(endpoint: string, options?: RequestInit): Prom
       const msg = (body as { error?: string }).error || "Validation failed";
       throw new ApiValidationError(msg, map, res.status);
     }
+
     const message = (body as { error?: string; message?: string }).error
       || (body as { message?: string }).message
       || (res.status === 403 ? "You don't have permission to do this." : "Request failed");
-    if (res.status === 403 && typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("api:forbidden", { detail: { message } }));
-    }
     throw new ApiError(message, res.status);
   }
   if (res.status === 204) {
