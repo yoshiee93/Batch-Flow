@@ -1,0 +1,116 @@
+Add user access control / permissions.
+
+Goal:
+Allow admins to create users and control what each user group can see and do.
+
+Business rules:
+- Admin users can see and do everything.
+- General staff can only access sections allowed by their assigned group.
+- Access should be controlled by groups/roles, not hardcoded per user.
+- Users must log in with username and password.
+
+Add:
+1. Users management page
+2. Groups/Roles management page
+3. Permission settings per group
+4. Login protection for restricted pages
+5. Backend permission checks for restricted API routes
+
+User fields:
+- username
+- passwordHash
+- fullName
+- email, optional
+- roleId / groupId
+- isActive
+- createdAt
+- updatedAt
+
+Group/Role fields:
+- name
+- description
+- permissions JSON
+- createdAt
+- updatedAt
+
+Required default groups:
+- Admin
+- General Staff
+
+Admin permissions:
+- full access to everything
+
+General Staff default permissions:
+- no admin/settings access
+- limited access only to assigned sections
+
+Permissions should cover sections:
+- Dashboard
+- Customers
+- Orders
+- Pack Orders
+- Inventory
+- Production
+- Traceability
+- Labels
+- Reports
+- Settings
+- Admin/User Management
+
+Each section should support:
+- view
+- create
+- edit
+- delete/export where relevant
+
+Example permissions:
+orders.view
+orders.create
+orders.edit
+orders.delete
+inventory.view
+inventory.create
+inventory.edit
+production.view
+production.create
+labels.view
+labels.print
+settings.view
+users.manage
+
+Frontend:
+- Hide sidebar items the user cannot view.
+- Prevent direct URL access to pages without permission.
+- Show a clear “Access denied” message if blocked.
+- Do not rely only on hiding buttons.
+
+Backend:
+- Add middleware to check permissions on API routes.
+- Admin bypasses all permission checks.
+- General staff must have the required permission.
+- Return 403 if user lacks permission.
+- Never trust frontend-only permissions.
+
+Security:
+- Passwords must be hashed.
+- Do not store plain text passwords.
+- Keep existing session/login structure if already present.
+- Do not break current admin login.
+- Existing admin user should become Admin group automatically.
+
+Important:
+Do not rewrite the app.
+Do not change inventory, production, traceability, order, stock, or label business logic.
+Only add access control around existing pages/actions.
+
+Implementation style:
+- Keep changes minimal.
+- Use existing auth/session structure if present.
+- Add schema only where needed for users/groups/permissions.
+- Prefer permissions JSON for flexibility instead of many boolean columns.
+
+After changes run:
+npm run check
+npm run build
+
+Fix only errors introduced by this user access control task.
