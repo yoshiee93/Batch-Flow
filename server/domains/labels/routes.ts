@@ -6,35 +6,30 @@ import { labelsRepository, printHistoryRepository } from "./repository";
 import { insertLabelTemplateSchema, insertPrintHistorySchema } from "@shared/schema";
 import { createAuditLog } from "../../lib/auditLog";
 
-const adminOnly = requirePermission("settings.view");
+const canViewLabels = requirePermission("labels.view");
+const canManageLabels = requirePermission("settings.view");
+const canPrintLabels = requirePermission("labels.print");
 
 export const labelsRouter = Router();
 
-labelsRouter.get("/label-templates", asyncHandler(async (req, res) => {
+labelsRouter.get("/label-templates", canViewLabels, asyncHandler(async (req, res) => {
   const { labelType, customerId } = req.query;
   if (labelType && typeof labelType === "string") {
-    // Template resolution for print — available to all authenticated users
     const type = labelType as "raw_intake" | "finished_output" | "batch";
     const cid = typeof customerId === "string" ? customerId : undefined;
     const template = await labelsRepository.getTemplateForContext(type, cid);
     return res.json(template ?? null);
   }
-  // List all templates — requires labels.view permission
-  const _lPerms = req.session?.permissions;
-  const _hasLabelsView = (_lPerms && _lPerms["labels.view"] === true) || (!_lPerms && req.session?.userRole === "admin");
-  if (!_hasLabelsView) {
-    return res.status(403).json({ error: "Insufficient permissions" });
-  }
   res.json(await labelsRepository.getAllTemplates());
 }));
 
-labelsRouter.get("/label-templates/:id", adminOnly, asyncHandler(async (req, res) => {
+labelsRouter.get("/label-templates/:id", canViewLabels, asyncHandler(async (req, res) => {
   const template = await labelsRepository.getTemplate(req.params.id);
   if (!template) return res.status(404).json({ error: "Template not found" });
   res.json(template);
 }));
 
-labelsRouter.post("/label-templates", adminOnly, asyncHandler(async (req, res) => {
+labelsRouter.post("/label-templates", canManageLabels, asyncHandler(async (req, res) => {
   const data = insertLabelTemplateSchema.parse(req.body);
   const created = await labelsRepository.createTemplate(data);
   if (created.isDefault) {
@@ -44,7 +39,7 @@ labelsRouter.post("/label-templates", adminOnly, asyncHandler(async (req, res) =
   res.status(201).json(created);
 }));
 
-labelsRouter.patch("/label-templates/:id", adminOnly, asyncHandler(async (req, res) => {
+labelsRouter.patch("/label-templates/:id", canManageLabels, asyncHandler(async (req, res) => {
   const data = insertLabelTemplateSchema.partial().parse(req.body);
   if (data.isDefault) {
     const existing = await labelsRepository.getTemplate(req.params.id);
@@ -60,7 +55,7 @@ labelsRouter.patch("/label-templates/:id", adminOnly, asyncHandler(async (req, r
   res.json(template);
 }));
 
-labelsRouter.delete("/label-templates/:id", adminOnly, asyncHandler(async (req, res) => {
+labelsRouter.delete("/label-templates/:id", canManageLabels, asyncHandler(async (req, res) => {
   const template = await labelsRepository.getTemplate(req.params.id);
   if (!template) return res.status(404).json({ error: "Template not found" });
   if (template.isDefault && !template.customerId) {
@@ -73,7 +68,7 @@ labelsRouter.delete("/label-templates/:id", adminOnly, asyncHandler(async (req, 
 
 const recordPrintBody = insertPrintHistorySchema.omit({ printedByUserId: true });
 
-labelsRouter.post("/print-history", requirePermission("labels.print"), asyncHandler(async (req, res) => {
+labelsRouter.post("/print-history", canPrintLabels, asyncHandler(async (req, res) => {
   const body = recordPrintBody.parse(req.body);
   const userId = req.session?.userId ?? null;
   const row = await printHistoryRepository.record({ ...body, printedByUserId: userId });
@@ -88,7 +83,7 @@ const listFiltersSchema = z.object({
   limit: z.coerce.number().int().positive().max(500).optional(),
 });
 
-labelsRouter.get("/print-history", adminOnly, asyncHandler(async (req, res) => {
+labelsRouter.get("/print-history", canManageLabels, asyncHandler(async (req, res) => {
   const filters = listFiltersSchema.parse(req.query);
   const rows = await printHistoryRepository.list({
     from: filters.from ? new Date(filters.from) : undefined,

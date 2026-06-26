@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../../db";
 import { userGroups, users } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { asyncHandler } from "../../lib/asyncHandler";
 import { requirePermission } from "../../lib/authMiddleware";
 import { createAuditLog } from "../../lib/auditLog";
@@ -69,11 +69,11 @@ adminGroupsRouter.patch("/admin/groups/:id", manageUsers, asyncHandler(async (re
   if (!existing) return res.status(404).json({ error: "Group not found" });
 
   if (existing.isSystem && data.name && data.name !== existing.name) {
-    return res.status(400).json({ error: "Cannot rename a system group" });
+    return res.status(403).json({ error: "Cannot rename a system group" });
   }
 
   if (existing.isSystem && existing.name === "Admin" && data.permissions !== undefined) {
-    return res.status(400).json({ error: "Cannot modify permissions of the Admin group" });
+    return res.status(403).json({ error: "Cannot modify permissions of the Admin group" });
   }
 
   const permissionsChanged = data.permissions !== undefined;
@@ -103,9 +103,10 @@ adminGroupsRouter.delete("/admin/groups/:id", manageUsers, asyncHandler(async (r
     return res.status(400).json({ error: "Cannot delete a system group" });
   }
 
-  const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(eq(users.groupId, req.params.id));
+  const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
+    .from(users).where(and(eq(users.groupId, req.params.id), eq(users.active, true)));
   if (count > 0) {
-    return res.status(400).json({ error: "Cannot delete a group that has users assigned to it. Reassign users first." });
+    return res.status(400).json({ error: "Cannot delete a group with active users assigned to it. Reassign users first." });
   }
 
   await db.delete(userGroups).where(eq(userGroups.id, req.params.id));
