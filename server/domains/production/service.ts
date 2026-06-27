@@ -8,8 +8,9 @@ import { buildBatchCode } from "@shared/batchCodeConfig";
 import {
   batchMaterials, batchOutputs, lots, stockMovements, qualityChecks, auditLogs,
   batches as batchesTable, products as productsTable, materials as materialsTable,
+  operationsLog,
 } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import type {
   Batch, InsertBatch, BatchMaterial, InsertBatchMaterial, BatchOutput, InsertStockMovement,
 } from "@shared/schema";
@@ -562,9 +563,15 @@ export const productionService = {
     numberOfStaff: number | null;
     finishTime?: Date | null;
     productAssessment?: { result: "pass" | "conditional" | "fail"; notes?: string } | null;
+    dryingTimeHours?: string | null;
+    dryingMachine?: string | null;
+    dryingExtensionRequired?: boolean;
+    dryingExtensionTimeHours?: string | null;
+    dryingNotes?: string | null;
+    finalComments?: string | null;
     markCompleted: boolean;
   }): Promise<FinalizeBatchResult> {
-    const { wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, finishTime, productAssessment, markCompleted } = opts;
+    const { wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, finishTime, productAssessment, dryingTimeHours, dryingMachine, dryingExtensionRequired, dryingExtensionTimeHours, dryingNotes, finalComments, markCompleted } = opts;
     const batch = await repo.getBatch(batchId);
     if (!batch) throw new Error("Batch not found");
 
@@ -580,6 +587,12 @@ export const productionService = {
       wetQuantity,
       cleaningTime: cleaningTime || null,
       numberOfStaff: numberOfStaff != null ? numberOfStaff : null,
+      dryingTimeHours: dryingTimeHours || null,
+      dryingMachine: dryingMachine || null,
+      dryingExtensionRequired: dryingExtensionRequired ?? false,
+      dryingExtensionTimeHours: dryingExtensionTimeHours || null,
+      dryingNotes: dryingNotes || null,
+      finalComments: finalComments || null,
     };
     if (productAssessment !== undefined) {
       updateData.productAssessment = productAssessment;

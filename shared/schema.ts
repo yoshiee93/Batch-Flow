@@ -304,6 +304,12 @@ export const batches = pgTable("batches", {
   numberOfStaff: integer("number_of_staff"),
   finishTime: timestamp("finish_time"),
   productAssessment: jsonb("product_assessment").$type<{ result: "pass" | "conditional" | "fail"; notes?: string }>(),
+  dryingTimeHours: decimal("drying_time_hours", { precision: 10, scale: 2 }),
+  dryingMachine: text("drying_machine"),
+  dryingExtensionRequired: boolean("drying_extension_required").notNull().default(false),
+  dryingExtensionTimeHours: decimal("drying_extension_time_hours", { precision: 10, scale: 2 }),
+  dryingNotes: text("drying_notes"),
+  finalComments: text("final_comments"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -517,6 +523,22 @@ export const insertLotSchema = createInsertSchema(lots).omit({ id: true, created
 });
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true });
 export const insertRecipeItemSchema = createInsertSchema(recipeItems).omit({ id: true });
+export const operationsLog = pgTable("operations_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sourceType: varchar("source_type", { length: 50 }).notNull(),
+  sourceId: varchar("source_id").notNull(),
+  noteType: varchar("note_type", { length: 50 }).notNull(),
+  content: text("content"),
+  severity: varchar("severity", { length: 20 }).notNull().default("info"),
+  status: varchar("status", { length: 20 }).notNull().default("open"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertOperationsLogSchema = createInsertSchema(operationsLog).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertOperationsLog = z.infer<typeof insertOperationsLogSchema>;
+export type OperationsLogEntry = typeof operationsLog.$inferSelect;
+
 export const insertBatchSchema = createInsertSchema(batches).omit({ id: true, createdAt: true }).extend({
   startDate: z.union([z.string(), z.date(), z.null()]).transform((val) => val === null ? null : typeof val === 'string' ? new Date(val) : val).optional(),
   endDate: z.union([z.string(), z.date(), z.null()]).transform((val) => val === null ? null : typeof val === 'string' ? new Date(val) : val).optional(),

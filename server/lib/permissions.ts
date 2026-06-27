@@ -23,6 +23,9 @@ export const VALID_PERMISSIONS = [
   "reports.export",
   "settings.view",
   "users.manage",
+  "operations_log.view",
+  "operations_log.edit",
+  "operations_log.export",
 ] as const;
 
 export type PermissionKey = typeof VALID_PERMISSIONS[number];

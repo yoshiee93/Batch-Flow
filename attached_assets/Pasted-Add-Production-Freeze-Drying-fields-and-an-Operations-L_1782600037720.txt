@@ -1,0 +1,150 @@
+Add Production Freeze Drying fields and an Operations Log.
+
+Goal:
+Capture simple freeze drying details during Production completion and provide one central place to review production notes, product assessments, and drying issues.
+
+Do not create a generic Forms module.
+Do not rebuild Production.
+Do not change stock movement logic.
+Do not change traceability logic.
+Do not change order logic.
+Do not change label logic.
+
+Part 1 — Production completion fields
+
+Add these fields to production batches/records:
+- dryingTimeHours decimal nullable
+- dryingMachine text nullable
+- dryingExtensionRequired boolean default false
+- dryingExtensionTimeHours decimal nullable
+- dryingNotes text nullable
+- finalComments text nullable
+
+Use existing productAssessment field if it already exists.
+Do not duplicate productAssessment if already present.
+
+Show these fields in the existing Manage Outputs / Complete Production workflow.
+
+Keep it simple for staff:
+- Drying Time Hours
+- Machine
+- Extension Required
+- Extension Time Hours, only if extension required
+- Drying Notes
+- Product Assessment
+- Final Comments
+
+Rules:
+- Drying time is manually entered only.
+- Do not add drying start time or drying finish time yet.
+- All fields are optional except where existing completion rules already require data.
+- Store drying time and extension time as numbers.
+- Store notes as text.
+
+Display:
+- Show drying time, machine, extension info, drying notes, product assessment, and final comments on the batch/production detail view.
+- Show drying time on production cards/list if practical.
+
+Part 2 — Operations Log
+
+Add a new Operations Log section.
+
+Purpose:
+Central review page for all important operational notes and observations.
+
+Initial source:
+Production completion only.
+
+When a production batch is completed or updated, automatically create Operations Log entries for:
+- dryingNotes
+- productAssessment
+- finalComments
+- dryingExtensionRequired / dryingExtensionTimeHours if applicable
+
+Do not create duplicate log entries every time the same record is saved.
+Update existing linked log entries when the production record notes are edited.
+
+Operations Log table fields:
+- id
+- sourceType text, e.g. "production"
+- sourceId UUID
+- productionBatchId nullable
+- productId nullable
+- customerId nullable
+- batchNumber nullable text
+- productName nullable text
+- machine nullable text
+- noteType text
+- severity text default "info"
+- status text default "open"
+- message text
+- createdBy nullable
+- createdAt
+- updatedAt
+
+Note types:
+- drying_note
+- product_assessment
+- final_comment
+- drying_extension
+
+Severity values:
+- info
+- warning
+- issue
+
+Status values:
+- open
+- reviewed
+- resolved
+
+Operations Log page:
+Add sidebar item:
+Operations Log
+
+Page features:
+- list entries newest first
+- search notes
+- filter by note type
+- filter by severity
+- filter by status
+- filter by product if available
+- filter by machine if available
+- filter by date range
+- link back to production batch if available
+- allow admin/supervisor to mark entry as reviewed/resolved
+
+Permissions:
+Add permission keys if needed:
+operations_log.view
+operations_log.edit
+operations_log.export
+
+Sidebar:
+Show Operations Log only if user has operations_log.view.
+
+Backend:
+Add operations-log domain following existing project structure.
+Add API routes:
+GET /api/operations-log
+PATCH /api/operations-log/:id/status
+PATCH /api/operations-log/:id/severity
+
+Future AI:
+Do not build AI now.
+Store clean structured data so AI can later summarise and review:
+- drying issues
+- recurring machine problems
+- product assessment trends
+- drying time patterns
+- yield/waste notes
+
+Important:
+AI must not change production data.
+This task only prepares the data structure and review screen.
+
+After changes run:
+npm run check
+npm run build
+
+Fix only errors introduced by this task.

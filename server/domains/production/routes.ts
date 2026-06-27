@@ -42,6 +42,12 @@ const finalizeBatchSchema = z.object({
     result: z.enum(["pass", "conditional", "fail"]),
     notes: z.string().optional(),
   }).nullable().optional(),
+  dryingTimeHours: optionalNonNegativeNumeric.optional(),
+  dryingMachine: z.string().nullable().optional(),
+  dryingExtensionRequired: z.boolean().optional(),
+  dryingExtensionTimeHours: optionalNonNegativeNumeric.optional(),
+  dryingNotes: z.string().nullable().optional(),
+  finalComments: z.string().nullable().optional(),
   markCompleted: z.boolean().optional(),
 });
 
@@ -222,6 +228,12 @@ productionRouter.post("/batches/:id/finalize", canEdit, asyncHandler(async (req,
     numberOfStaff: parsed.numberOfStaff ?? null,
     finishTime: parsed.finishTime ?? null,
     productAssessment: parsed.productAssessment ?? null,
+    dryingTimeHours: parsed.dryingTimeHours ?? null,
+    dryingMachine: parsed.dryingMachine ?? null,
+    dryingExtensionRequired: parsed.dryingExtensionRequired ?? false,
+    dryingExtensionTimeHours: parsed.dryingExtensionTimeHours ?? null,
+    dryingNotes: parsed.dryingNotes ?? null,
+    finalComments: parsed.finalComments ?? null,
     markCompleted: parsed.markCompleted ?? false,
   }));
 }));
