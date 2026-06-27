@@ -52,6 +52,7 @@ export async function runGroupMigration(): Promise<void> {
   `);
   await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS batch_id varchar`);
   await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS product_id varchar`);
+  await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS customer_id varchar`);
   await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS machine varchar(100)`);
   await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS batch_number varchar(100)`);
   await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS product_name varchar(200)`);

@@ -533,6 +533,7 @@ export const operationsLog = pgTable("operations_log", {
   status: varchar("status", { length: 20 }).notNull().default("open"),
   batchId: varchar("batch_id"),
   productId: varchar("product_id"),
+  customerId: varchar("customer_id"),
   machine: varchar("machine", { length: 100 }),
   batchNumber: varchar("batch_number", { length: 100 }),
   productName: varchar("product_name", { length: 200 }),

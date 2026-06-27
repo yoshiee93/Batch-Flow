@@ -11,6 +11,7 @@ export interface OpsLogEntry {
   status: "open" | "reviewed" | "resolved";
   batchId: string | null;
   productId: string | null;
+  customerId: string | null;
   machine: string | null;
   batchNumber: string | null;
   productName: string | null;

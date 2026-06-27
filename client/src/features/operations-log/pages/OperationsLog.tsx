@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ClipboardCheck, AlertTriangle, Info, AlertCircle, Search, Download } from "lucide-react";
 import { useOpsLog, useUpdateOpsLogStatus, useUpdateOpsLogSeverity, type OpsLogEntry } from "@/features/operations-log/api";
+import { useProducts } from "@/features/catalog/api";
 import { usePermissions } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -47,6 +48,9 @@ export default function OperationsLog() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [machine, setMachine] = useState("");
+  const [productId, setProductId] = useState("all");
+
+  const { data: products = [] } = useProducts();
 
   const { data: entries = [], isLoading } = useOpsLog({
     q: q || undefined,
@@ -56,6 +60,7 @@ export default function OperationsLog() {
     from: from || undefined,
     to: to || undefined,
     machine: machine || undefined,
+    productId: productId !== "all" ? productId : undefined,
   });
 
   const updateStatus = useUpdateOpsLogStatus();
@@ -137,6 +142,17 @@ export default function OperationsLog() {
                 data-testid="input-ops-log-search"
               />
             </div>
+            <Select value={productId} onValueChange={setProductId}>
+              <SelectTrigger className="w-44" data-testid="select-ops-log-product">
+                <SelectValue placeholder="All products" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All products</SelectItem>
+                {products.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               placeholder="Machine…"
               className="w-36"
