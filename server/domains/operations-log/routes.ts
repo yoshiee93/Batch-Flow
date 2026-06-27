@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../../db";
 import { operationsLog } from "@shared/schema";
-import { eq, and, gte, lte, ilike, or } from "drizzle-orm";
+import { eq, and, gte, lte, ilike, or, desc } from "drizzle-orm";
 import { asyncHandler } from "../../lib/asyncHandler";
 import { requirePermission } from "../../lib/authMiddleware";
 
@@ -20,7 +20,9 @@ const updateSeveritySchema = z.object({
 });
 
 operationsLogRouter.get("/operations-log", canView, asyncHandler(async (req, res) => {
-  const { noteType, severity, status, q, from, to } = req.query as Record<string, string | undefined>;
+  const { noteType, severity, status, q, from, to, sourceId, sourceType } = req.query as Record<string, string | undefined>;
+  const limit = Math.min(parseInt((req.query.limit as string) || "100"), 500);
+  const offset = parseInt((req.query.offset as string) || "0");
 
   let query = db.select().from(operationsLog).$dynamic();
 
@@ -28,8 +30,14 @@ operationsLogRouter.get("/operations-log", canView, asyncHandler(async (req, res
   if (noteType) conditions.push(eq(operationsLog.noteType, noteType));
   if (severity) conditions.push(eq(operationsLog.severity, severity));
   if (status) conditions.push(eq(operationsLog.status, status));
+  if (sourceId) conditions.push(eq(operationsLog.sourceId, sourceId));
+  if (sourceType) conditions.push(eq(operationsLog.sourceType, sourceType));
   if (from) conditions.push(gte(operationsLog.createdAt, new Date(from)));
-  if (to) conditions.push(lte(operationsLog.createdAt, new Date(to)));
+  if (to) {
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999);
+    conditions.push(lte(operationsLog.createdAt, toDate));
+  }
   if (q) conditions.push(
     or(
       ilike(operationsLog.content, `%${q}%`),
@@ -42,8 +50,8 @@ operationsLogRouter.get("/operations-log", canView, asyncHandler(async (req, res
     query = query.where(and(...conditions));
   }
 
-  const rows = await query.orderBy(operationsLog.createdAt);
-  res.json(rows.reverse());
+  const rows = await query.orderBy(desc(operationsLog.createdAt)).limit(limit).offset(offset);
+  res.json(rows);
 }));
 
 operationsLogRouter.patch("/operations-log/:id/status", canEdit, asyncHandler(async (req, res) => {

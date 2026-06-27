@@ -20,6 +20,10 @@ export function useOpsLog(filters?: {
   q?: string;
   from?: string;
   to?: string;
+  sourceId?: string;
+  sourceType?: string;
+  limit?: number;
+  offset?: number;
 }) {
   const params = new URLSearchParams();
   if (filters?.noteType) params.set("noteType", filters.noteType);
@@ -28,6 +32,10 @@ export function useOpsLog(filters?: {
   if (filters?.q) params.set("q", filters.q);
   if (filters?.from) params.set("from", filters.from);
   if (filters?.to) params.set("to", filters.to);
+  if (filters?.sourceId) params.set("sourceId", filters.sourceId);
+  if (filters?.sourceType) params.set("sourceType", filters.sourceType);
+  if (filters?.limit != null) params.set("limit", String(filters.limit));
+  if (filters?.offset != null) params.set("offset", String(filters.offset));
   const qs = params.toString();
 
   return useQuery<OpsLogEntry[]>({

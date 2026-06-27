@@ -44,12 +44,16 @@ export default function OperationsLog() {
   const [noteType, setNoteType] = useState("all");
   const [severity, setSeverity] = useState("all");
   const [status, setStatus] = useState("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
 
   const { data: entries = [], isLoading } = useOpsLog({
     q: q || undefined,
     noteType: noteType !== "all" ? noteType : undefined,
     severity: severity !== "all" ? severity : undefined,
     status: status !== "all" ? status : undefined,
+    from: from || undefined,
+    to: to || undefined,
   });
 
   const updateStatus = useUpdateOpsLogStatus();
@@ -163,6 +167,24 @@ export default function OperationsLog() {
                 <SelectItem value="resolved">Resolved</SelectItem>
               </SelectContent>
             </Select>
+            <Input
+              type="date"
+              className="w-40"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              data-testid="input-ops-log-from"
+              title="From date"
+              placeholder="From"
+            />
+            <Input
+              type="date"
+              className="w-40"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              data-testid="input-ops-log-to"
+              title="To date"
+              placeholder="To"
+            />
           </div>
         </CardContent>
       </Card>

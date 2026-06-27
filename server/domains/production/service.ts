@@ -681,8 +681,15 @@ export const productionService = {
 
     await createAuditLog({ entityType: "batch", entityId: batchId, action: markCompleted ? "completed" : "updated", changes: JSON.stringify({ totalOutput, wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, finishTime: effectiveFinishTime?.toISOString() ?? null, productAssessment: productAssessment ?? null, markCompleted }) });
 
-    // Upsert operations log entries (sourceType + sourceId + noteType = stable unique key)
+    // Upsert or delete operations log entries (sourceType + sourceId + noteType = stable unique key)
     const now = new Date();
+    const logKey = (noteType: string) =>
+      and(
+        eq(operationsLog.sourceType, "production"),
+        eq(operationsLog.sourceId, batchId),
+        eq(operationsLog.noteType, noteType)
+      );
+
     if (dryingNotes) {
       await db.insert(operationsLog).values({
         sourceType: "production", sourceId: batchId, noteType: "drying_note",
@@ -691,7 +698,10 @@ export const productionService = {
         target: [operationsLog.sourceType, operationsLog.sourceId, operationsLog.noteType],
         set: { content: dryingNotes, updatedAt: now },
       });
+    } else {
+      await db.delete(operationsLog).where(logKey("drying_note"));
     }
+
     if (productAssessment) {
       const content = `${productAssessment.result}${productAssessment.notes ? `: ${productAssessment.notes}` : ""}`;
       await db.insert(operationsLog).values({
@@ -701,7 +711,10 @@ export const productionService = {
         target: [operationsLog.sourceType, operationsLog.sourceId, operationsLog.noteType],
         set: { content, updatedAt: now },
       });
+    } else {
+      await db.delete(operationsLog).where(logKey("product_assessment"));
     }
+
     if (finalComments) {
       await db.insert(operationsLog).values({
         sourceType: "production", sourceId: batchId, noteType: "final_comment",
@@ -710,7 +723,10 @@ export const productionService = {
         target: [operationsLog.sourceType, operationsLog.sourceId, operationsLog.noteType],
         set: { content: finalComments, updatedAt: now },
       });
+    } else {
+      await db.delete(operationsLog).where(logKey("final_comment"));
     }
+
     if (dryingExtensionRequired) {
       const extContent = dryingExtensionTimeHours ? `Extension required: ${dryingExtensionTimeHours}h` : "Extension required";
       await db.insert(operationsLog).values({
@@ -721,14 +737,7 @@ export const productionService = {
         set: { content: extContent, severity: "warning", updatedAt: now },
       });
     } else {
-      // If extension is no longer required, remove/close the entry
-      await db.delete(operationsLog).where(
-        and(
-          eq(operationsLog.sourceType, "production"),
-          eq(operationsLog.sourceId, batchId),
-          eq(operationsLog.noteType, "drying_extension")
-        )
-      );
+      await db.delete(operationsLog).where(logKey("drying_extension"));
     }
 
     const outputLots = await inventoryRepository.getBatchOutputLots(batchId);
