@@ -18,6 +18,12 @@ export interface Batch {
   numberOfStaff: number | null;
   finishTime: string | null;
   productAssessment: { result: "pass" | "conditional" | "fail"; notes?: string } | null;
+  dryingTimeHours: string | null;
+  dryingMachine: string | null;
+  dryingExtensionRequired: boolean;
+  dryingExtensionTimeHours: string | null;
+  dryingNotes: string | null;
+  finalComments: string | null;
   startDate: string | null;
   endDate: string | null;
   assignedTo: string | null;
@@ -217,7 +223,7 @@ export function useRemoveBatchOutput() {
 export function useFinalizeBatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ batchId, wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, finishTime, productAssessment, markCompleted }: {
+    mutationFn: ({ batchId, wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, finishTime, productAssessment, dryingTimeHours, dryingMachine, dryingExtensionRequired, dryingExtensionTimeHours, dryingNotes, finalComments, markCompleted }: {
       batchId: string;
       wasteQuantity: string;
       millingQuantity: string;
@@ -226,11 +232,17 @@ export function useFinalizeBatch() {
       numberOfStaff?: number;
       finishTime?: string | null;
       productAssessment?: { result: "pass" | "conditional" | "fail"; notes?: string } | null;
+      dryingTimeHours?: string;
+      dryingMachine?: string | null;
+      dryingExtensionRequired?: boolean;
+      dryingExtensionTimeHours?: string | null;
+      dryingNotes?: string | null;
+      finalComments?: string | null;
       markCompleted: boolean;
     }) =>
       fetchApi<FinalizeResult>(`/batches/${batchId}/finalize`, {
         method: "POST",
-        body: JSON.stringify({ wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, finishTime, productAssessment, markCompleted })
+        body: JSON.stringify({ wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, finishTime, productAssessment, dryingTimeHours, dryingMachine, dryingExtensionRequired, dryingExtensionTimeHours, dryingNotes, finalComments, markCompleted })
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["batches"] });

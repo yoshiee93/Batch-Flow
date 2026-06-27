@@ -681,6 +681,56 @@ export const productionService = {
 
     await createAuditLog({ entityType: "batch", entityId: batchId, action: markCompleted ? "completed" : "updated", changes: JSON.stringify({ totalOutput, wasteQuantity, millingQuantity, wetQuantity, cleaningTime, numberOfStaff, finishTime: effectiveFinishTime?.toISOString() ?? null, productAssessment: productAssessment ?? null, markCompleted }) });
 
+    // Upsert operations log entries (sourceType + sourceId + noteType = stable unique key)
+    const now = new Date();
+    if (dryingNotes) {
+      await db.insert(operationsLog).values({
+        sourceType: "production", sourceId: batchId, noteType: "drying_note",
+        content: dryingNotes, severity: "info", status: "open", updatedAt: now,
+      }).onConflictDoUpdate({
+        target: [operationsLog.sourceType, operationsLog.sourceId, operationsLog.noteType],
+        set: { content: dryingNotes, updatedAt: now },
+      });
+    }
+    if (productAssessment) {
+      const content = `${productAssessment.result}${productAssessment.notes ? `: ${productAssessment.notes}` : ""}`;
+      await db.insert(operationsLog).values({
+        sourceType: "production", sourceId: batchId, noteType: "product_assessment",
+        content, severity: "info", status: "open", updatedAt: now,
+      }).onConflictDoUpdate({
+        target: [operationsLog.sourceType, operationsLog.sourceId, operationsLog.noteType],
+        set: { content, updatedAt: now },
+      });
+    }
+    if (finalComments) {
+      await db.insert(operationsLog).values({
+        sourceType: "production", sourceId: batchId, noteType: "final_comment",
+        content: finalComments, severity: "info", status: "open", updatedAt: now,
+      }).onConflictDoUpdate({
+        target: [operationsLog.sourceType, operationsLog.sourceId, operationsLog.noteType],
+        set: { content: finalComments, updatedAt: now },
+      });
+    }
+    if (dryingExtensionRequired) {
+      const extContent = dryingExtensionTimeHours ? `Extension required: ${dryingExtensionTimeHours}h` : "Extension required";
+      await db.insert(operationsLog).values({
+        sourceType: "production", sourceId: batchId, noteType: "drying_extension",
+        content: extContent, severity: "warning", status: "open", updatedAt: now,
+      }).onConflictDoUpdate({
+        target: [operationsLog.sourceType, operationsLog.sourceId, operationsLog.noteType],
+        set: { content: extContent, severity: "warning", updatedAt: now },
+      });
+    } else {
+      // If extension is no longer required, remove/close the entry
+      await db.delete(operationsLog).where(
+        and(
+          eq(operationsLog.sourceType, "production"),
+          eq(operationsLog.sourceId, batchId),
+          eq(operationsLog.noteType, "drying_extension")
+        )
+      );
+    }
+
     const outputLots = await inventoryRepository.getBatchOutputLots(batchId);
     return { batch: updated, outputLots };
   },

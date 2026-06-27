@@ -272,6 +272,56 @@ export default function BatchDetail() {
                 </div>
               )}
             </div>
+            {(batch.dryingTimeHours != null || batch.dryingMachine || batch.dryingNotes || batch.finalComments || batch.dryingExtensionRequired) && (
+              <>
+                <Separator className="my-4" />
+                <div>
+                  <div className="text-muted-foreground text-xs uppercase font-medium mb-2">Freeze Drying</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+                    {batch.dryingTimeHours != null && (
+                      <div>
+                        <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Drying Time</div>
+                        <div className="font-mono" data-testid="text-drying-time-hours">{batch.dryingTimeHours} hrs</div>
+                      </div>
+                    )}
+                    {batch.dryingMachine && (
+                      <div>
+                        <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Drying Machine</div>
+                        <div data-testid="text-drying-machine">{batch.dryingMachine}</div>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Extension Required</div>
+                      <div data-testid="text-drying-extension-required">
+                        {batch.dryingExtensionRequired ? (
+                          <Badge className="bg-amber-100 text-amber-800">Yes</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">No</span>
+                        )}
+                      </div>
+                    </div>
+                    {batch.dryingExtensionRequired && batch.dryingExtensionTimeHours != null && (
+                      <div>
+                        <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Extension Time</div>
+                        <div className="font-mono" data-testid="text-drying-extension-hours">{batch.dryingExtensionTimeHours} hrs</div>
+                      </div>
+                    )}
+                    {batch.dryingNotes && (
+                      <div className="col-span-2 sm:col-span-3">
+                        <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Drying Notes</div>
+                        <div data-testid="text-drying-notes">{batch.dryingNotes}</div>
+                      </div>
+                    )}
+                    {batch.finalComments && (
+                      <div className="col-span-2 sm:col-span-3">
+                        <div className="text-muted-foreground text-xs uppercase font-medium mb-0.5">Final Comments</div>
+                        <div data-testid="text-final-comments">{batch.finalComments}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
             {(batch.barcodeValue || batch.batchCode) && (
               <>
                 <Separator className="my-4" />

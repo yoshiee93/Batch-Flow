@@ -21,6 +21,7 @@ import Calculator from "@/pages/Calculator";
 import NotFound from "@/pages/not-found";
 import BatchDetail from "@/features/production/pages/BatchDetail";
 import BatchTimeline from "@/features/production/pages/BatchTimeline";
+import OperationsLog from "@/features/operations-log/pages/OperationsLog";
 import LotDetail from "@/features/inventory/pages/LotDetail";
 import Login from "@/pages/Login";
 import { Loader2, ShieldOff } from "lucide-react";
@@ -147,6 +148,9 @@ function Router() {
               <Route path="/products"><Redirect to="/inventory" /></Route>
               <Route path="/traceability">
                 <RequirePermission perm="traceability.view"><Traceability /></RequirePermission>
+              </Route>
+              <Route path="/ops-log">
+                <RequirePermission perm="operations_log.view"><OperationsLog /></RequirePermission>
               </Route>
               <Route path="/calculator" component={Calculator} />
               <Route path="/settings">

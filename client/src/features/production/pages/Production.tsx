@@ -1234,6 +1234,12 @@ export default function Production() {
               numberOfStaff={selectedBatch.numberOfStaff ?? undefined}
               finishTime={selectedBatch.finishTime ?? null}
               productAssessment={selectedBatch.productAssessment ?? null}
+              dryingTimeHours={selectedBatch.dryingTimeHours}
+              dryingMachine={selectedBatch.dryingMachine}
+              dryingExtensionRequired={selectedBatch.dryingExtensionRequired}
+              dryingExtensionTimeHours={selectedBatch.dryingExtensionTimeHours}
+              dryingNotes={selectedBatch.dryingNotes}
+              finalComments={selectedBatch.finalComments}
               onClose={() => setIsRecordOutputOpen(false)}
             />
           )}
@@ -1720,6 +1726,12 @@ function BatchOutputsEditor({
   numberOfStaff: initialNumberOfStaff,
   finishTime: initialFinishTime,
   productAssessment: initialProductAssessment,
+  dryingTimeHours: initialDryingTimeHours,
+  dryingMachine: initialDryingMachine,
+  dryingExtensionRequired: initialDryingExtensionRequired,
+  dryingExtensionTimeHours: initialDryingExtensionTimeHours,
+  dryingNotes: initialDryingNotes,
+  finalComments: initialFinalComments,
   onClose,
 }: { 
   batchId: string;
@@ -1731,6 +1743,12 @@ function BatchOutputsEditor({
   numberOfStaff?: number;
   finishTime?: string | Date | null;
   productAssessment?: { result: "pass" | "conditional" | "fail"; notes?: string } | null;
+  dryingTimeHours?: string | null;
+  dryingMachine?: string | null;
+  dryingExtensionRequired?: boolean;
+  dryingExtensionTimeHours?: string | null;
+  dryingNotes?: string | null;
+  finalComments?: string | null;
   onClose: () => void;
 }) {
   const [newOutputForm, setNewOutputForm] = useState({ productId: '', quantity: '' });
@@ -1744,6 +1762,12 @@ function BatchOutputsEditor({
     finishTime: z.string().refine((v) => v === '' || !isNaN(new Date(v).getTime()), { message: 'Finish time must be a valid date' }),
     assessmentResult: z.enum(['', 'pass', 'conditional', 'fail']),
     assessmentNotes: z.string(),
+    dryingTimeHours: z.string().refine((v) => v === '' || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0), { message: 'Drying time must be a non-negative number' }),
+    dryingMachine: z.string(),
+    dryingExtensionRequired: z.boolean(),
+    dryingExtensionTimeHours: z.string().refine((v) => v === '' || (!isNaN(parseFloat(v)) && parseFloat(v) >= 0), { message: 'Extension time must be a non-negative number' }),
+    dryingNotes: z.string(),
+    finalComments: z.string(),
   });
   type FinalizeValues = z.infer<typeof finalizeSchema>;
   const toLocalInput = (d: string | Date | null | undefined) => {
@@ -1764,6 +1788,12 @@ function BatchOutputsEditor({
       finishTime: toLocalInput(initialFinishTime),
       assessmentResult: (initialProductAssessment?.result ?? '') as '' | 'pass' | 'conditional' | 'fail',
       assessmentNotes: initialProductAssessment?.notes ?? '',
+      dryingTimeHours: initialDryingTimeHours ?? '',
+      dryingMachine: initialDryingMachine ?? '',
+      dryingExtensionRequired: initialDryingExtensionRequired ?? false,
+      dryingExtensionTimeHours: initialDryingExtensionTimeHours ?? '',
+      dryingNotes: initialDryingNotes ?? '',
+      finalComments: initialFinalComments ?? '',
     },
     mode: 'onChange',
   });
@@ -1775,6 +1805,12 @@ function BatchOutputsEditor({
   const finishTimeValue = finalizeForm.watch('finishTime');
   const assessmentResult = finalizeForm.watch('assessmentResult');
   const assessmentNotes = finalizeForm.watch('assessmentNotes');
+  const dryingTimeHours = finalizeForm.watch('dryingTimeHours');
+  const dryingMachine = finalizeForm.watch('dryingMachine');
+  const dryingExtensionRequired = finalizeForm.watch('dryingExtensionRequired');
+  const dryingExtensionTimeHours = finalizeForm.watch('dryingExtensionTimeHours');
+  const dryingNotes = finalizeForm.watch('dryingNotes');
+  const finalComments = finalizeForm.watch('finalComments');
   const setWasteQuantity = (v: string) => finalizeForm.setValue('wasteQuantity', v, { shouldDirty: true });
   const setMillingQuantity = (v: string) => finalizeForm.setValue('millingQuantity', v, { shouldDirty: true });
   const setWetQuantity = (v: string) => finalizeForm.setValue('wetQuantity', v, { shouldDirty: true });
@@ -1804,10 +1840,16 @@ function BatchOutputsEditor({
       finishTime: toLocalInput(initialFinishTime),
       assessmentResult: (initialProductAssessment?.result ?? '') as '' | 'pass' | 'conditional' | 'fail',
       assessmentNotes: initialProductAssessment?.notes ?? '',
+      dryingTimeHours: initialDryingTimeHours ?? '',
+      dryingMachine: initialDryingMachine ?? '',
+      dryingExtensionRequired: initialDryingExtensionRequired ?? false,
+      dryingExtensionTimeHours: initialDryingExtensionTimeHours ?? '',
+      dryingNotes: initialDryingNotes ?? '',
+      finalComments: initialFinalComments ?? '',
     });
     setMarkCompleted(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [batchId, initialWaste, initialMilling, initialWet, initialCleaningTime, initialNumberOfStaff, initialFinishTime, initialProductAssessment]);
+  }, [batchId, initialWaste, initialMilling, initialWet, initialCleaningTime, initialNumberOfStaff, initialFinishTime, initialProductAssessment, initialDryingTimeHours, initialDryingMachine, initialDryingExtensionRequired, initialDryingExtensionTimeHours, initialDryingNotes, initialFinalComments]);
 
   useEffect(() => {
     setNewOutputForm(f => ({ ...f, productId: batchData?.productId ?? '' }));
@@ -1883,6 +1925,12 @@ function BatchOutputsEditor({
         productAssessment: values.assessmentResult
           ? { result: values.assessmentResult, notes: values.assessmentNotes || undefined }
           : null,
+        dryingTimeHours: values.dryingTimeHours || undefined,
+        dryingMachine: values.dryingMachine || null,
+        dryingExtensionRequired: values.dryingExtensionRequired,
+        dryingExtensionTimeHours: values.dryingExtensionTimeHours || null,
+        dryingNotes: values.dryingNotes || null,
+        finalComments: values.finalComments || null,
         markCompleted,
       });
       if (markCompleted) {
@@ -2394,6 +2442,87 @@ function BatchOutputsEditor({
                   onChange={(e) => setAssessmentNotes(e.target.value)}
                   placeholder="Optional notes about product assessment"
                   data-testid="input-finalize-assessment-notes"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="font-medium text-sm">Freeze Drying</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="dryingTimeHours">Drying Time (hours)</Label>
+                <Input
+                  id="dryingTimeHours"
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={dryingTimeHours}
+                  onChange={(e) => finalizeForm.setValue('dryingTimeHours', e.target.value, { shouldDirty: true })}
+                  placeholder="e.g. 48"
+                  data-testid="input-finalize-drying-time-hours"
+                />
+                {finalizeForm.formState.errors.dryingTimeHours && <p className="text-sm text-destructive">{finalizeForm.formState.errors.dryingTimeHours.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dryingMachine">Drying Machine</Label>
+                <Input
+                  id="dryingMachine"
+                  value={dryingMachine}
+                  onChange={(e) => finalizeForm.setValue('dryingMachine', e.target.value, { shouldDirty: true })}
+                  placeholder="e.g. FD-01"
+                  data-testid="input-finalize-drying-machine"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 pt-6">
+                  <Checkbox
+                    id="dryingExtensionRequired"
+                    checked={dryingExtensionRequired}
+                    onCheckedChange={(v) => finalizeForm.setValue('dryingExtensionRequired', !!v, { shouldDirty: true })}
+                    data-testid="checkbox-drying-extension-required"
+                  />
+                  <Label htmlFor="dryingExtensionRequired" className="text-sm font-normal cursor-pointer">
+                    Drying extension required
+                  </Label>
+                </div>
+              </div>
+              {dryingExtensionRequired && (
+                <div className="space-y-2">
+                  <Label htmlFor="dryingExtensionTimeHours">Extension Time (hours)</Label>
+                  <Input
+                    id="dryingExtensionTimeHours"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={dryingExtensionTimeHours}
+                    onChange={(e) => finalizeForm.setValue('dryingExtensionTimeHours', e.target.value, { shouldDirty: true })}
+                    placeholder="e.g. 12"
+                    data-testid="input-finalize-drying-extension-hours"
+                  />
+                  {finalizeForm.formState.errors.dryingExtensionTimeHours && <p className="text-sm text-destructive">{finalizeForm.formState.errors.dryingExtensionTimeHours.message}</p>}
+                </div>
+              )}
+              <div className="space-y-2 col-span-full">
+                <Label htmlFor="dryingNotes">Drying Notes</Label>
+                <Textarea
+                  id="dryingNotes"
+                  rows={2}
+                  value={dryingNotes}
+                  onChange={(e) => finalizeForm.setValue('dryingNotes', e.target.value, { shouldDirty: true })}
+                  placeholder="Optional notes about the drying process"
+                  data-testid="input-finalize-drying-notes"
+                />
+              </div>
+              <div className="space-y-2 col-span-full">
+                <Label htmlFor="finalComments">Final Comments</Label>
+                <Textarea
+                  id="finalComments"
+                  rows={2}
+                  value={finalComments}
+                  onChange={(e) => finalizeForm.setValue('finalComments', e.target.value, { shouldDirty: true })}
+                  placeholder="Any final comments for this batch"
+                  data-testid="input-finalize-final-comments"
                 />
               </div>
             </div>
