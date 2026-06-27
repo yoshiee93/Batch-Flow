@@ -6,9 +6,15 @@ export interface OpsLogEntry {
   sourceType: string;
   sourceId: string;
   noteType: string;
-  content: string;
+  content: string | null;
   severity: "info" | "warning" | "issue";
   status: "open" | "reviewed" | "resolved";
+  batchId: string | null;
+  productId: string | null;
+  machine: string | null;
+  batchNumber: string | null;
+  productName: string | null;
+  createdBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -22,6 +28,8 @@ export function useOpsLog(filters?: {
   to?: string;
   sourceId?: string;
   sourceType?: string;
+  productId?: string;
+  machine?: string;
   limit?: number;
   offset?: number;
 }) {
@@ -34,6 +42,8 @@ export function useOpsLog(filters?: {
   if (filters?.to) params.set("to", filters.to);
   if (filters?.sourceId) params.set("sourceId", filters.sourceId);
   if (filters?.sourceType) params.set("sourceType", filters.sourceType);
+  if (filters?.productId) params.set("productId", filters.productId);
+  if (filters?.machine) params.set("machine", filters.machine);
   if (filters?.limit != null) params.set("limit", String(filters.limit));
   if (filters?.offset != null) params.set("offset", String(filters.offset));
   const qs = params.toString();

@@ -690,13 +690,26 @@ export const productionService = {
         eq(operationsLog.noteType, noteType)
       );
 
+    // Fetch primary product name once for structured log fields
+    const primaryProduct = await repo.getProductById(batch.productId);
+    const logBase = {
+      sourceType: "production" as const,
+      sourceId: batchId,
+      batchId,
+      productId: batch.productId,
+      machine: dryingMachine ?? null,
+      batchNumber: batch.batchNumber ?? batch.batchCode ?? null,
+      productName: primaryProduct?.name ?? null,
+      updatedAt: now,
+    };
+
     if (dryingNotes) {
       await db.insert(operationsLog).values({
-        sourceType: "production", sourceId: batchId, noteType: "drying_note",
-        content: dryingNotes, severity: "info", status: "open", updatedAt: now,
+        ...logBase, noteType: "drying_note",
+        content: dryingNotes, severity: "info", status: "open",
       }).onConflictDoUpdate({
         target: [operationsLog.sourceType, operationsLog.sourceId, operationsLog.noteType],
-        set: { content: dryingNotes, updatedAt: now },
+        set: { content: dryingNotes, machine: logBase.machine, batchNumber: logBase.batchNumber, productName: logBase.productName, productId: logBase.productId, batchId: logBase.batchId, updatedAt: now },
       });
     } else {
       await db.delete(operationsLog).where(logKey("drying_note"));
@@ -705,11 +718,11 @@ export const productionService = {
     if (productAssessment) {
       const content = `${productAssessment.result}${productAssessment.notes ? `: ${productAssessment.notes}` : ""}`;
       await db.insert(operationsLog).values({
-        sourceType: "production", sourceId: batchId, noteType: "product_assessment",
-        content, severity: "info", status: "open", updatedAt: now,
+        ...logBase, noteType: "product_assessment",
+        content, severity: "info", status: "open",
       }).onConflictDoUpdate({
         target: [operationsLog.sourceType, operationsLog.sourceId, operationsLog.noteType],
-        set: { content, updatedAt: now },
+        set: { content, machine: logBase.machine, batchNumber: logBase.batchNumber, productName: logBase.productName, productId: logBase.productId, batchId: logBase.batchId, updatedAt: now },
       });
     } else {
       await db.delete(operationsLog).where(logKey("product_assessment"));
@@ -717,11 +730,11 @@ export const productionService = {
 
     if (finalComments) {
       await db.insert(operationsLog).values({
-        sourceType: "production", sourceId: batchId, noteType: "final_comment",
-        content: finalComments, severity: "info", status: "open", updatedAt: now,
+        ...logBase, noteType: "final_comment",
+        content: finalComments, severity: "info", status: "open",
       }).onConflictDoUpdate({
         target: [operationsLog.sourceType, operationsLog.sourceId, operationsLog.noteType],
-        set: { content: finalComments, updatedAt: now },
+        set: { content: finalComments, machine: logBase.machine, batchNumber: logBase.batchNumber, productName: logBase.productName, productId: logBase.productId, batchId: logBase.batchId, updatedAt: now },
       });
     } else {
       await db.delete(operationsLog).where(logKey("final_comment"));
@@ -730,11 +743,11 @@ export const productionService = {
     if (dryingExtensionRequired) {
       const extContent = dryingExtensionTimeHours ? `Extension required: ${dryingExtensionTimeHours}h` : "Extension required";
       await db.insert(operationsLog).values({
-        sourceType: "production", sourceId: batchId, noteType: "drying_extension",
-        content: extContent, severity: "warning", status: "open", updatedAt: now,
+        ...logBase, noteType: "drying_extension",
+        content: extContent, severity: "warning", status: "open",
       }).onConflictDoUpdate({
         target: [operationsLog.sourceType, operationsLog.sourceId, operationsLog.noteType],
-        set: { content: extContent, severity: "warning", updatedAt: now },
+        set: { content: extContent, severity: "warning", machine: logBase.machine, batchNumber: logBase.batchNumber, productName: logBase.productName, productId: logBase.productId, batchId: logBase.batchId, updatedAt: now },
       });
     } else {
       await db.delete(operationsLog).where(logKey("drying_extension"));

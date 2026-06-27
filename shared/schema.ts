@@ -531,6 +531,12 @@ export const operationsLog = pgTable("operations_log", {
   content: text("content"),
   severity: varchar("severity", { length: 20 }).notNull().default("info"),
   status: varchar("status", { length: 20 }).notNull().default("open"),
+  batchId: varchar("batch_id"),
+  productId: varchar("product_id"),
+  machine: varchar("machine", { length: 100 }),
+  batchNumber: varchar("batch_number", { length: 100 }),
+  productName: varchar("product_name", { length: 200 }),
+  createdBy: varchar("created_by", { length: 100 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

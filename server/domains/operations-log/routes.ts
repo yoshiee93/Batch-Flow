@@ -20,7 +20,7 @@ const updateSeveritySchema = z.object({
 });
 
 operationsLogRouter.get("/operations-log", canView, asyncHandler(async (req, res) => {
-  const { noteType, severity, status, q, from, to, sourceId, sourceType } = req.query as Record<string, string | undefined>;
+  const { noteType, severity, status, q, from, to, sourceId, sourceType, productId, machine } = req.query as Record<string, string | undefined>;
   const limit = Math.min(parseInt((req.query.limit as string) || "100"), 500);
   const offset = parseInt((req.query.offset as string) || "0");
 
@@ -32,6 +32,8 @@ operationsLogRouter.get("/operations-log", canView, asyncHandler(async (req, res
   if (status) conditions.push(eq(operationsLog.status, status));
   if (sourceId) conditions.push(eq(operationsLog.sourceId, sourceId));
   if (sourceType) conditions.push(eq(operationsLog.sourceType, sourceType));
+  if (productId) conditions.push(eq(operationsLog.productId, productId));
+  if (machine) conditions.push(ilike(operationsLog.machine, `%${machine}%`));
   if (from) conditions.push(gte(operationsLog.createdAt, new Date(from)));
   if (to) {
     const toDate = new Date(to);
@@ -42,7 +44,9 @@ operationsLogRouter.get("/operations-log", canView, asyncHandler(async (req, res
     or(
       ilike(operationsLog.content, `%${q}%`),
       ilike(operationsLog.sourceId, `%${q}%`),
-      ilike(operationsLog.noteType, `%${q}%`)
+      ilike(operationsLog.noteType, `%${q}%`),
+      ilike(operationsLog.batchNumber, `%${q}%`),
+      ilike(operationsLog.productName, `%${q}%`)
     )
   );
 

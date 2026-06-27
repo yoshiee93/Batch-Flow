@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,7 @@ export default function OperationsLog() {
   const [status, setStatus] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [machine, setMachine] = useState("");
 
   const { data: entries = [], isLoading } = useOpsLog({
     q: q || undefined,
@@ -54,6 +55,7 @@ export default function OperationsLog() {
     status: status !== "all" ? status : undefined,
     from: from || undefined,
     to: to || undefined,
+    machine: machine || undefined,
   });
 
   const updateStatus = useUpdateOpsLogStatus();
@@ -80,12 +82,14 @@ export default function OperationsLog() {
   function handleExport() {
     if (!canExport) return;
     const rows = [
-      ["Date", "Source", "Type", "Content", "Severity", "Status"],
+      ["Date", "Batch#", "Product", "Machine", "Type", "Content", "Severity", "Status"],
       ...entries.map((e) => [
         fmtDate(e.createdAt),
-        `${e.sourceType}/${e.sourceId}`,
+        e.batchNumber ?? "",
+        e.productName ?? "",
+        e.machine ?? "",
         NOTE_TYPE_LABELS[e.noteType] ?? e.noteType,
-        e.content,
+        e.content ?? "",
         e.severity,
         e.status,
       ]),
@@ -126,13 +130,20 @@ export default function OperationsLog() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search content, batch ID…"
+                placeholder="Search content, batch#, product…"
                 className="pl-9"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 data-testid="input-ops-log-search"
               />
             </div>
+            <Input
+              placeholder="Machine…"
+              className="w-36"
+              value={machine}
+              onChange={(e) => setMachine(e.target.value)}
+              data-testid="input-ops-log-machine"
+            />
             <Select value={noteType} onValueChange={setNoteType}>
               <SelectTrigger className="w-44" data-testid="select-ops-log-note-type">
                 <SelectValue placeholder="Note type" />
@@ -174,7 +185,6 @@ export default function OperationsLog() {
               onChange={(e) => setFrom(e.target.value)}
               data-testid="input-ops-log-from"
               title="From date"
-              placeholder="From"
             />
             <Input
               type="date"
@@ -183,7 +193,6 @@ export default function OperationsLog() {
               onChange={(e) => setTo(e.target.value)}
               data-testid="input-ops-log-to"
               title="To date"
-              placeholder="To"
             />
           </div>
         </CardContent>
@@ -228,15 +237,33 @@ export default function OperationsLog() {
                         <span className="text-xs text-muted-foreground ml-auto">{fmtDate(entry.createdAt)}</span>
                       </div>
                       <p className="text-sm text-foreground">{entry.content}</p>
-                      <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
-                        <span>
-                          Source:{" "}
-                          <Link href={`/batches/${entry.sourceId}`}>
-                            <span className="underline hover:text-foreground cursor-pointer font-mono" data-testid={`link-source-${entry.id}`}>
-                              {entry.sourceType}/{entry.sourceId.slice(0, 8)}…
-                            </span>
-                          </Link>
-                        </span>
+                      <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground flex-wrap">
+                        {entry.batchNumber && (
+                          <span>
+                            Batch:{" "}
+                            <Link href={`/batches/${entry.batchId ?? entry.sourceId}`}>
+                              <span className="underline hover:text-foreground cursor-pointer font-mono" data-testid={`link-batch-${entry.id}`}>
+                                {entry.batchNumber}
+                              </span>
+                            </Link>
+                          </span>
+                        )}
+                        {entry.productName && (
+                          <span>· {entry.productName}</span>
+                        )}
+                        {entry.machine && (
+                          <span>· ❄ {entry.machine}</span>
+                        )}
+                        {!entry.batchNumber && (
+                          <span>
+                            Source:{" "}
+                            <Link href={`/batches/${entry.sourceId}`}>
+                              <span className="underline hover:text-foreground cursor-pointer font-mono" data-testid={`link-source-${entry.id}`}>
+                                {entry.sourceType}/{entry.sourceId.slice(0, 8)}…
+                              </span>
+                            </Link>
+                          </span>
+                        )}
                         {entry.updatedAt !== entry.createdAt && (
                           <span>· Updated {fmtDate(entry.updatedAt)}</span>
                         )}

@@ -39,11 +39,23 @@ export async function runGroupMigration(): Promise<void> {
       content text,
       severity varchar(20) NOT NULL DEFAULT 'info',
       status varchar(20) NOT NULL DEFAULT 'open',
+      batch_id varchar,
+      product_id varchar,
+      machine varchar(100),
+      batch_number varchar(100),
+      product_name varchar(200),
+      created_by varchar(100),
       created_at timestamp NOT NULL DEFAULT now(),
       updated_at timestamp NOT NULL DEFAULT now(),
       UNIQUE (source_type, source_id, note_type)
     )
   `);
+  await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS batch_id varchar`);
+  await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS product_id varchar`);
+  await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS machine varchar(100)`);
+  await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS batch_number varchar(100)`);
+  await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS product_name varchar(200)`);
+  await db.execute(sql`ALTER TABLE operations_log ADD COLUMN IF NOT EXISTS created_by varchar(100)`);
 }
 
 export async function seedDefaultGroups(): Promise<void> {
