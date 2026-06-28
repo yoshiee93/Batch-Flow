@@ -679,7 +679,7 @@ export const forecastOrders = pgTable("forecast_orders", {
   expectedDate: timestamp("expected_date").notNull(),
   notes: text("notes"),
   confidenceLevel: text("confidence_level"),
-  status: forecastStatusEnum("status").notNull().default("Draft"),
+  status: forecastStatusEnum("status").notNull(),
   convertedOrderId: varchar("converted_order_id").references(() => orders.id),
   convertedAt: timestamp("converted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
