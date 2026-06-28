@@ -1,0 +1,173 @@
+Copy/paste this into Replit:
+
+```text
+Add an Operations Centre above the existing Operations Log.
+
+Goal:
+Give supervisors one central place to review production patterns, drying issues, notes, product assessments, and machine trends without opening each production run.
+
+Important:
+Do not remove the existing Operations Log.
+Do not rebuild Production.
+Do not change stock movement, traceability, orders, labels, inventory, or forecast logic.
+Use existing production batch data and existing operations_log data.
+
+Rename/structure:
+Add sidebar item:
+Operations Centre
+
+Operations Centre should contain tabs:
+1. Overview
+2. Operations Log
+3. Products
+4. Machines
+5. Analytics
+
+Permissions:
+Use existing permissions:
+- operations_log.view can view Operations Centre
+- operations_log.edit can mark log entries reviewed/resolved
+- operations_log.export can export if export exists
+
+Tab 1 — Overview
+
+Show summary cards for selected date range:
+- Production runs
+- Batches with notes
+- Drying extensions
+- Open issues
+- Unreviewed entries
+- Average drying time
+- Average yield if available
+- Warning count
+- Issue count
+
+Add date range filter:
+- Last 7 days
+- Last 30 days
+- This month
+- Custom range
+
+Below cards, show:
+- Recent drying extensions
+- Recent issues/warnings
+- Recent product assessments
+- Recent final comments
+
+Each row should link back to the production batch if available.
+
+Tab 2 — Operations Log
+
+Move or reuse the existing OperationsLog page inside this tab.
+
+Keep current features:
+- newest first
+- search
+- filter by note type
+- filter by severity
+- filter by status
+- filter by product
+- filter by machine
+- filter by date range
+- mark reviewed/resolved
+
+Do not remove the standalone component if it is easier to reuse it.
+
+Tab 3 — Products
+
+Show grouped production intelligence by product.
+
+For each product, show:
+- product name
+- production run count
+- average drying time
+- drying extension count
+- warning count
+- issue count
+- average yield if available
+- most recent production date
+
+Clicking a product expands or opens details showing:
+- recent operations log entries for that product
+- recent batches
+- drying time history list
+- extension history
+
+Tab 4 — Machines
+
+Show grouped production intelligence by drying machine.
+
+For each machine, show:
+- machine name
+- run count
+- average drying time
+- drying extension count
+- warning count
+- issue count
+- recent notes
+
+Clicking a machine expands or opens details showing:
+- recent operations log entries for that machine
+- recent batches using that machine
+- drying extensions linked to that machine
+
+Tab 5 — Analytics
+
+Do not build AI yet.
+
+Use normal database aggregation only.
+
+Show simple analytics:
+- Average drying time by product
+- Average drying time by machine
+- Drying extension count by product
+- Drying extension count by machine
+- Warning/issue count by product
+- Warning/issue count by machine
+- Most common note types
+- Open vs reviewed vs resolved counts
+
+Backend:
+Add summary endpoints if needed, for example:
+GET /api/operations-centre/overview
+GET /api/operations-centre/products
+GET /api/operations-centre/machines
+GET /api/operations-centre/analytics
+
+Or extend existing operations-log domain if cleaner.
+
+Frontend:
+Create:
+client/src/features/operations-centre/pages/OperationsCentre.tsx
+
+Reuse existing:
+client/src/features/operations-log/pages/OperationsLog.tsx
+
+Sidebar:
+Replace or add sidebar entry:
+Operations Centre
+
+If Operations Log is currently a separate sidebar item, move it under Operations Centre as the Operations Log tab, unless keeping both is simpler.
+Avoid duplicate confusing menu items.
+
+Important UX:
+This page is for supervisors.
+It should show patterns first, raw notes second.
+Default tab should be Overview.
+
+Optional Product Assessment improvement:
+If productAssessment is currently free text only, do not change it in this task.
+Do not alter existing completion workflow unless required.
+A future task can add structured ratings such as Excellent / Good / Acceptable / Poor.
+
+AI:
+Do not build AI now.
+Add a placeholder note only:
+“AI summaries can be added later once enough operations data is collected.”
+
+After changes run:
+npm run check
+npm run build
+
+Fix only errors introduced by this Operations Centre task.
+```
