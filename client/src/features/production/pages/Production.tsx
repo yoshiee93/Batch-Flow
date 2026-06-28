@@ -2411,11 +2411,6 @@ function BatchOutputsEditor({
                 <Input id="numberOfStaff" type="number" step="1" min="0" value={numberOfStaff} onChange={(e) => setNumberOfStaff(e.target.value)} placeholder="0" data-testid="input-finalize-number-of-staff" />
                 {finalizeForm.formState.errors.numberOfStaff && <p className="text-sm text-destructive" data-testid="error-finalize-number-of-staff">{finalizeForm.formState.errors.numberOfStaff.message}</p>}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="finishTime">Finish Time</Label>
-                <Input id="finishTime" type="datetime-local" value={finishTimeValue} onChange={(e) => setFinishTime(e.target.value)} data-testid="input-finalize-finish-time" />
-                {finalizeForm.formState.errors.finishTime && <p className="text-sm text-destructive" data-testid="error-finalize-finish-time">{finalizeForm.formState.errors.finishTime.message}</p>}
-              </div>
             </div>
           </div>
 
@@ -2469,16 +2464,6 @@ function BatchOutputsEditor({
                   data-testid="input-finalize-drying-time-hours"
                 />
                 {finalizeForm.formState.errors.dryingTimeHours && <p className="text-sm text-destructive">{finalizeForm.formState.errors.dryingTimeHours.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dryingMachine">Drying Machine</Label>
-                <Input
-                  id="dryingMachine"
-                  value={dryingMachine}
-                  onChange={(e) => finalizeForm.setValue('dryingMachine', e.target.value, { shouldDirty: true })}
-                  placeholder="e.g. FD-01"
-                  data-testid="input-finalize-drying-machine"
-                />
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2 pt-6">
