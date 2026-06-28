@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, boolean, pgEnum, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, boolean, pgEnum, jsonb, index, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -540,7 +540,9 @@ export const operationsLog = pgTable("operations_log", {
   createdBy: varchar("created_by", { length: 100 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [
+  unique("operations_log_source_type_source_id_note_type_key").on(table.sourceType, table.sourceId, table.noteType),
+]);
 
 export const insertOperationsLogSchema = createInsertSchema(operationsLog).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertOperationsLog = z.infer<typeof insertOperationsLogSchema>;
