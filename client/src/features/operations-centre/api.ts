@@ -3,7 +3,7 @@ import { fetchApi } from "@/lib/fetchApi";
 
 export interface OverviewStats {
   productionRuns: number;
-  batchesWithExtensions: number;
+  batchesWithNotes: number;
   dryingExtensions: number;
   openIssues: number;
   unreviewedEntries: number;

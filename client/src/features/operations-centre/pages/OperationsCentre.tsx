@@ -206,7 +206,7 @@ function OverviewTab({ from, to, preset, onPresetChange, customFrom, customTo, o
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <StatCard icon={Activity} label="Production Runs" value={stats.productionRuns} />
-            <StatCard icon={Repeat2} label="Batches Extended" value={stats.batchesWithExtensions} />
+            <StatCard icon={Repeat2} label="Batches with Notes" value={stats.batchesWithNotes} />
             <StatCard icon={Clock} label="Drying Extensions" value={stats.dryingExtensions} />
             <StatCard icon={AlertCircle} label="Open Issues" value={stats.openIssues} color="red" />
             <StatCard icon={Info} label="Unreviewed Entries" value={stats.unreviewedEntries} color="amber" />

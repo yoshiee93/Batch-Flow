@@ -30,8 +30,8 @@ operationsCentreRouter.get("/operations-centre/overview", canView, asyncHandler(
   const [statsResult, avgResult, recentExt, recentIssues, recentAssessments, recentComments] = await Promise.all([
     db.execute(sql`
       SELECT
-        COUNT(DISTINCT ol.source_id)::int AS production_runs,
-        COUNT(DISTINCT CASE WHEN ol.note_type = 'drying_extension' THEN ol.source_id END)::int AS batches_with_extensions,
+        (SELECT COUNT(*)::int FROM batches WHERE created_at BETWEEN ${fromDate} AND ${toDate}) AS production_runs,
+        COUNT(DISTINCT ol.source_id)::int AS batches_with_notes,
         COUNT(*) FILTER (WHERE ol.note_type = 'drying_extension')::int AS drying_extensions,
         COUNT(*) FILTER (WHERE ol.severity = 'issue' AND ol.status = 'open')::int AS open_issues,
         COUNT(*) FILTER (WHERE ol.status = 'open')::int AS unreviewed_entries,
@@ -90,7 +90,7 @@ operationsCentreRouter.get("/operations-centre/overview", canView, asyncHandler(
   res.json({
     stats: {
       productionRuns: s.production_runs ?? 0,
-      batchesWithExtensions: s.batches_with_extensions ?? 0,
+      batchesWithNotes: s.batches_with_notes ?? 0,
       dryingExtensions: s.drying_extensions ?? 0,
       openIssues: s.open_issues ?? 0,
       unreviewedEntries: s.unreviewed_entries ?? 0,
@@ -174,7 +174,7 @@ operationsCentreRouter.get("/operations-centre/machines", canView, asyncHandler(
 }));
 
 operationsCentreRouter.get("/operations-centre/machines/:machine", canView, asyncHandler(async (req, res) => {
-  const machine = decodeURIComponent(req.params.machine);
+  const machine = req.params.machine;
 
   const [logsResult, batchesResult] = await Promise.all([
     db.execute(sql`
