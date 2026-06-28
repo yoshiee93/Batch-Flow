@@ -22,6 +22,7 @@ import NotFound from "@/pages/not-found";
 import BatchDetail from "@/features/production/pages/BatchDetail";
 import BatchTimeline from "@/features/production/pages/BatchTimeline";
 import OperationsLog from "@/features/operations-log/pages/OperationsLog";
+import OperationsCentre from "@/features/operations-centre/pages/OperationsCentre";
 import LotDetail from "@/features/inventory/pages/LotDetail";
 import Login from "@/pages/Login";
 import { Loader2, ShieldOff } from "lucide-react";
@@ -151,6 +152,9 @@ function Router() {
               </Route>
               <Route path="/ops-log">
                 <RequirePermission perm="operations_log.view"><OperationsLog /></RequirePermission>
+              </Route>
+              <Route path="/operations-centre">
+                <RequirePermission perm="operations_log.view"><OperationsCentre /></RequirePermission>
               </Route>
               <Route path="/calculator" component={Calculator} />
               <Route path="/settings">

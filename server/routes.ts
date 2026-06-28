@@ -18,6 +18,7 @@ import { forecastRouter } from "./domains/forecast/routes";
 import { reportsRouter } from "./domains/reports/routes";
 import { searchRouter } from "./domains/search/routes";
 import { operationsLogRouter } from "./domains/operations-log/routes";
+import { operationsCentreRouter } from "./domains/operations-centre/routes";
 import { requireAuth, requireFreshPermissions } from "./lib/authMiddleware";
 
 export async function registerRoutes(
@@ -44,6 +45,7 @@ export async function registerRoutes(
   app.use("/api", reportsRouter);
   app.use("/api", searchRouter);
   app.use("/api", operationsLogRouter);
+  app.use("/api", operationsCentreRouter);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof z.ZodError) {

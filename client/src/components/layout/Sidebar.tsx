@@ -30,7 +30,7 @@ const navItems = [
   { label: 'Inventory', icon: Box, href: '/inventory', permission: 'inventory.view' },
   { label: 'Tracking', icon: ScanSearch, href: '/traceability', permission: 'traceability.view' },
   { label: 'Calculator', icon: Calculator, href: '/calculator', permission: null },
-  { label: 'Ops Log', icon: ClipboardCheck, href: '/ops-log', permission: 'operations_log.view' },
+  { label: 'Ops Centre', icon: ClipboardCheck, href: '/operations-centre', permission: 'operations_log.view' },
   { label: 'Reports', icon: BarChart3, href: '/reports/production', permission: 'reports.view' },
 ];
 
