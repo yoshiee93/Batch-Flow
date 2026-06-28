@@ -111,10 +111,11 @@ authRouter.get("/auth/me", asyncHandler(async (req, res) => {
     return res.status(401).json({ error: "Not authenticated" });
   }
 
-  let groupPermissions = req.session.permissions ?? null;
+  let groupPermissions: Record<string, boolean> | null = null;
   const groupId = user.groupId ?? null;
 
-  if (groupId && !req.session.permissions) {
+  // Always re-fetch from DB so stale sessions pick up permission changes on the next page load.
+  if (groupId) {
     const [group] = await db.select().from(userGroups).where(eq(userGroups.id, groupId)).limit(1);
     if (group) {
       groupPermissions = group.permissions as Record<string, boolean>;

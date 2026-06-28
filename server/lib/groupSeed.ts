@@ -75,6 +75,25 @@ export async function seedDefaultGroups(): Promise<void> {
     },
   ]).onConflictDoNothing();
 
+  // Always ensure Admin group has every current VALID_PERMISSIONS key set to true.
+  // Runs on every startup so newly added permissions propagate to existing groups.
+  await db.execute(sql`
+    UPDATE user_groups
+    SET permissions = ${JSON.stringify(ADMIN_PERMISSIONS)}::jsonb,
+        permissions_version = permissions_version + 1,
+        updated_at = now()
+    WHERE name = 'Admin' AND is_system = true
+      AND permissions != ${JSON.stringify(ADMIN_PERMISSIONS)}::jsonb
+  `);
+
+  // For General Staff, merge any missing keys in (new keys default to false; existing values are preserved).
+  await db.execute(sql`
+    UPDATE user_groups
+    SET permissions = ${JSON.stringify(GENERAL_STAFF_PERMISSIONS)}::jsonb || permissions,
+        updated_at = now()
+    WHERE name = 'General Staff' AND is_system = true
+  `);
+
   const groups = await db.select().from(userGroups);
   const adminId = groups.find(g => g.name === "Admin")?.id ?? null;
   const staffId = groups.find(g => g.name === "General Staff")?.id ?? null;

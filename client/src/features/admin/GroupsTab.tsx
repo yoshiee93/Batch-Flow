@@ -26,6 +26,7 @@ const PERMISSION_GROUPS: { label: string; keys: string[] }[] = [
   { label: 'Reports', keys: ['reports.view', 'reports.export'] },
   { label: 'Settings', keys: ['settings.view'] },
   { label: 'Users', keys: ['users.manage'] },
+  { label: 'Operations Log', keys: ['operations_log.view', 'operations_log.edit', 'operations_log.export'] },
 ];
 
 function permLabel(key: string): string {
