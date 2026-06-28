@@ -656,9 +656,11 @@ export type Template = typeof templates.$inferSelect;
 
 export const processCodeDefinitions = pgTable("process_code_definitions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  code: varchar("code", { length: 1 }).notNull().unique(),
+  code: varchar("code", { length: 1 }).notNull(),
   meaning: varchar("meaning", { length: 200 }).notNull(),
-});
+}, (table) => [
+  unique("process_code_definitions_code_key").on(table.code),
+]);
 
 export const insertProcessCodeDefinitionSchema = z.object({
   code: z.string().min(1).max(1),

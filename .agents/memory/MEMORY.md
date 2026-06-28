@@ -1,1 +1,1 @@
-- [Permission system architecture](permission-system.md) — group-based JSON permissions replace hardcoded roles; backward compat via admin role fallback when no group assigned
+- [Publish constraint conflicts](publish-constraint-conflicts.md) — startup-migration-created constraints use PostgreSQL anonymous naming (_key), Drizzle expects named (_unique); must match both dev and prod to prod's existing names.
