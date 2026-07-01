@@ -124,11 +124,22 @@ inventoryRouter.post("/lots", canCreate, asyncHandler(async (req, res) => {
   res.status(201).json(await svc.createLot(data));
 }));
 
+const nullableDateField = z.union([z.string(), z.date()])
+  .transform(v => typeof v === "string" ? new Date(v) : v)
+  .nullable()
+  .optional();
+
+const patchLotSchema = insertLotSchema
+  .omit({ testingStatus: true, testingNotes: true, testingCertificate: true, testedAt: true, testedById: true })
+  .partial()
+  .extend({
+    expiryDate: nullableDateField,
+    producedDate: nullableDateField,
+    barcodePrintedAt: nullableDateField,
+  });
+
 inventoryRouter.patch("/lots/:id", canEdit, asyncHandler(async (req, res) => {
-  const data = insertLotSchema
-    .omit({ testingStatus: true, testingNotes: true, testingCertificate: true, testedAt: true, testedById: true })
-    .partial()
-    .parse(req.body);
+  const data = patchLotSchema.parse(req.body);
   const lot = await svc.updateLot(req.params.id, data);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
   res.json(lot);
