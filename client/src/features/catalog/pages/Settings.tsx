@@ -67,6 +67,7 @@ export default function Settings() {
     showInProductionBatch: true,
     showInProductionInputs: true,
     showInProductionOutputs: true,
+    showInForecast: true,
     sortOrder: 0,
     processCode: '',
   });
@@ -133,6 +134,7 @@ export default function Settings() {
           showInProductionBatch: category.showInProductionBatch,
           showInProductionInputs: category.showInProductionInputs,
           showInProductionOutputs: category.showInProductionOutputs,
+          showInForecast: category.showInForecast,
           sortOrder: category.sortOrder,
           processCode: nextCode || null,
         });
@@ -229,7 +231,7 @@ export default function Settings() {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', excludeFromYield: false, showInTabs: true, showInInventory: true, showInReceiveStock: true, showInProductionBatch: true, showInProductionInputs: true, showInProductionOutputs: true, sortOrder: 0, processCode: '' });
+    setFormData({ name: '', excludeFromYield: false, showInTabs: true, showInInventory: true, showInReceiveStock: true, showInProductionBatch: true, showInProductionInputs: true, showInProductionOutputs: true, showInForecast: true, sortOrder: 0, processCode: '' });
   };
 
   const handleCreate = async () => {
@@ -247,6 +249,7 @@ export default function Settings() {
         showInProductionBatch: formData.showInProductionBatch,
         showInProductionInputs: formData.showInProductionInputs,
         showInProductionOutputs: formData.showInProductionOutputs,
+        showInForecast: formData.showInForecast,
         isDefault: false,
         sortOrder: formData.sortOrder,
         processCode: formData.processCode || null,
@@ -270,6 +273,7 @@ export default function Settings() {
       showInProductionBatch: category.showInProductionBatch,
       showInProductionInputs: category.showInProductionInputs,
       showInProductionOutputs: category.showInProductionOutputs,
+      showInForecast: category.showInForecast,
       sortOrder: category.sortOrder,
       processCode: category.processCode || '',
     });
@@ -292,6 +296,7 @@ export default function Settings() {
         showInProductionBatch: formData.showInProductionBatch,
         showInProductionInputs: formData.showInProductionInputs,
         showInProductionOutputs: formData.showInProductionOutputs,
+        showInForecast: formData.showInForecast,
         sortOrder: formData.sortOrder,
         processCode: formData.processCode || null,
       });
@@ -1070,6 +1075,10 @@ export default function Settings() {
                   <Label htmlFor="create-showInProductionOutputs" className="font-normal text-sm cursor-pointer">Batch outputs</Label>
                   <Switch id="create-showInProductionOutputs" checked={formData.showInProductionOutputs} onCheckedChange={(checked) => setFormData({ ...formData, showInProductionOutputs: checked })} data-testid="switch-show-in-production-outputs" />
                 </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="create-showInForecast" className="font-normal text-sm cursor-pointer">Forecast section</Label>
+                  <Switch id="create-showInForecast" checked={formData.showInForecast} onCheckedChange={(checked) => setFormData({ ...formData, showInForecast: checked })} data-testid="switch-show-in-forecast" />
+                </div>
               </div>
             </div>
             <div className="flex items-center justify-between">
@@ -1151,6 +1160,10 @@ export default function Settings() {
                 <div className="flex items-center justify-between px-3 py-2">
                   <Label htmlFor="edit-showInProductionOutputs" className="font-normal text-sm cursor-pointer">Batch outputs</Label>
                   <Switch id="edit-showInProductionOutputs" checked={formData.showInProductionOutputs} onCheckedChange={(checked) => setFormData({ ...formData, showInProductionOutputs: checked })} data-testid="switch-edit-show-in-production-outputs" />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <Label htmlFor="edit-showInForecast" className="font-normal text-sm cursor-pointer">Forecast section</Label>
+                  <Switch id="edit-showInForecast" checked={formData.showInForecast} onCheckedChange={(checked) => setFormData({ ...formData, showInForecast: checked })} data-testid="switch-edit-show-in-forecast" />
                 </div>
               </div>
             </div>

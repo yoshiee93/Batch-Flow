@@ -11,6 +11,7 @@ export interface Category {
   showInProductionBatch: boolean;
   showInProductionInputs: boolean;
   showInProductionOutputs: boolean;
+  showInForecast: boolean;
   isDefault: boolean;
   sortOrder: number;
   processCode: string | null;

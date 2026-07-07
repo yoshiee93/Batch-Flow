@@ -183,6 +183,7 @@ export const categories = pgTable("categories", {
   showInProductionBatch: boolean("show_in_production_batch").notNull().default(true),
   showInProductionInputs: boolean("show_in_production_inputs").notNull().default(true),
   showInProductionOutputs: boolean("show_in_production_outputs").notNull().default(true),
+  showInForecast: boolean("show_in_forecast").notNull().default(true),
   isDefault: boolean("is_default").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   processCode: varchar("process_code", { length: 10 }),
