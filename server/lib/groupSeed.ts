@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { userGroups } from "@shared/schema";
-import { ADMIN_PERMISSIONS, GENERAL_STAFF_PERMISSIONS } from "./permissions";
+import { ADMIN_PERMISSIONS, GENERAL_STAFF_PERMISSIONS, PRODUCTION_STAFF_PERMISSIONS, INVENTORY_STAFF_PERMISSIONS } from "./permissions";
 
 export async function runGroupMigration(): Promise<void> {
   await db.execute(sql`
@@ -73,6 +73,18 @@ export async function seedDefaultGroups(): Promise<void> {
       permissions: GENERAL_STAFF_PERMISSIONS,
       isSystem: true,
     },
+    {
+      name: "Production Staff",
+      description: "Production, inventory, traceability, labels and reports access",
+      permissions: PRODUCTION_STAFF_PERMISSIONS,
+      isSystem: true,
+    },
+    {
+      name: "Inventory Staff",
+      description: "Inventory, traceability and labels access",
+      permissions: INVENTORY_STAFF_PERMISSIONS,
+      isSystem: true,
+    },
   ]).onConflictDoNothing();
 
   // Always ensure Admin group has every current VALID_PERMISSIONS key set to true.
@@ -86,7 +98,9 @@ export async function seedDefaultGroups(): Promise<void> {
       AND permissions != ${JSON.stringify(ADMIN_PERMISSIONS)}::jsonb
   `);
 
-  // For General Staff, merge any missing keys in (new keys default to false; existing values are preserved).
+  // For each operational group, merge any missing permission keys using the
+  // canonical constant as the base (new keys default to false; existing admin
+  // customisations are preserved by letting the existing jsonb win on overlap).
   await db.execute(sql`
     UPDATE user_groups
     SET permissions = ${JSON.stringify(GENERAL_STAFF_PERMISSIONS)}::jsonb || permissions,
@@ -94,12 +108,46 @@ export async function seedDefaultGroups(): Promise<void> {
     WHERE name = 'General Staff' AND is_system = true
   `);
 
+  await db.execute(sql`
+    UPDATE user_groups
+    SET permissions = ${JSON.stringify(PRODUCTION_STAFF_PERMISSIONS)}::jsonb || permissions,
+        updated_at = now()
+    WHERE name = 'Production Staff' AND is_system = true
+  `);
+
+  await db.execute(sql`
+    UPDATE user_groups
+    SET permissions = ${JSON.stringify(INVENTORY_STAFF_PERMISSIONS)}::jsonb || permissions,
+        updated_at = now()
+    WHERE name = 'Inventory Staff' AND is_system = true
+  `);
+
   const groups = await db.select().from(userGroups);
   const adminId = groups.find(g => g.name === "Admin")?.id ?? null;
+  const productionStaffId = groups.find(g => g.name === "Production Staff")?.id ?? null;
+  const inventoryStaffId = groups.find(g => g.name === "Inventory Staff")?.id ?? null;
   const staffId = groups.find(g => g.name === "General Staff")?.id ?? null;
 
   if (!adminId || !staffId) return;
 
+  // Assign admin users to Admin group.
   await db.execute(sql`UPDATE users SET group_id = ${adminId} WHERE role = 'admin' AND group_id IS NULL`);
+
+  // Assign legacy production/inventory role users to their matching operational
+  // group if they have no group yet. Only touches users with no group assigned.
+  if (productionStaffId) {
+    await db.execute(sql`
+      UPDATE users SET group_id = ${productionStaffId}
+      WHERE role = 'production' AND group_id IS NULL
+    `);
+  }
+  if (inventoryStaffId) {
+    await db.execute(sql`
+      UPDATE users SET group_id = ${inventoryStaffId}
+      WHERE role = 'inventory' AND group_id IS NULL
+    `);
+  }
+
+  // Fallback: any remaining user with no group goes to General Staff.
   await db.execute(sql`UPDATE users SET group_id = ${staffId} WHERE group_id IS NULL`);
 }

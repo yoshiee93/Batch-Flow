@@ -112,6 +112,7 @@ authRouter.get("/auth/me", asyncHandler(async (req, res) => {
   }
 
   let groupPermissions: Record<string, boolean> | null = null;
+  let permissionsVersion: number | null = null;
   const groupId = user.groupId ?? null;
 
   // Always re-fetch from DB so stale sessions pick up permission changes on the next page load.
@@ -119,14 +120,19 @@ authRouter.get("/auth/me", asyncHandler(async (req, res) => {
     const [group] = await db.select().from(userGroups).where(eq(userGroups.id, groupId)).limit(1);
     if (group) {
       groupPermissions = group.permissions as Record<string, boolean>;
-      req.session.permissions = groupPermissions;
-      req.session.permissionsVersion = group.permissionsVersion;
-      req.session.groupId = groupId;
-      req.session.permissionsLastChecked = Date.now();
-      if (!req.session.loginAt) req.session.loginAt = Date.now();
-      await new Promise<void>((resolve, reject) => req.session.save(err => err ? reject(err) : resolve()));
+      permissionsVersion = group.permissionsVersion;
     }
   }
+
+  // Always write groupId and permissions back to the session (even when null) so
+  // requireFreshPermissions never sees session.groupId === undefined for any
+  // user who has loaded the app after this fix.
+  req.session.groupId = groupId;
+  req.session.permissions = groupPermissions;
+  req.session.permissionsVersion = permissionsVersion;
+  req.session.permissionsLastChecked = Date.now();
+  if (!req.session.loginAt) req.session.loginAt = Date.now();
+  await new Promise<void>((resolve, reject) => req.session.save(err => err ? reject(err) : resolve()));
 
   const { password: _pw, failedLoginAttempts: _f, lockedUntil: _l, sessionInvalidatedAt: _s, ...safeUser } = user;
   return res.json({ user: { ...safeUser, groupId, permissions: groupPermissions } });

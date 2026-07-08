@@ -48,8 +48,12 @@ export function requireFreshPermissions(req: Request, res: Response, next: NextF
   if (!session?.userId) return next();
 
   if (session.groupId === undefined) {
+    // Pre-group-system session: groupId key was never written.
+    // For admins, allow through. For everyone else, attempt a DB refresh
+    // (same path as the >60s freshness check) so the session is re-established
+    // rather than hard-failing with permissions_changed.
     if (session.userRole === "admin") return next();
-    return res.status(401).json({ error: "permissions_changed", message: "Please sign in again to continue." });
+    return checkPermissionsFreshness(req, res, next, Date.now()).catch(next);
   }
 
   const now = Date.now();
