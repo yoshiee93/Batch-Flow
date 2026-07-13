@@ -189,6 +189,24 @@ export default function Production() {
     }
   }, [batchNumberEdited, newBatch.productId, newBatch.startDate, products, categories]);
 
+  // Pre-fill quantity from recipe when a reliable match is found.
+  // Recipe items carry materialId; for product inputs we compare against productId.
+  // If the selected product's ID is registered as a recipe ingredient materialId,
+  // pre-fill with max(required - alreadyRecorded, 0). If no match, leave quantity unchanged.
+  useEffect(() => {
+    if (recordInputForm.inputType !== 'product' || !recordInputForm.productId) return;
+    if (selectedBatchRecipeItems.length === 0) return;
+    const matchedItem = selectedBatchRecipeItems.find(ri => ri.materialId === recordInputForm.productId);
+    if (!matchedItem) return; // no reliable match → intentionally leave quantity blank
+    const itemRequired = parseFloat(matchedItem.quantity || '0');
+    const alreadyRecorded = dialogBatchMaterials
+      .filter(bm => bm.materialId === matchedItem.materialId)
+      .reduce((sum, bm) => sum + parseFloat(bm.quantity || '0'), 0);
+    const remaining = Math.max(itemRequired - alreadyRecorded, 0);
+    setRecordInputForm(prev => ({ ...prev, quantity: remaining.toFixed(2) }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordInputForm.productId, selectedBatchRecipeItems, dialogBatchMaterials]);
+
   const handleCreateBatch = createBatchForm.handleSubmit(async (values) => {
     try {
       const payload: Partial<Batch> = {
