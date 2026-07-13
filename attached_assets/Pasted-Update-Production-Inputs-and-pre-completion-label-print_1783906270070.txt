@@ -1,0 +1,118 @@
+Update Production Inputs and pre-completion label printing.
+
+Goal:
+Make production input selection faster and safer by entering quantity first, sorting lots oldest-to-newest, and adding an Auto Pick button that selects oldest stock first. Also allow production labels to be printed after a production run has started, before the run is completed.
+
+Part 1 — Quantity-first input selection
+
+Current issue:
+Staff must choose lots before or without a clear required quantity workflow.
+
+Required behaviour:
+1. In the Production input section, place Required Quantity before the lot selector.
+2. Once a quantity is entered, show only available lots for the selected product/material.
+3. Sort lot options oldest to newest using:
+   - received date first, if available
+   - otherwise created date
+   - otherwise lot/batch date
+4. Clearly show for each lot:
+   - lot number
+   - available quantity
+   - date
+   - expiry/best-before date if available
+5. Keep manual lot selection available.
+
+Part 2 — Auto Pick oldest stock
+
+Add an “Auto Pick Oldest Stock” button.
+
+Behaviour:
+- Use oldest available lots first.
+- Allocate across multiple lots if one lot does not contain enough stock.
+- Stop when the entered required quantity is reached.
+- Do not allocate more than the available quantity in any lot.
+- Do not change stock yet; this only prepares the selected input allocation.
+- Staff can manually adjust the selected lots after Auto Pick.
+- If available stock is insufficient, show:
+  “Only X available of Y required.”
+- Do not silently over-allocate.
+
+Important:
+This is an FEFO/FIFO-style helper for Production inputs only.
+Do not reintroduce Suggest FIFO in Pack Orders.
+Do not change Pack Orders behaviour.
+
+Use expiry date first if expiry/best-before data is reliable:
+1. Earliest expiry date
+2. Oldest received/created date as tie-breaker
+
+If expiry data is incomplete, use oldest received/created date.
+
+Part 3 — Print production labels before completion
+
+Goal:
+Allow labels to be printed after a production run has started, without waiting for final completion.
+
+Required behaviour:
+- Add a “Print Labels” action to an active/in-progress production run.
+- Allow printing once the batch/production number has been created.
+- Reuse the existing label template and print engine.
+- Do not require the production run to be completed.
+- Do not create finished inventory or stock movements just because a label is printed.
+- Clearly mark pre-completion labels as provisional if final output data is not yet available.
+
+Available pre-completion label data:
+- production/batch number
+- product name
+- customer if linked
+- production date/start date
+- recipe/product code if available
+- planned quantity if available
+- barcode/QR based on existing batch identifier
+- any other existing fields that are already known
+
+Fields that are not yet known:
+- final finished quantity
+- final weight
+- waste
+- yield
+- completion date
+- finished lot data that does not exist yet
+
+Rules:
+- Do not invent missing values.
+- Hide unavailable fields or show them blank.
+- Do not create fake finished lots.
+- Do not mark the production run completed.
+- Existing post-completion label printing must continue unchanged.
+
+Permissions:
+- Production input editing uses production.edit or existing production input permission.
+- Pre-completion label printing requires both:
+  - production.view
+  - labels.print
+
+Frontend:
+Likely update:
+- Production input editor/component
+- Active production run actions
+- Existing label print dialog/component
+
+Backend:
+Only add backend support if the current label endpoint blocks non-completed batches.
+Do not duplicate label generation logic.
+
+Do not change:
+- stock movement calculations
+- traceability
+- production finalisation
+- pack order logic
+- finished lot creation
+- order allocation
+- existing label templates
+
+After changes run:
+npm run check
+npm run build
+
+Fix only errors introduced by this task.
