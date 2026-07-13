@@ -121,7 +121,7 @@ productionRouter.post("/batches", canCreate, asyncHandler(async (req, res) => {
 
 productionRouter.patch("/batches/:id", canEdit, asyncHandler(async (req, res) => {
   const data = insertBatchSchema.partial().parse(req.body);
-  if (data.status === "completed" || "endDate" in data || "finishTime" in data || "productAssessment" in data) {
+  if (data.status === "completed" || "finishTime" in data || "productAssessment" in data) {
     return res.status(400).json({ error: "Use POST /api/batches/:id/finalize to complete a batch or set finish/assessment fields." });
   }
   const batch = await svc.updateBatch(req.params.id, data);

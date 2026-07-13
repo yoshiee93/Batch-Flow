@@ -95,11 +95,16 @@ export default function Production() {
   };
   const [batchNumberEdited, setBatchNumberEdited] = useState(false);
   
+  const [createTimeIn, setCreateTimeIn] = useState('');
+
   const [editForm, setEditForm] = useState({
     actualQuantity: '',
     wasteQuantity: '',
     millingQuantity: '',
     notes: '',
+    timeIn: '',
+    timeOutDate: '',
+    timeOut: '',
   });
   
   const [recordInputForm, setRecordInputForm] = useState({
@@ -215,12 +220,17 @@ export default function Production() {
 
   const handleCreateBatch = createBatchForm.handleSubmit(async (values) => {
     try {
+      const startDateStr = values.startDate
+        ? (createTimeIn
+            ? new Date(values.startDate + 'T' + createTimeIn + ':00').toISOString()
+            : new Date(values.startDate + 'T00:00:00Z').toISOString())
+        : null;
       const payload: Partial<Batch> = {
         batchNumber: values.batchNumber,
         productId: values.productId,
         plannedQuantity: "0",
         status: 'in_progress',
-        startDate: values.startDate || null,
+        startDate: startDateStr,
       };
       if (values.recipeId) payload.recipeId = values.recipeId;
       const created = await createBatch.mutateAsync(payload);
@@ -233,6 +243,7 @@ export default function Production() {
       setIsCreateDialogOpen(false);
       createBatchForm.reset({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
       setBatchNumberEdited(false);
+      setCreateTimeIn('');
     } catch (error) {
       if (error instanceof ApiValidationError) {
         const unmatched = applyServerFieldErrors(error, createBatchForm.setError, ['batchNumber', 'productId', 'recipeId', 'startDate']);
@@ -247,11 +258,24 @@ export default function Production() {
 
   const handleEditClick = (batch: Batch) => {
     setSelectedBatch(batch);
+    const startDt = batch.startDate ? new Date(batch.startDate) : null;
+    const isUTCMidnight = startDt
+      ? (startDt.getUTCHours() === 0 && startDt.getUTCMinutes() === 0 && startDt.getUTCSeconds() === 0)
+      : true;
+    const tIn = startDt && !isUTCMidnight ? format(startDt, 'HH:mm') : '';
+    const endDt = batch.endDate ? new Date(batch.endDate) : null;
+    const tOut = endDt ? format(endDt, 'HH:mm') : '';
+    const tOutDate = endDt
+      ? format(endDt, 'yyyy-MM-dd')
+      : (startDt ? format(startDt, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'));
     setEditForm({
       actualQuantity: batch.actualQuantity || '',
       wasteQuantity: batch.wasteQuantity || '',
       millingQuantity: batch.millingQuantity || '',
       notes: batch.notes || '',
+      timeIn: tIn,
+      timeOutDate: tOutDate,
+      timeOut: tOut,
     });
     setIsEditDialogOpen(true);
   };
@@ -271,12 +295,22 @@ export default function Production() {
       return;
     }
     try {
+      const startDt = selectedBatch.startDate ? new Date(selectedBatch.startDate) : null;
+      const datePart = startDt ? format(startDt, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+      const newStartDate = editForm.timeIn
+        ? new Date(datePart + 'T' + editForm.timeIn + ':00').toISOString()
+        : new Date(datePart + 'T00:00:00Z').toISOString();
+      const newEndDate = editForm.timeOut
+        ? new Date(editForm.timeOutDate + 'T' + editForm.timeOut + ':00').toISOString()
+        : null;
       await updateBatch.mutateAsync({
         id: selectedBatch.id,
         actualQuantity: editForm.actualQuantity || undefined,
         wasteQuantity: editForm.wasteQuantity || undefined,
         millingQuantity: editForm.millingQuantity || undefined,
         notes: editForm.notes || undefined,
+        startDate: newStartDate,
+        endDate: newEndDate,
       });
       toast({ title: "Batch updated", description: `Batch ${selectedBatch.batchNumber} updated successfully` });
       setIsEditDialogOpen(false);
@@ -808,18 +842,30 @@ export default function Production() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="startDate">Batch Date</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={newBatch.startDate}
-                  onChange={(e) => setNewBatch({ ...newBatch, startDate: e.target.value })}
-                  data-testid="input-batch-date"
-                />
+                <Label>Batch Date &amp; Time In</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={newBatch.startDate}
+                    onChange={(e) => setNewBatch({ ...newBatch, startDate: e.target.value })}
+                    data-testid="input-batch-date"
+                    className="flex-1"
+                  />
+                  <Input
+                    id="timeIn"
+                    type="time"
+                    value={createTimeIn}
+                    onChange={(e) => setCreateTimeIn(e.target.value)}
+                    data-testid="input-batch-time-in"
+                    className="w-32"
+                    placeholder="HH:MM"
+                  />
+                </div>
                 {createBatchForm.formState.errors.startDate && (
                   <p className="text-sm text-destructive" data-testid="error-create-batch-start-date">{createBatchForm.formState.errors.startDate.message}</p>
                 )}
-                <p className="text-xs text-muted-foreground">Defaults to today. Change if recording a previous day's batch.</p>
+                <p className="text-xs text-muted-foreground">Date defaults to today. Time In is optional.</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="batchNumber">Batch Number *</Label>
@@ -866,6 +912,7 @@ export default function Production() {
                 setIsCreateDialogOpen(false);
                 createBatchForm.reset({ batchNumber: '', productId: '', recipeId: '', startDate: format(new Date(), 'yyyy-MM-dd') });
                 setBatchNumberEdited(false);
+                setCreateTimeIn('');
               }}>Cancel</Button>
               <Button onClick={handleCreateBatch} disabled={!createBatchForm.formState.isValid || createBatch.isPending} data-testid="button-submit-batch">
                 {createBatch.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -1053,6 +1100,42 @@ export default function Production() {
                 placeholder="Add notes about this batch..."
                 data-testid="input-edit-notes"
               />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-timeIn">Time In</Label>
+                <Input
+                  id="edit-timeIn"
+                  type="time"
+                  value={editForm.timeIn}
+                  onChange={(e) => setEditForm({ ...editForm, timeIn: e.target.value })}
+                  data-testid="input-edit-time-in"
+                />
+                <p className="text-xs text-muted-foreground">When production started.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-timeOut">Time Out</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="edit-timeOutDate"
+                    type="date"
+                    value={editForm.timeOutDate}
+                    onChange={(e) => setEditForm({ ...editForm, timeOutDate: e.target.value })}
+                    data-testid="input-edit-time-out-date"
+                    className="flex-1"
+                  />
+                  <Input
+                    id="edit-timeOut"
+                    type="time"
+                    value={editForm.timeOut}
+                    onChange={(e) => setEditForm({ ...editForm, timeOut: e.target.value })}
+                    data-testid="input-edit-time-out"
+                    className="w-32"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">When production ended.</p>
+              </div>
             </div>
             
             {selectedBatch && (
@@ -1798,7 +1881,11 @@ function BatchCard({
                   <div>
                     <div className="font-mono font-bold text-sm">{batch.batchNumber}</div>
                     <div className="text-xs text-muted-foreground">
-                      {batch.startDate ? format(new Date(batch.startDate), 'MMM d, yyyy') : format(new Date(batch.createdAt), 'MMM d')}
+                      {batch.startDate ? (() => {
+                        const d = new Date(batch.startDate);
+                        const hasTime = !(d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0);
+                        return format(d, hasTime ? 'MMM d, yyyy HH:mm' : 'MMM d, yyyy');
+                      })() : format(new Date(batch.createdAt), 'MMM d')}
                     </div>
                   </div>
                   <div>
@@ -2052,8 +2139,12 @@ function BatchCard({
             
             <div className="mt-4 pt-3 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-muted-foreground">
-                {batch.startDate && <span>Batch Date: {format(new Date(batch.startDate), 'MMM d, yyyy')}</span>}
-                {batch.endDate && <span>Completed: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
+                {batch.startDate && (() => {
+                  const d = new Date(batch.startDate);
+                  const hasTime = !(d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0);
+                  return <span>{hasTime ? `Time In: ${format(d, 'MMM d, yyyy HH:mm')}` : `Batch Date: ${format(d, 'MMM d, yyyy')}`}</span>;
+                })()}
+                {batch.endDate && <span>Time Out: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
               </div>
               <div className="flex flex-wrap gap-2">
                 {canManageBatches && (
