@@ -42,6 +42,7 @@ import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
 import { buildBatchCode } from '@shared/batchCodeConfig';
 import { useRole, usePermissions } from '@/contexts/AuthContext';
+import { useRecipeItems } from '@/features/catalog/api';
 
 export default function Production() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(() => {
@@ -147,9 +148,18 @@ export default function Production() {
   );
   const { toast } = useToast();
 
+  const { data: dialogBatchMaterials = [] } = useBatchMaterials(selectedBatch?.id || '');
+  const { data: selectedBatchRecipeItems = [] } = useRecipeItems(selectedBatch?.recipeId || '');
+
   const sortedProductLots = [...availableProductLots].sort((a, b) => {
-    const dateA = new Date(a.receivedDate || a.createdAt || '').getTime();
-    const dateB = new Date(b.receivedDate || b.createdAt || '').getTime();
+    const dateA = (a.receivedDate ? new Date(a.receivedDate).getTime() : null)
+      ?? (a.createdAt ? new Date(a.createdAt).getTime() : null)
+      ?? (a.producedDate ? new Date(a.producedDate).getTime() : null)
+      ?? 0;
+    const dateB = (b.receivedDate ? new Date(b.receivedDate).getTime() : null)
+      ?? (b.createdAt ? new Date(b.createdAt).getTime() : null)
+      ?? (b.producedDate ? new Date(b.producedDate).getTime() : null)
+      ?? 0;
     return dateA - dateB;
   });
 
@@ -280,7 +290,15 @@ export default function Production() {
       const expA = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
       const expB = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
       if (expA !== expB) return expA - expB;
-      return new Date(a.receivedDate || a.createdAt || '').getTime() - new Date(b.receivedDate || b.createdAt || '').getTime();
+      const tA = (a.receivedDate ? new Date(a.receivedDate).getTime() : null)
+        ?? (a.createdAt ? new Date(a.createdAt).getTime() : null)
+        ?? (a.producedDate ? new Date(a.producedDate).getTime() : null)
+        ?? 0;
+      const tB = (b.receivedDate ? new Date(b.receivedDate).getTime() : null)
+        ?? (b.createdAt ? new Date(b.createdAt).getTime() : null)
+        ?? (b.producedDate ? new Date(b.producedDate).getTime() : null)
+        ?? 0;
+      return tA - tB;
     });
 
     let remaining = qty;
@@ -1220,6 +1238,32 @@ export default function Production() {
                     <>
                       {/* Quantity field — above lot picker */}
                       <div className="space-y-1.5 pt-1">
+                        {(() => {
+                          // Recipe guidance: show only when a reliable exact-ID match is found
+                          const matchedItem = selectedBatchRecipeItems.find(ri => ri.materialId === recordInputForm.productId);
+                          if (!matchedItem) return null;
+                          const itemRequired = parseFloat(matchedItem.quantity || '0');
+                          const alreadyRecorded = dialogBatchMaterials
+                            .filter(bm => bm.materialId === matchedItem.materialId)
+                            .reduce((sum, bm) => sum + parseFloat(bm.quantity || '0'), 0);
+                          const remaining = Math.max(itemRequired - alreadyRecorded, 0);
+                          return (
+                            <div className="text-xs text-muted-foreground rounded-md border bg-muted/30 px-3 py-2 space-y-0.5 mb-1" data-testid="recipe-guidance">
+                              <div className="flex justify-between">
+                                <span>Recipe requires:</span>
+                                <span className="font-mono font-medium">{itemRequired.toFixed(2)} {unit}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Already recorded:</span>
+                                <span className="font-mono font-medium">{alreadyRecorded.toFixed(2)} {unit}</span>
+                              </div>
+                              <div className="flex justify-between font-semibold text-foreground">
+                                <span>Remaining:</span>
+                                <span className="font-mono">{remaining.toFixed(2)} {unit}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                         <Label htmlFor="input-product-quantity">Required Quantity *</Label>
                         <Input
                           id="input-product-quantity"
@@ -1840,7 +1884,6 @@ function BatchCard({
                         secondaryName: batchRef,
                         toast: toastCard,
                         recordPrint: (d) => recordPrintCard.mutate(d),
-                        onAfterPrint: () => markBatchPrintedCard.mutate(batch.id),
                       });
                     }}
                   >
@@ -2043,7 +2086,6 @@ function BatchCard({
                         secondaryName: batchRef,
                         toast: toastCard,
                         recordPrint: (d) => recordPrintCard.mutate(d),
-                        onAfterPrint: () => markBatchPrintedCard.mutate(batch.id),
                       });
                     }}
                   >

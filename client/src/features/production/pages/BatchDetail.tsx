@@ -487,7 +487,6 @@ export default function BatchDetail() {
                     secondaryName: batchRef,
                     toast,
                     recordPrint: (d) => recordPrint.mutate(d),
-                    onAfterPrint: () => markBatchBarcodePrinted.mutate(batch.id),
                   });
                 }}
               >
