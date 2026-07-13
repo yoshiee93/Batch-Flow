@@ -41,7 +41,7 @@ import { useRecordPrint } from '@/features/labels/api';
 import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
 import { buildBatchCode } from '@shared/batchCodeConfig';
-import { useRole } from '@/contexts/AuthContext';
+import { useRole, usePermissions } from '@/contexts/AuthContext';
 
 export default function Production() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(() => {
@@ -120,6 +120,8 @@ export default function Production() {
   const [inputProductCategoryFilter, setInputProductCategoryFilter] = useState<string>('all');
   const [selectedSourceLotId, setSelectedSourceLotId] = useState<string>('');
   const [sourceLotSearchOpen, setSourceLotSearchOpen] = useState(false);
+  const [allocations, setAllocations] = useState<Array<{ lot: Lot; quantity: string }>>([]);
+  const [addLotOpen, setAddLotOpen] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -144,6 +146,12 @@ export default function Production() {
     recordInputForm.inputType === 'product' ? recordInputForm.productId || undefined : undefined
   );
   const { toast } = useToast();
+
+  const sortedProductLots = [...availableProductLots].sort((a, b) => {
+    const dateA = new Date(a.receivedDate || a.createdAt || '').getTime();
+    const dateB = new Date(b.receivedDate || b.createdAt || '').getTime();
+    return dateA - dateB;
+  });
 
   // Group products by category for dropdown display (only categories visible in production batch form)
   const productsByCategory = categories.filter(c => c.showInProductionBatch).map(category => ({
@@ -259,7 +267,33 @@ export default function Production() {
     setBarcodeError('');
     setInputProductCategoryFilter('all');
     setSelectedSourceLotId('');
+    setAllocations([]);
+    setAddLotOpen(false);
     setIsRecordInputOpen(true);
+  };
+
+  const handleAutoPick = () => {
+    const qty = parseFloat(recordInputForm.quantity);
+    if (!qty || qty <= 0) return;
+
+    const sorted = [...availableProductLots].sort((a, b) => {
+      const expA = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
+      const expB = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
+      if (expA !== expB) return expA - expB;
+      return new Date(a.receivedDate || a.createdAt || '').getTime() - new Date(b.receivedDate || b.createdAt || '').getTime();
+    });
+
+    let remaining = qty;
+    const newAllocations: Array<{ lot: Lot; quantity: string }> = [];
+    for (const lot of sorted) {
+      if (remaining <= 0) break;
+      const available = parseFloat(lot.remainingQuantity || '0');
+      if (available <= 0) continue;
+      const take = Math.min(remaining, available);
+      newAllocations.push({ lot, quantity: take.toFixed(3) });
+      remaining -= take;
+    }
+    setAllocations(newAllocations);
   };
 
   const handleBarcodeLookup = async (value: string) => {
@@ -320,6 +354,64 @@ export default function Production() {
 
     const { inputType, materialId, productId, quantity, lotId } = recordInputForm;
 
+    // === MULTI-LOT ALLOCATION PATH ===
+    if (inputType === 'product' && allocations.length > 0) {
+      if (!productId) {
+        toast({ title: "Missing product", description: "Please select a product", variant: "destructive" });
+        return;
+      }
+      const inputProduct = products.find(p => p.id === productId);
+      if (inputProduct?.categoryId) {
+        const inputCat = categories.find(c => c.id === inputProduct.categoryId);
+        if (inputCat && !inputCat.showInProductionInputs) {
+          toast({ title: "Category not allowed", description: `Category "${inputCat.name}" is not configured for production inputs.`, variant: "destructive" });
+          return;
+        }
+      }
+      const seenLotIds = new Set<string>();
+      const validRows: Array<{ lot: Lot; quantity: string }> = [];
+      for (const alloc of allocations) {
+        const qty = parseFloat(alloc.quantity);
+        const available = parseFloat(alloc.lot.remainingQuantity || '0');
+        if (!qty || qty <= 0 || qty > available || seenLotIds.has(alloc.lot.id)) continue;
+        seenLotIds.add(alloc.lot.id);
+        validRows.push(alloc);
+      }
+      if (validRows.length === 0) {
+        toast({ title: "No valid allocations", description: "All rows have invalid quantities or are duplicate lots.", variant: "destructive" });
+        return;
+      }
+      let successCount = 0;
+      for (const alloc of validRows) {
+        try {
+          await recordBatchInput.mutateAsync({
+            batchId: selectedBatch.id,
+            productId,
+            quantity: alloc.quantity,
+            sourceLotId: alloc.lot.id,
+          });
+          successCount++;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          const earlierNote = successCount > 0
+            ? ` — ${successCount} earlier row${successCount === 1 ? '' : 's'} may already be recorded.`
+            : '';
+          toast({ title: `Failed on lot ${alloc.lot.lotNumber}`, description: msg + earlierNote, variant: "destructive" });
+          return;
+        }
+      }
+      toast({ title: "Inputs recorded", description: `${successCount} input${successCount === 1 ? '' : 's'} recorded across ${successCount} lot${successCount === 1 ? '' : 's'}.` });
+      setAllocations([]);
+      setRecordInputForm({ inputType: 'material', materialId: '', productId: '', quantity: '', lotId: '' });
+      setSelectedSourceLotId('');
+      setBarcodeInput('');
+      setScannedLot(null);
+      setBarcodeError('');
+      setTimeout(() => barcodeScanRef.current?.focus(), 50);
+      return;
+    }
+
+    // === SINGLE-LOT PATH ===
     if (!quantity) {
       toast({ title: "Missing quantity", description: "Please enter quantity", variant: "destructive" });
       return;
@@ -1119,88 +1211,242 @@ export default function Production() {
                   </PopoverContent>
                 </Popover>
 
-                {/* Source lot — shown once a product is chosen */}
-                {recordInputForm.productId && (
-                  <div className="space-y-1.5 pt-1">
-                    <Label>Source Lot *</Label>
-                    <Popover open={sourceLotSearchOpen} onOpenChange={setSourceLotSearchOpen}>
-                      <PopoverTrigger asChild>
+                {/* Quantity + Auto Pick + Lot selection — shown once a product is chosen */}
+                {recordInputForm.productId && (() => {
+                  const unit = products.find(p => p.id === recordInputForm.productId)?.unit || '';
+                  const totalAllocated = allocations.reduce((sum, a) => sum + (parseFloat(a.quantity) || 0), 0);
+                  const required = parseFloat(recordInputForm.quantity) || 0;
+                  return (
+                    <>
+                      {/* Quantity field — above lot picker */}
+                      <div className="space-y-1.5 pt-1">
+                        <Label htmlFor="input-product-quantity">Required Quantity *</Label>
+                        <Input
+                          id="input-product-quantity"
+                          type="number"
+                          step="0.01"
+                          value={recordInputForm.quantity}
+                          onChange={(e) => {
+                            setRecordInputForm({ ...recordInputForm, quantity: e.target.value });
+                            if (allocations.length > 0) setAllocations([]);
+                          }}
+                          placeholder="Enter quantity"
+                          data-testid="input-product-quantity"
+                        />
+                      </div>
+
+                      {/* Auto Pick button */}
+                      {parseFloat(recordInputForm.quantity) > 0 && sortedProductLots.length > 0 && allocations.length === 0 && (
                         <Button
+                          type="button"
                           variant="outline"
-                          role="combobox"
-                          aria-expanded={sourceLotSearchOpen}
-                          className="w-full justify-between font-normal"
-                          data-testid="select-source-lot"
+                          className="w-full text-sm"
+                          onClick={handleAutoPick}
+                          data-testid="button-auto-pick"
                         >
-                          {selectedSourceLotId
-                            ? (() => {
-                                const sl = availableProductLots.find(l => l.id === selectedSourceLotId) || (scannedLot?.id === selectedSourceLotId ? scannedLot : null);
-                                return sl ? `${(sl as { lotNumber: string }).lotNumber} — ${parseFloat((sl as { remainingQuantity?: string }).remainingQuantity || '0').toFixed(2)} ${products.find(p => p.id === recordInputForm.productId)?.unit || ''}` : 'Select a lot…';
-                              })()
-                            : availableProductLots.length === 0 ? 'No active lots available' : 'Search lots…'}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          Auto Pick Oldest Stock
                         </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Search by lot number…" />
-                          <CommandList className="max-h-[200px] overflow-y-auto">
-                            <CommandEmpty>No lots found.</CommandEmpty>
-                            <CommandGroup>
-                              {availableProductLots.map(lot => (
-                                <CommandItem
-                                  key={lot.id}
-                                  value={lot.lotNumber}
-                                  onSelect={() => {
-                                    setSelectedSourceLotId(lot.id);
-                                    setSourceLotSearchOpen(false);
+                      )}
+
+                      {/* Allocation list (editable) */}
+                      {allocations.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs font-medium">
+                            <span className="text-muted-foreground uppercase tracking-wide">Allocated Lots</span>
+                            <span className={cn("font-mono", totalAllocated < required ? "text-amber-600" : totalAllocated > required ? "text-amber-600" : "text-green-600")}>
+                              {totalAllocated.toFixed(2)} / {required.toFixed(2)} {unit}
+                            </span>
+                          </div>
+                          {totalAllocated < required && (
+                            <p className="text-xs text-amber-600" data-testid="text-alloc-shortfall">
+                              Only {totalAllocated.toFixed(2)} {unit} allocated of {required.toFixed(2)} {unit} required.
+                            </p>
+                          )}
+                          {totalAllocated > required && (
+                            <p className="text-xs text-amber-600" data-testid="text-alloc-over">
+                              Allocated {totalAllocated.toFixed(2)} {unit} exceeds required {required.toFixed(2)} {unit}.
+                            </p>
+                          )}
+                          {allocations.map((alloc, idx) => {
+                            const available = parseFloat(alloc.lot.remainingQuantity || '0');
+                            const qty = parseFloat(alloc.quantity) || 0;
+                            const hasError = qty <= 0 || qty > available;
+                            return (
+                              <div key={alloc.lot.id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/30" data-testid={`alloc-row-${idx}`}>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-mono text-xs truncate">{alloc.lot.lotNumber}</div>
+                                  <div className="text-xs text-muted-foreground">Avail: {available.toFixed(2)} {unit}</div>
+                                </div>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0.001"
+                                  max={available}
+                                  value={alloc.quantity}
+                                  onChange={(e) => {
+                                    const updated = [...allocations];
+                                    updated[idx] = { ...alloc, quantity: e.target.value };
+                                    setAllocations(updated);
                                   }}
-                                  data-testid={`option-source-lot-${lot.id}`}
+                                  className={cn("w-24 h-7 text-xs font-mono", hasError && "border-destructive")}
+                                  data-testid={`input-alloc-qty-${idx}`}
+                                />
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-destructive shrink-0"
+                                  onClick={() => setAllocations(allocations.filter((_, i) => i !== idx))}
+                                  data-testid={`button-remove-alloc-${idx}`}
                                 >
-                                  <Check className={cn("mr-2 h-4 w-4", selectedSourceLotId === lot.id ? "opacity-100" : "opacity-0")} />
-                                  <span className="font-mono">{lot.lotNumber}</span>
-                                  <span className="ml-2 text-muted-foreground text-xs">{parseFloat(lot.remainingQuantity || '0').toFixed(2)} {products.find(p => p.id === recordInputForm.productId)?.unit || ''}</span>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    {selectedSourceLotId && (() => {
-                      const sl = availableProductLots.find(l => l.id === selectedSourceLotId) || (scannedLot?.id === selectedSourceLotId ? scannedLot : null);
-                      const rem = parseFloat((sl as { remainingQuantity?: string } | null)?.remainingQuantity || '0');
-                      return sl ? (
-                        <p className="text-xs text-muted-foreground">
-                          Available in lot: <span className="font-mono font-medium">{rem.toFixed(2)} {products.find(p => p.id === recordInputForm.productId)?.unit || ''}</span>
-                        </p>
-                      ) : null;
-                    })()}
-                  </div>
-                )}
+                                  <X size={12} />
+                                </Button>
+                              </div>
+                            );
+                          })}
+                          {/* Add Another Lot */}
+                          <Popover open={addLotOpen} onOpenChange={setAddLotOpen}>
+                            <PopoverTrigger asChild>
+                              <Button type="button" variant="outline" size="sm" className="w-full text-xs" data-testid="button-add-another-lot">
+                                <Plus className="h-3 w-3 mr-1" /> Add Another Lot
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Search lots…" />
+                                <CommandList className="max-h-[200px] overflow-y-auto">
+                                  <CommandEmpty>No lots available.</CommandEmpty>
+                                  <CommandGroup>
+                                    {sortedProductLots.filter(lot => !allocations.some(a => a.lot.id === lot.id)).map(lot => {
+                                      const avail = parseFloat(lot.remainingQuantity || '0');
+                                      return (
+                                        <CommandItem
+                                          key={lot.id}
+                                          value={lot.lotNumber}
+                                          disabled={avail <= 0}
+                                          onSelect={() => {
+                                            setAllocations(prev => [...prev, { lot, quantity: '' }]);
+                                            setAddLotOpen(false);
+                                          }}
+                                          data-testid={`option-add-lot-${lot.id}`}
+                                        >
+                                          <span className="font-mono text-xs">{lot.lotNumber}</span>
+                                          <span className="ml-2 text-muted-foreground text-xs">{avail.toFixed(2)} {unit}</span>
+                                        </CommandItem>
+                                      );
+                                    })}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      ) : (
+                        /* Single lot picker (when no allocation list) */
+                        <div className="space-y-1.5">
+                          <Label>Source Lot *</Label>
+                          <Popover open={sourceLotSearchOpen} onOpenChange={setSourceLotSearchOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={sourceLotSearchOpen}
+                                className="w-full justify-between font-normal"
+                                data-testid="select-source-lot"
+                              >
+                                {selectedSourceLotId
+                                  ? (() => {
+                                      const sl = sortedProductLots.find(l => l.id === selectedSourceLotId) || (scannedLot?.id === selectedSourceLotId ? scannedLot : null);
+                                      return sl ? `${(sl as { lotNumber: string }).lotNumber} — ${parseFloat((sl as { remainingQuantity?: string }).remainingQuantity || '0').toFixed(2)} ${unit}` : 'Select a lot…';
+                                    })()
+                                  : sortedProductLots.length === 0 ? 'No active lots available' : 'Search lots…'}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Search by lot number…" />
+                                <CommandList className="max-h-[220px] overflow-y-auto">
+                                  <CommandEmpty>No lots found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {sortedProductLots.map(lot => {
+                                      const avail = parseFloat(lot.remainingQuantity || '0');
+                                      const dateStr = lot.receivedDate
+                                        ? format(new Date(lot.receivedDate), 'dd MMM yyyy')
+                                        : lot.createdAt
+                                          ? format(new Date(lot.createdAt), 'dd MMM yyyy')
+                                          : '';
+                                      return (
+                                        <CommandItem
+                                          key={lot.id}
+                                          value={lot.lotNumber}
+                                          onSelect={() => {
+                                            setSelectedSourceLotId(lot.id);
+                                            setSourceLotSearchOpen(false);
+                                          }}
+                                          data-testid={`option-source-lot-${lot.id}`}
+                                        >
+                                          <Check className={cn("mr-2 h-4 w-4 shrink-0", selectedSourceLotId === lot.id ? "opacity-100" : "opacity-0")} />
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-mono text-sm">{lot.lotNumber}</span>
+                                              <span className="text-muted-foreground text-xs">{avail.toFixed(2)} {unit}</span>
+                                            </div>
+                                            {dateStr && <div className="text-xs text-muted-foreground">{dateStr}</div>}
+                                            {lot.expiryDate && (
+                                              <div className="text-xs text-muted-foreground">
+                                                Expires: {format(new Date(lot.expiryDate), 'dd MMM yyyy')}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </CommandItem>
+                                      );
+                                    })}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          {selectedSourceLotId && (() => {
+                            const sl = sortedProductLots.find(l => l.id === selectedSourceLotId) || (scannedLot?.id === selectedSourceLotId ? scannedLot : null);
+                            const rem = parseFloat((sl as { remainingQuantity?: string } | null)?.remainingQuantity || '0');
+                            return sl ? (
+                              <p className="text-xs text-muted-foreground">
+                                Available in lot: <span className="font-mono font-medium">{rem.toFixed(2)} {unit}</span>
+                              </p>
+                            ) : null;
+                          })()}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="input-quantity">
-                Quantity *
-                {scannedLot && (
-                  <span className="text-xs text-muted-foreground ml-2">(max: {parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.materialUnit || scannedLot.productUnit || ''})</span>
-                )}
-              </Label>
-              <Input
-                id="input-quantity"
-                type="number"
-                step="0.01"
-                value={recordInputForm.quantity}
-                onChange={(e) => setRecordInputForm({ ...recordInputForm, quantity: e.target.value })}
-                placeholder="Enter quantity to use"
-                data-testid="input-material-quantity"
-              />
-            </div>
+            {/* Quantity field for material scan inputs */}
+            {!recordInputForm.productId && (
+              <div className="space-y-2">
+                <Label htmlFor="input-quantity">
+                  Quantity *
+                  {scannedLot && (
+                    <span className="text-xs text-muted-foreground ml-2">(max: {parseFloat(scannedLot.remainingQuantity || '0').toFixed(2)} {scannedLot.materialUnit || scannedLot.productUnit || ''})</span>
+                  )}
+                </Label>
+                <Input
+                  id="input-quantity"
+                  type="number"
+                  step="0.01"
+                  value={recordInputForm.quantity}
+                  onChange={(e) => setRecordInputForm({ ...recordInputForm, quantity: e.target.value })}
+                  placeholder="Enter quantity to use"
+                  data-testid="input-material-quantity"
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsRecordInputOpen(false); setBarcodeInput(''); setScannedLot(null); setBarcodeError(''); setInputProductCategoryFilter('all'); setSelectedSourceLotId(''); }}>Close</Button>
+            <Button variant="outline" onClick={() => { setIsRecordInputOpen(false); setBarcodeInput(''); setScannedLot(null); setBarcodeError(''); setInputProductCategoryFilter('all'); setSelectedSourceLotId(''); setAllocations([]); setAddLotOpen(false); }}>Close</Button>
             <Button onClick={handleRecordInput} disabled={recordBatchInput.isPending} data-testid="button-add-input">
               {recordBatchInput.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add to Batch
@@ -1446,6 +1692,10 @@ function BatchCard({
   const product = products.find(p => p.id === batch.productId);
   const isCompleted = batch.status === 'completed';
   const { canManageBatches } = useRole();
+  const { hasPermission } = usePermissions();
+  const markBatchPrintedCard = useMarkBatchBarcodePrinted();
+  const recordPrintCard = useRecordPrint();
+  const { toast: toastCard } = useToast();
   
   const { data: batchMaterials = [] } = useBatchMaterials(batch.id);
   const { data: batchOutputs = [] } = useBatchOutputs(batch.id);
@@ -1553,6 +1803,49 @@ function BatchCard({
                       {isCompleted ? <Printer size={16} /> : <ArrowDownCircle size={16} />}
                     </Button>
                   </>
+                )}
+                {!isCompleted && hasPermission('production.view') && hasPermission('labels.print') && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Print IN PRODUCTION Label"
+                    data-testid={`button-print-inprogress-${batch.id}`}
+                    onClick={async () => {
+                      const productName = product?.name || 'Batch';
+                      const batchRef = batch.batchCode || batch.batchNumber;
+                      await printAndRecord({
+                        kind: 'batch',
+                        customerId: null,
+                        ctx: {
+                          productName,
+                          batchCode: batchRef + ' [IN PRODUCTION]',
+                          barcodeValue: batch.barcodeValue ?? batchRef,
+                          quantity: batch.plannedQuantity,
+                          unit: product?.unit || '',
+                          productionDate: batch.startDate || batch.createdAt,
+                        },
+                        legacyData: {
+                          template: 'batch',
+                          batchCode: batchRef,
+                          barcodeValue: batch.barcodeValue,
+                          productName,
+                          quantity: batch.plannedQuantity,
+                          unit: product?.unit || '',
+                          productionDate: batch.startDate || batch.createdAt,
+                          status: 'IN PRODUCTION',
+                        },
+                        entityType: 'batch',
+                        entityId: batch.id,
+                        displayName: productName,
+                        secondaryName: batchRef,
+                        toast: toastCard,
+                        recordPrint: (d) => recordPrintCard.mutate(d),
+                        onAfterPrint: () => markBatchPrintedCard.mutate(batch.id),
+                      });
+                    }}
+                  >
+                    <Printer size={16} />
+                  </Button>
                 )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -1693,27 +1986,71 @@ function BatchCard({
                 {batch.startDate && <span>Batch Date: {format(new Date(batch.startDate), 'MMM d, yyyy')}</span>}
                 {batch.endDate && <span>Completed: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
               </div>
-              {canManageBatches && (
-                <div className="flex flex-wrap gap-2">
-                  {!isCompleted && (
-                    <Button size="sm" variant="outline" onClick={() => onRecordInputClick(batch)}>
-                      <Package size={14} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Add </span>Input
+              <div className="flex flex-wrap gap-2">
+                {canManageBatches && (
+                  <>
+                    {!isCompleted && (
+                      <Button size="sm" variant="outline" onClick={() => onRecordInputClick(batch)}>
+                        <Package size={14} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Add </span>Input
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant={isCompleted ? "outline" : "default"}
+                      className={isCompleted ? "text-green-600 border-green-200" : "bg-green-600 hover:bg-green-700"}
+                      onClick={() => onRecordOutputClick(batch)}
+                      data-testid={`button-manage-outputs-expanded-${batch.id}`}
+                    >
+                      {isCompleted
+                        ? <><Printer size={14} className="mr-1 sm:mr-2" /> View / Edit Output</>
+                        : <><ArrowDownCircle size={14} className="mr-1 sm:mr-2" /> Manage Outputs / Complete</>
+                      }
                     </Button>
-                  )}
+                  </>
+                )}
+                {!isCompleted && hasPermission('production.view') && hasPermission('labels.print') && (
                   <Button
                     size="sm"
-                    variant={isCompleted ? "outline" : "default"}
-                    className={isCompleted ? "text-green-600 border-green-200" : "bg-green-600 hover:bg-green-700"}
-                    onClick={() => onRecordOutputClick(batch)}
-                    data-testid={`button-manage-outputs-expanded-${batch.id}`}
+                    variant="outline"
+                    data-testid={`button-print-inprogress-expanded-${batch.id}`}
+                    onClick={async () => {
+                      const productName = product?.name || 'Batch';
+                      const batchRef = batch.batchCode || batch.batchNumber;
+                      await printAndRecord({
+                        kind: 'batch',
+                        customerId: null,
+                        ctx: {
+                          productName,
+                          batchCode: batchRef + ' [IN PRODUCTION]',
+                          barcodeValue: batch.barcodeValue ?? batchRef,
+                          quantity: batch.plannedQuantity,
+                          unit: product?.unit || '',
+                          productionDate: batch.startDate || batch.createdAt,
+                        },
+                        legacyData: {
+                          template: 'batch',
+                          batchCode: batchRef,
+                          barcodeValue: batch.barcodeValue,
+                          productName,
+                          quantity: batch.plannedQuantity,
+                          unit: product?.unit || '',
+                          productionDate: batch.startDate || batch.createdAt,
+                          status: 'IN PRODUCTION',
+                        },
+                        entityType: 'batch',
+                        entityId: batch.id,
+                        displayName: productName,
+                        secondaryName: batchRef,
+                        toast: toastCard,
+                        recordPrint: (d) => recordPrintCard.mutate(d),
+                        onAfterPrint: () => markBatchPrintedCard.mutate(batch.id),
+                      });
+                    }}
                   >
-                    {isCompleted
-                      ? <><Printer size={14} className="mr-1 sm:mr-2" /> View / Edit Output</>
-                      : <><ArrowDownCircle size={14} className="mr-1 sm:mr-2" /> Manage Outputs / Complete</>
-                    }
+                    <Printer size={14} className="mr-1 sm:mr-2" /> IN PRODUCTION Label
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </CollapsibleContent>

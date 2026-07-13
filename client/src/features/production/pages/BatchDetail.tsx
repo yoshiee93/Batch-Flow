@@ -26,7 +26,7 @@ import { format } from 'date-fns';
 import { useRecordPrint } from '@/features/labels/api';
 import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
-import { useRole } from '@/contexts/AuthContext';
+import { useRole, usePermissions } from '@/contexts/AuthContext';
 import LabelPreview from '@/components/LabelPreview';
 
 const batchStatusColors: Record<string, string> = {
@@ -94,6 +94,7 @@ export default function BatchDetail() {
   const batchCustomerId = outputLots[0]?.customerId ?? null;
   const createQualityCheck = useCreateQualityCheck();
   const { canManageBatches } = useRole();
+  const { hasPermission } = usePermissions();
 
   const [showQcForm, setShowQcForm] = useState(false);
   const [qcForm, setQcForm] = useState({
@@ -451,6 +452,49 @@ export default function BatchDetail() {
                 View Full Trace
               </Button>
             </Link>
+            {batch.status !== 'completed' && hasPermission('production.view') && hasPermission('labels.print') && (
+              <Button
+                variant="outline"
+                className="w-full"
+                data-testid="button-print-inproduction-label"
+                onClick={async () => {
+                  const productName = product?.name || 'Batch';
+                  const batchRef = batch.batchCode || batch.batchNumber;
+                  await printAndRecord({
+                    kind: 'batch',
+                    customerId: batchCustomerId,
+                    ctx: {
+                      productName,
+                      batchCode: batchRef + ' [IN PRODUCTION]',
+                      barcodeValue: batch.barcodeValue ?? batchRef,
+                      quantity: batch.plannedQuantity,
+                      unit: product?.unit || '',
+                      productionDate: batch.startDate || batch.createdAt,
+                    },
+                    legacyData: {
+                      template: 'batch',
+                      batchCode: batchRef,
+                      barcodeValue: batch.barcodeValue,
+                      productName,
+                      quantity: batch.plannedQuantity,
+                      unit: product?.unit || '',
+                      productionDate: batch.startDate || batch.createdAt,
+                      status: 'IN PRODUCTION',
+                    },
+                    entityType: 'batch',
+                    entityId: batch.id,
+                    displayName: productName,
+                    secondaryName: batchRef,
+                    toast,
+                    recordPrint: (d) => recordPrint.mutate(d),
+                    onAfterPrint: () => markBatchBarcodePrinted.mutate(batch.id),
+                  });
+                }}
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                Print IN PRODUCTION Label
+              </Button>
+            )}
             {canManageBatches && batch.status === 'completed' && (
               <Button
                 className="w-full"
