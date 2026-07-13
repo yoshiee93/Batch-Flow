@@ -190,17 +190,23 @@ export default function Production() {
   }, [batchNumberEdited, newBatch.productId, newBatch.startDate, products, categories]);
 
   // Pre-fill quantity from recipe when a reliable match is found.
-  // Recipe items carry materialId; for product inputs we compare against productId.
-  // If the selected product's ID is registered as a recipe ingredient materialId,
-  // pre-fill with max(required - alreadyRecorded, 0). If no match, leave quantity unchanged.
+  // Recipe items carry materialId. For a product input we attempt an exact-ID match:
+  //   recipeItem.materialId === selectedProductId
+  // This resolves only when the same UUID is intentionally shared between the materials
+  // and products tables (e.g. product-as-ingredient). If no match, nothing is shown or
+  // pre-filled — intentional per spec ("if not resolvable safely, show no figures").
+  //
+  // "Already recorded" is aggregated from batch-material rows where productId matches
+  // the selected product (product-input rows store productId, not materialId).
   useEffect(() => {
     if (recordInputForm.inputType !== 'product' || !recordInputForm.productId) return;
     if (selectedBatchRecipeItems.length === 0) return;
     const matchedItem = selectedBatchRecipeItems.find(ri => ri.materialId === recordInputForm.productId);
     if (!matchedItem) return; // no reliable match → intentionally leave quantity blank
     const itemRequired = parseFloat(matchedItem.quantity || '0');
+    // Product-input rows have productId set; sum only those rows for this product
     const alreadyRecorded = dialogBatchMaterials
-      .filter(bm => bm.materialId === matchedItem.materialId)
+      .filter(bm => bm.productId === recordInputForm.productId)
       .reduce((sum, bm) => sum + parseFloat(bm.quantity || '0'), 0);
     const remaining = Math.max(itemRequired - alreadyRecorded, 0);
     setRecordInputForm(prev => ({ ...prev, quantity: remaining.toFixed(2) }));
@@ -1257,12 +1263,14 @@ export default function Production() {
                       {/* Quantity field — above lot picker */}
                       <div className="space-y-1.5 pt-1">
                         {(() => {
-                          // Recipe guidance: show only when a reliable exact-ID match is found
+                          // Recipe guidance: show only when a reliable exact-ID match is found.
+                          // Product-input rows have productId set (not materialId), so
+                          // "already recorded" sums by productId, not materialId.
                           const matchedItem = selectedBatchRecipeItems.find(ri => ri.materialId === recordInputForm.productId);
                           if (!matchedItem) return null;
                           const itemRequired = parseFloat(matchedItem.quantity || '0');
                           const alreadyRecorded = dialogBatchMaterials
-                            .filter(bm => bm.materialId === matchedItem.materialId)
+                            .filter(bm => bm.productId === recordInputForm.productId)
                             .reduce((sum, bm) => sum + parseFloat(bm.quantity || '0'), 0);
                           const remaining = Math.max(itemRequired - alreadyRecorded, 0);
                           return (
