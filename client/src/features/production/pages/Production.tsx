@@ -223,7 +223,7 @@ export default function Production() {
       const startDateStr = values.startDate
         ? (createTimeIn
             ? new Date(values.startDate + 'T' + createTimeIn + ':00').toISOString()
-            : new Date(values.startDate + 'T00:00:00Z').toISOString())
+            : new Date(values.startDate + 'T00:00:00').toISOString())
         : null;
       const payload: Partial<Batch> = {
         batchNumber: values.batchNumber,
@@ -259,10 +259,10 @@ export default function Production() {
   const handleEditClick = (batch: Batch) => {
     setSelectedBatch(batch);
     const startDt = batch.startDate ? new Date(batch.startDate) : null;
-    const isUTCMidnight = startDt
-      ? (startDt.getUTCHours() === 0 && startDt.getUTCMinutes() === 0 && startDt.getUTCSeconds() === 0)
+    const isLocalMidnight = startDt
+      ? (startDt.getHours() === 0 && startDt.getMinutes() === 0 && startDt.getSeconds() === 0)
       : true;
-    const tIn = startDt && !isUTCMidnight ? format(startDt, 'HH:mm') : '';
+    const tIn = startDt && !isLocalMidnight ? format(startDt, 'HH:mm') : '';
     const endDt = batch.endDate ? new Date(batch.endDate) : null;
     const tOut = endDt ? format(endDt, 'HH:mm') : '';
     const tOutDate = endDt
@@ -299,7 +299,7 @@ export default function Production() {
       const datePart = startDt ? format(startDt, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
       const newStartDate = editForm.timeIn
         ? new Date(datePart + 'T' + editForm.timeIn + ':00').toISOString()
-        : new Date(datePart + 'T00:00:00Z').toISOString();
+        : new Date(datePart + 'T00:00:00').toISOString();
       const newEndDate = editForm.timeOut
         ? new Date(editForm.timeOutDate + 'T' + editForm.timeOut + ':00').toISOString()
         : null;
@@ -1883,7 +1883,7 @@ function BatchCard({
                     <div className="text-xs text-muted-foreground">
                       {batch.startDate ? (() => {
                         const d = new Date(batch.startDate);
-                        const hasTime = !(d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0);
+                        const hasTime = !(d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0);
                         return format(d, hasTime ? 'MMM d, yyyy HH:mm' : 'MMM d, yyyy');
                       })() : format(new Date(batch.createdAt), 'MMM d')}
                     </div>
@@ -2141,7 +2141,7 @@ function BatchCard({
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-muted-foreground">
                 {batch.startDate && (() => {
                   const d = new Date(batch.startDate);
-                  const hasTime = !(d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0);
+                  const hasTime = !(d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0);
                   return <span>{hasTime ? `Time In: ${format(d, 'MMM d, yyyy HH:mm')}` : `Batch Date: ${format(d, 'MMM d, yyyy')}`}</span>;
                 })()}
                 {batch.endDate && <span>Time Out: {format(new Date(batch.endDate), 'MMM d, yyyy HH:mm')}</span>}
