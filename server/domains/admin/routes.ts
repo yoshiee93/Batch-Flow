@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import {
   users, customers, categories, products, materials, lots, recipes, recipeItems,
   batches, batchMaterials, batchOutputs, orders, orderItems, qualityChecks,
-  stockMovements, auditLogs, processCodeDefinitions,
+  stockMovements, auditLogs, processCodeDefinitions, templates,
 } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../lib/authMiddleware";
@@ -30,7 +30,7 @@ adminRouter.get("/admin/export", adminOnly, asyncHandler(async (_req, res) => {
     usersData, customersData, categoriesData, productsData, materialsData, lotsData,
     recipesData, recipeItemsData, batchesData, batchMaterialsData, batchOutputsData,
     ordersData, orderItemsData, qualityChecksData, stockMovementsData, auditLogsData,
-    processCodeDefsData,
+    processCodeDefsData, templatesData,
   ] = await Promise.all([
     db.select().from(users),
     db.select().from(customers),
@@ -49,6 +49,7 @@ adminRouter.get("/admin/export", adminOnly, asyncHandler(async (_req, res) => {
     db.select().from(stockMovements),
     db.select().from(auditLogs),
     db.select().from(processCodeDefinitions),
+    db.select().from(templates),
   ]);
 
   const snapshot = {
@@ -72,6 +73,7 @@ adminRouter.get("/admin/export", adminOnly, asyncHandler(async (_req, res) => {
       stockMovements: stockMovementsData,
       auditLogs: auditLogsData,
       processCodeDefinitions: processCodeDefsData,
+      templates: templatesData,
     },
   };
 
@@ -108,7 +110,7 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
       TRUNCATE users, customers, categories, products, materials, lots,
         recipes, recipe_items, batches, batch_materials, batch_outputs,
         orders, order_items, quality_checks, stock_movements, audit_logs,
-        process_code_definitions
+        process_code_definitions, templates
       CASCADE
     `);
 
@@ -155,6 +157,12 @@ adminRouter.post("/admin/import", adminOnly, asyncHandler(async (req, res) => {
       const defs = (t.processCodeDefinitions as Array<{ code: string; meaning: string }>)
         .map(r => ({ code: String(r.code), meaning: String(r.meaning) }));
       await tx.insert(processCodeDefinitions).values(defs);
+    }
+
+    // templates — optional field, added after the initial backup/restore feature.
+    // Older export files without this key are still valid; the table is simply left empty.
+    if (Array.isArray(t.templates) && t.templates.length) {
+      await tx.insert(templates).values(t.templates.map(parseDates));
     }
   });
 
