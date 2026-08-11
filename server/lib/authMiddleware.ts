@@ -39,6 +39,27 @@ export function requirePermission(permission: string) {
   };
 }
 
+/**
+ * Passes if the user holds at least one of the listed permissions.
+ * Admins (no permissions snapshot) always pass.
+ */
+export function requireAnyPermission(permissions: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const session = req.session;
+    if (!session?.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    const perms = session.permissions;
+    if (!perms && session.userRole === "admin") {
+      return next();
+    }
+    if (!perms || !permissions.some(p => perms[p] === true)) {
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
+    return next();
+  };
+}
+
 export function requireFreshPermissions(req: Request, res: Response, next: NextFunction) {
   if (req.path.startsWith("/auth/") || req.path === "/users") {
     return next();

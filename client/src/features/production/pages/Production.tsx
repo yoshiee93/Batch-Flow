@@ -2331,6 +2331,7 @@ function BatchOutputsEditor({
   const recordPrint = useRecordPrint();
   const { data: batchData } = useBatch(batchId);
   const { isAdmin } = useRole();
+  const { hasPermission } = usePermissions();
   
   useEffect(() => {
     finalizeForm.reset({
@@ -2593,8 +2594,8 @@ function BatchOutputsEditor({
   
   return (
     <div className="space-y-4 py-2">
-      {/* Add Product Output — admin-only */}
-      {isAdmin && (
+      {/* Add Product Output — requires production.edit */}
+      {hasPermission('production.edit') && (
       <div className="space-y-3 pb-4 border-b" data-testid="section-add-output">
         <div className="flex items-center justify-between gap-2">
           <h4 className="font-medium text-sm">Add Product Output</h4>

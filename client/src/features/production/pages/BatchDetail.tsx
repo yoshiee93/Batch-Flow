@@ -76,14 +76,22 @@ const qcResultColors: Record<string, string> = {
 
 export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
+  // Permission hooks first so they can gate data queries below.
+  const { canManageBatches } = useRole();
+  const { hasPermission } = usePermissions();
   const { data: batch, isLoading: batchLoading, isError } = useBatch(id!);
   const { data: products = [] } = useProducts();
   const { data: materials = [] } = useMaterials();
   const { data: recipes = [] } = useRecipes();
   const { data: inputLots = [], isLoading: inputsLoading } = useBatchInputLots(id!);
   const { data: outputLots = [], isLoading: outputsLoading } = useBatchOutputLots(id!);
-  const { data: movements = [], isLoading: movementsLoading } = useStockMovements(id!);
-  const { data: auditLogs = [], isLoading: auditLoading } = useAuditLogs('batch', id!);
+  // Stock movements require inventory.view — gate so Production Staff don't get a false 403 toast.
+  const { data: movements = [], isLoading: movementsLoading } = useStockMovements(id!, { enabled: hasPermission('inventory.view') });
+  // Audit logs require settings.view — pass undefined entityType to disable for users without that permission.
+  const { data: auditLogs = [], isLoading: auditLoading } = useAuditLogs(
+    hasPermission('settings.view') ? 'batch' : undefined,
+    id!,
+  );
   const { data: qualityChecks = [], isLoading: qcLoading } = useQualityChecks(id!);
   const { data: users = [] } = useUsers();
   const markBatchBarcodePrinted = useMarkBatchBarcodePrinted();
@@ -93,8 +101,6 @@ export default function BatchDetail() {
   const updateBatch = useUpdateBatch();
   const batchCustomerId = outputLots[0]?.customerId ?? null;
   const createQualityCheck = useCreateQualityCheck();
-  const { canManageBatches } = useRole();
-  const { hasPermission } = usePermissions();
 
   const [showQcForm, setShowQcForm] = useState(false);
   const [qcForm, setQcForm] = useState({

@@ -226,13 +226,14 @@ export function useMarkBarcodePrinted() {
   });
 }
 
-export function useStockMovements(batchId?: string) {
+export function useStockMovements(batchId?: string, options?: { enabled?: boolean }) {
   return useQuery<StockMovement[]>({
     queryKey: ["stockMovements", batchId ?? "all"],
     queryFn: () => {
       const params = batchId ? `?batchId=${encodeURIComponent(batchId)}` : "";
       return fetchApi<StockMovement[]>(`/stock-movements${params}`);
     },
+    enabled: options?.enabled !== false,
   });
 }
 
