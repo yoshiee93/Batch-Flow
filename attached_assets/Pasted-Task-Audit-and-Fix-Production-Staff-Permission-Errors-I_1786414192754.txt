@@ -1,0 +1,183 @@
+Task: Audit and Fix Production Staff Permission Errors
+
+Issue:
+
+A staff user assigned to the Production Staff group has the required Production permissions and can perform most Production functions.
+
+However:
+
+1. They cannot add Product Outputs to a production run.
+
+2. During other Production actions they sometimes receive a popup/toast saying they do not have permission, even though the requested action actually succeeds.
+
+This indicates a permission enforcement/call-chain problem, not simply missing group configuration.
+
+DO NOT solve this by giving Production Staff admin access or adding unrelated permissions.
+
+Required investigation:
+
+PART 1 — Product Output failure
+
+Trace the complete Add Product Output workflow from:
+
+Production.tsx / BatchDetail.tsx
+→ frontend mutation
+→ API endpoint
+→ middleware
+→ production service/repository
+→ any secondary API calls triggered afterward
+
+Identify every permission checked during this operation.
+
+A Production Staff user with the appropriate production permissions must be able to:
+- record production inputs
+- record product outputs
+- record waste/output information
+- edit the production run where permitted
+- complete/finalise production where permitted
+
+Check specifically whether Add Product Output accidentally requires:
+- inventory.edit
+- inventory.create
+- settings permissions
+- admin role
+- another unrelated permission
+
+If recording a Product Output legitimately creates inventory/traceability records as part of the Production service, that internal backend operation should execute as part of the authorised Production action.
+
+Do NOT require the operator to separately have inventory administration permissions merely because Production internally creates the appropriate stock records.
+
+PART 2 — False "no permission" popups
+
+Trace actions where:
+1. Primary mutation succeeds.
+2. A subsequent request/refetch/invalidation receives 401/403.
+3. Frontend displays that secondary failure as a permission error.
+
+Inspect:
+- React Query invalidations/refetches
+- permission freshness requests
+- operations log requests
+- inventory refreshes
+- traceability refreshes
+- label-related requests
+- dashboard/stat requests
+
+A user should not receive a "You don't have permission" toast merely because an optional/background query for another module is forbidden.
+
+Permission-denied handling must distinguish between:
+
+A. User directly attempts a forbidden action:
+Show Access Denied / permission error.
+
+B. Background/refetch query for a module they cannot access:
+Do not show a global permission-error popup.
+The inaccessible query/module should simply not run for that user where practical.
+
+PART 3 — Frontend query gating
+
+Audit Production page hooks.
+
+Do not automatically execute queries for modules the user cannot view.
+
+Example:
+
+If Production.tsx loads:
+- production data
+- inventory data
+- traceability data
+- customers
+- labels
+- operations log
+- settings
+
+gate optional queries with the corresponding hasPermission() where appropriate.
+
+A Production Staff user should not continuously generate 403 responses from APIs for modules they are not authorised to access.
+
+PART 4 — Permission alignment
+
+Audit every Production action against the permission matrix.
+
+Create a clear mapping such as:
+
+production.view
+- view production runs
+- view batch detail
+
+production.create
+- create production run
+
+production.edit
+- record inputs
+- record outputs
+- update production information
+- drying information
+- production notes
+
+production.delete
+- delete/cancel where currently supported
+
+If finalisation has its own existing permission, preserve it.
+Otherwise use the existing intended production permission.
+
+Do not introduce new permission keys unless genuinely necessary.
+
+PART 5 — Session permissions
+
+Also verify the staff user's session contains the same permissions shown in Settings > Groups.
+
+Compare:
+- database group permissions
+- /api/auth/me permissions
+- session.permissions
+- frontend AuthContext permissions
+
+There should not be a stale or partial permission snapshot.
+
+IMPORTANT:
+
+Do not:
+- give Production Staff Admin
+- bypass backend security
+- give them all inventory permissions as a workaround
+- remove requirePermission middleware
+- change stock movement logic
+- change traceability logic
+- change production calculations
+
+Fix the actual permission boundary.
+
+Expected result:
+
+A correctly configured Production Staff user can complete the full normal Production workflow, including adding Product Outputs.
+
+They do not receive false permission-error popups for successful actions.
+
+They still cannot access genuinely restricted modules/actions.
+
+Admin continues to have full access.
+
+After fixing:
+
+Test using an actual non-admin Production Staff account:
+
+1. Login
+2. Open Production
+3. Create/open production run
+4. Record input
+5. Add Product Output
+6. Record waste if applicable
+7. Add drying information
+8. Print IN PRODUCTION label
+9. Complete/finalise run
+10. Confirm resulting inventory/traceability records were created correctly
+11. Confirm no false permission popups occurred
+
+Also test direct access to a genuinely restricted page and confirm it remains blocked.
+
+Run:
+npm run check
+npm run build
+
+Fix only errors related to this task.
