@@ -175,10 +175,11 @@ export function useDeleteCustomer() {
   });
 }
 
-export function useOrders() {
+export function useOrders(options?: { enabled?: boolean }) {
   return useQuery<Order[]>({
     queryKey: ["orders"],
     queryFn: () => fetchApi("/orders"),
+    enabled: options?.enabled !== false,
   });
 }
 

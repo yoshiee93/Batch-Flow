@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { insertLotSchema, insertStockMovementSchema } from "@shared/schema";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { requirePermission } from "../../lib/authMiddleware";
+import { requirePermission, requireAnyPermission } from "../../lib/authMiddleware";
 import { inventoryService as svc } from "./service";
 
 const canView = requirePermission("inventory.view");
@@ -100,7 +100,7 @@ inventoryRouter.patch("/lots/:id/testing", canEdit, asyncHandler(async (req, res
   res.json(lot);
 }));
 
-inventoryRouter.patch("/lots/:id/barcode-printed", canEdit, asyncHandler(async (req, res) => {
+inventoryRouter.patch("/lots/:id/barcode-printed", requireAnyPermission(["inventory.edit", "labels.print"]), asyncHandler(async (req, res) => {
   const lot = await svc.updateLotBarcodePrinted(req.params.id);
   if (!lot) return res.status(404).json({ error: "Lot not found" });
   res.json(lot);

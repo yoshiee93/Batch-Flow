@@ -24,6 +24,7 @@ import type { OutputLot } from '@/features/inventory/api';
 import { useRecordPrint } from '@/features/labels/api';
 import { printAndRecord } from '@/lib/printAndRecord';
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/contexts/AuthContext';
 
 type Candidate =
   | { type: 'lot'; id: string; label: string; sublabel?: string }
@@ -34,6 +35,8 @@ export default function Traceability() {
   const search = useSearch();
   const params = new URLSearchParams(search);
   const initialQuery = params.get('batch') || params.get('lot') || params.get('order') || '';
+  const { hasPermission } = usePermissions();
+  const canViewOrders = hasPermission('orders.view');
 
   const [query, setQuery] = useState(initialQuery);
   const [activeQuery, setActiveQuery] = useState('');
@@ -47,7 +50,9 @@ export default function Traceability() {
   const { data: batches = [] } = useBatches();
   const { data: materials = [] } = useMaterials();
   const { data: products = [] } = useProducts();
-  const { data: orders = [] } = useOrders();
+  // Only fetch orders for users with orders.view — avoids a false 403 toast for
+  // Production Staff and other roles that don't need order-number search.
+  const { data: orders = [] } = useOrders({ enabled: canViewOrders });
 
   const { data: forwardTrace, isLoading: forwardLoading, isError: forwardError } = useTraceabilityForward(
     searchId?.type === 'lot' ? searchId.id : ''
