@@ -11,6 +11,7 @@ export const VALID_PERMISSIONS = [
   "pack_orders.view",
   "pack_orders.create",
   "inventory.view",
+  "inventory.receive",
   "inventory.create",
   "inventory.edit",
   "production.view",

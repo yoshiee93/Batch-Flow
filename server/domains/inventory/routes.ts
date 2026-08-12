@@ -160,7 +160,7 @@ inventoryRouter.get("/products/:id/lots", canView, asyncHandler(async (req, res)
   res.json(await svc.getLotsByProduct(req.params.id, { includeHistorical }));
 }));
 
-inventoryRouter.post("/receive-stock", canCreate, asyncHandler(async (req, res) => {
+inventoryRouter.post("/receive-stock", requirePermission("inventory.receive"), asyncHandler(async (req, res) => {
   const data = receiveStockSchema.parse(req.body);
   res.status(201).json(await svc.receiveStock(data));
 }));

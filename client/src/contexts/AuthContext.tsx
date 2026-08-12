@@ -107,7 +107,7 @@ export function useRole() {
     isInventory: hasPermission("inventory.view"),
     canWrite: hasPermission("production.create") || hasPermission("inventory.create") || hasPermission("orders.create") || hasPermission("customers.create"),
     canManageSettings: hasPermission("settings.view"),
-    canReceiveStock: hasPermission("inventory.create"),
+    canReceiveStock: hasPermission("inventory.receive"),
     canManageBatches: hasPermission("production.create"),
     canManageOrders: hasPermission("orders.create"),
     canManageCustomers: hasPermission("customers.create"),

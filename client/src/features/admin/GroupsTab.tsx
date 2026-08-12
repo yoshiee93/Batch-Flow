@@ -19,7 +19,7 @@ const PERMISSION_GROUPS: { label: string; keys: string[] }[] = [
   { label: 'Dashboard', keys: ['dashboard.view'] },
   { label: 'Customers', keys: ['customers.view', 'customers.create', 'customers.edit', 'customers.delete'] },
   { label: 'Orders', keys: ['orders.view', 'orders.create', 'orders.edit', 'orders.delete', 'pack_orders.view', 'pack_orders.create'] },
-  { label: 'Inventory', keys: ['inventory.view', 'inventory.create', 'inventory.edit'] },
+  { label: 'Inventory', keys: ['inventory.view', 'inventory.receive', 'inventory.create', 'inventory.edit'] },
   { label: 'Production', keys: ['production.view', 'production.create', 'production.edit'] },
   { label: 'Traceability', keys: ['traceability.view'] },
   { label: 'Labels', keys: ['labels.view', 'labels.print'] },
