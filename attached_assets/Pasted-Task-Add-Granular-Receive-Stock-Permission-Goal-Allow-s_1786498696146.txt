@@ -1,0 +1,138 @@
+Task: Add Granular Receive Stock Permission
+
+Goal:
+Allow selected staff/groups to receive incoming stock without granting them broad inventory creation/editing permissions.
+
+Current behaviour:
+The Receive Stock workflow currently uses:
+inventory.create
+
+Both the frontend and backend use inventory.create to determine whether a user can receive stock.
+
+Required change:
+
+1. Add new permission:
+inventory.receive
+
+Add it everywhere permissions are centrally defined:
+- VALID_PERMISSIONS
+- ADMIN_PERMISSIONS
+- permission matrix/section definitions
+- default group permission objects where appropriate
+
+2. Receiving Stock backend
+
+Change the Receive Stock endpoint from:
+requirePermission("inventory.create")
+
+to:
+requirePermission("inventory.receive")
+
+This permission authorises the complete Receive Stock transaction.
+
+If receiving stock internally creates:
+- inventory records
+- lots
+- stock movements
+- traceability records
+- audit records
+
+those internal consequences must NOT require the logged-in user to separately have inventory.create or inventory.edit.
+
+The authorised business action is inventory.receive.
+
+3. Frontend
+
+Change:
+canReceiveStock = hasPermission("inventory.create")
+
+to:
+canReceiveStock = hasPermission("inventory.receive")
+
+Any:
+- Receive Stock button
+- Receive Stock dialog
+- receiving action
+
+must use inventory.receive.
+
+4. Groups
+
+Expose "Receive Stock" as a separate permission under Inventory in Settings > Groups.
+
+Example:
+
+Inventory
+[ ] View
+[ ] Receive Stock
+[ ] Create
+[ ] Edit
+[ ] Delete
+
+Do not automatically give inventory.receive to every existing non-admin group.
+
+Admin must receive it automatically through the existing Admin all-permissions mechanism.
+
+We will manually decide which operational groups receive it.
+
+5. Direct/API security
+
+A user without inventory.receive:
+- must not see the Receive Stock action
+- must receive 403 if they directly call the receiving endpoint
+
+A user with inventory.receive:
+- can complete the entire receiving workflow
+- does not require inventory.create
+- does not require inventory.edit
+
+6. Existing inventory permissions
+
+Do not change the meaning of:
+inventory.view
+inventory.create
+inventory.edit
+inventory.delete
+
+inventory.receive is specifically for receiving incoming stock.
+
+Do not change:
+- receiving calculations
+- stock movement logic
+- lot generation
+- traceability
+- production
+- orders
+- milling
+- labels
+
+Testing:
+
+Create/test a non-admin group with:
+inventory.view = true
+inventory.receive = true
+inventory.create = false
+inventory.edit = false
+inventory.delete = false
+
+Confirm that user can:
+- open Inventory
+- open Receive Stock
+- receive stock successfully
+- see resulting lot/stock
+
+Confirm they cannot:
+- create/edit inventory configuration
+- perform unrelated inventory administration
+
+Also test a user with:
+inventory.view = true
+inventory.receive = false
+
+Confirm Receive Stock is hidden and direct API access returns 403.
+
+Run:
+npm run check
+npm run build
+
+Fix only errors introduced by this task.
